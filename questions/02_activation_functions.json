@@ -1,0 +1,86 @@
+{
+    "topic": "Activation Functions",
+    "questions": [
+        {
+            "id": "act_relu",
+            "title": "ReLU from Scratch",
+            "difficulty": "easy",
+            "description": "Implement the ReLU activation function using NumPy.",
+            "code": "import numpy as np\n\ndef relu(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": ["np.maximum(0, x)", "np.maximum(x, 0)", "np.where(x > 0, x, 0)"],
+                    "hint": "ReLU returns max(0, x). NumPy has np.maximum()."
+                }
+            ]
+        },
+        {
+            "id": "act_sigmoid",
+            "title": "Sigmoid from Scratch",
+            "difficulty": "easy",
+            "description": "Implement the sigmoid activation function.",
+            "code": "import numpy as np\n\ndef sigmoid(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 / (1 + ???)",
+                    "acceptable": ["1 / (1 + np.exp(-x))"],
+                    "hint": "Sigmoid = 1 / (1 + e^(-x))."
+                }
+            ]
+        },
+        {
+            "id": "act_softmax",
+            "title": "Softmax from Scratch",
+            "difficulty": "medium",
+            "description": "Implement the numerically stable softmax function. Subtract the max for stability.",
+            "code": "import numpy as np\n\ndef softmax(x):\n    e_x = np.exp(x - {{b1}})\n    return e_x / {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": ["np.max(x)", "np.max(x, axis=-1, keepdims=True)", "x.max()"],
+                    "hint": "Subtract the maximum value for numerical stability."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.???",
+                    "acceptable": ["np.sum(e_x)", "e_x.sum()", "np.sum(e_x, axis=-1, keepdims=True)", "e_x.sum(axis=-1, keepdims=True)"],
+                    "hint": "Divide by the sum of all exponentiated values."
+                }
+            ]
+        },
+        {
+            "id": "act_tanh",
+            "title": "Tanh from Scratch",
+            "difficulty": "easy",
+            "description": "Implement the tanh activation function using NumPy.",
+            "code": "import numpy as np\n\ndef tanh(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": ["np.tanh(x)", "(np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))"],
+                    "hint": "NumPy has a built-in np.tanh() function."
+                }
+            ]
+        },
+        {
+            "id": "act_leaky_relu",
+            "title": "Leaky ReLU",
+            "difficulty": "easy",
+            "description": "Implement Leaky ReLU with a slope of 0.01 for negative values.",
+            "code": "import numpy as np\n\ndef leaky_relu(x, alpha=0.01):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": ["np.where(x > 0, x, alpha * x)", "np.maximum(alpha * x, x)", "np.maximum(x, alpha * x)"],
+                    "hint": "Like ReLU, but negative values are scaled by alpha instead of zeroed."
+                }
+            ]
+        }
+    ]
+}

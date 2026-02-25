@@ -1,0 +1,47 @@
+{
+    "topic": "Recurrent Neural Networks",
+    "questions": [
+        {
+            "id": "rnn_cell_numpy",
+            "title": "Vanilla RNN Cell (NumPy)",
+            "difficulty": "medium",
+            "description": "Implement a single RNN cell step: h_t = tanh(W_hh @ h_{t-1} + W_xh @ x_t + b).",
+            "code": "import numpy as np\n\ndef rnn_cell(x_t, h_prev, W_xh, W_hh, b):\n    h_t = {{b1}}\n    return h_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.tanh(??? + ??? + b)",
+                    "acceptable": ["np.tanh(W_hh @ h_prev + W_xh @ x_t + b)", "np.tanh(W_xh @ x_t + W_hh @ h_prev + b)"],
+                    "hint": "h_t = tanh(W_hh @ h_{t-1} + W_xh @ x_t + b)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_pytorch",
+            "title": "LSTM in PyTorch",
+            "difficulty": "medium",
+            "description": "Define an LSTM-based model in PyTorch. Input size=100 (embedding dim), hidden size=256, 2 layers, output=10 classes.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass LSTMClassifier(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.lstm = {{b1}}\n        self.fc = {{b2}}\n\n    def forward(self, x):\n        # x shape: (batch, seq_len, 100)\n        output, (h_n, c_n) = self.lstm(x)\n        # Use last hidden state\n        return self.fc({{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.LSTM(?, ?, num_layers=?, batch_first=True)",
+                    "acceptable": ["nn.LSTM(100, 256, num_layers=2, batch_first=True)"],
+                    "hint": "LSTM(input_size=100, hidden_size=256, num_layers=2, batch_first=True)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": ["nn.Linear(256, 10)"],
+                    "hint": "Map hidden size (256) to num classes (10)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "h_n[???]",
+                    "acceptable": ["h_n[-1]"],
+                    "hint": "Use the hidden state from the last layer: h_n[-1]."
+                }
+            ]
+        }
+    ]
+}

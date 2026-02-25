@@ -1,0 +1,59 @@
+{
+    "topic": "Attention & Transformers",
+    "questions": [
+        {
+            "id": "attn_scaled_dot",
+            "title": "Scaled Dot-Product Attention",
+            "difficulty": "hard",
+            "description": "Implement scaled dot-product attention: Attention(Q, K, V) = softmax(Q @ K^T / sqrt(d_k)) @ V.",
+            "code": "import numpy as np\n\ndef softmax(x, axis=-1):\n    e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))\n    return e_x / np.sum(e_x, axis=axis, keepdims=True)\n\ndef scaled_dot_product_attention(Q, K, V):\n    d_k = Q.shape[-1]\n    scores = {{b1}}\n    weights = {{b2}}\n    return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "Q @ ??? / np.sqrt(???)",
+                    "acceptable": ["Q @ K.T / np.sqrt(d_k)"],
+                    "hint": "Scores = Q @ K^T / sqrt(d_k)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "softmax(???)",
+                    "acceptable": ["softmax(scores)", "softmax(scores, axis=-1)"],
+                    "hint": "Apply softmax to the scores."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? @ V",
+                    "acceptable": ["weights @ V"],
+                    "hint": "Multiply attention weights by values."
+                }
+            ]
+        },
+        {
+            "id": "attn_multihead_pytorch",
+            "title": "Multi-Head Attention (PyTorch)",
+            "difficulty": "hard",
+            "description": "Use PyTorch's built-in MultiheadAttention. Model dim=512, 8 attention heads.",
+            "code": "import torch.nn as nn\n\nclass TransformerBlock(nn.Module):\n    def __init__(self, d_model=512, nhead=8):\n        super().__init__()\n        self.attn = {{b1}}\n        self.norm = {{b2}}\n\n    def forward(self, x):\n        attn_out, _ = self.attn(x, x, x)\n        return self.norm({{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(?, ?)",
+                    "acceptable": ["nn.MultiheadAttention(d_model, nhead)", "nn.MultiheadAttention(512, 8)"],
+                    "hint": "nn.MultiheadAttention(embed_dim, num_heads)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???(d_model)",
+                    "acceptable": ["nn.LayerNorm(d_model)", "nn.LayerNorm(512)"],
+                    "hint": "Layer normalization over the model dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x + ???",
+                    "acceptable": ["x + attn_out"],
+                    "hint": "Residual connection: x + attention_output."
+                }
+            ]
+        }
+    ]
+}

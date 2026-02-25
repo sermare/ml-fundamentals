@@ -1,0 +1,50 @@
+{
+    "topic": "Linear Algebra",
+    "questions": [
+        {
+            "id": "linalg_dot_product",
+            "title": "Dot Product",
+            "difficulty": "easy",
+            "description": "Implement a dot product between two vectors using NumPy.",
+            "code": "import numpy as np\n\ndef dot_product(a, b):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": ["np.dot(a, b)", "np.dot(a,b)", "a @ b", "np.sum(a * b)", "np.sum(a*b)"],
+                    "hint": "NumPy has a function for dot products, or you can use the @ operator."
+                }
+            ]
+        },
+        {
+            "id": "linalg_matrix_multiply",
+            "title": "Matrix Multiplication",
+            "difficulty": "easy",
+            "description": "Multiply two matrices using NumPy.",
+            "code": "import numpy as np\n\ndef matmul(A, B):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": ["np.matmul(A, B)", "np.matmul(A,B)", "A @ B", "np.dot(A, B)", "np.dot(A,B)"],
+                    "hint": "Use np.matmul(), np.dot(), or the @ operator."
+                }
+            ]
+        },
+        {
+            "id": "linalg_transpose",
+            "title": "Matrix Transpose",
+            "difficulty": "easy",
+            "description": "Transpose a matrix using NumPy.",
+            "code": "import numpy as np\n\ndef transpose(X):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "X.???",
+                    "acceptable": ["X.T", "np.transpose(X)", "X.transpose()"],
+                    "hint": "Use the .T attribute or np.transpose()."
+                }
+            ]
+        }
+    ]
+}

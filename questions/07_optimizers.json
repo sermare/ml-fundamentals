@@ -1,0 +1,68 @@
+{
+    "topic": "Optimizers",
+    "questions": [
+        {
+            "id": "opt_sgd",
+            "title": "SGD Update Rule",
+            "difficulty": "easy",
+            "description": "Implement the vanilla SGD parameter update step.",
+            "code": "def sgd_step(param, grad, lr):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "param - ???",
+                    "acceptable": ["param - lr * grad"],
+                    "hint": "SGD: param = param - lr * gradient."
+                }
+            ]
+        },
+        {
+            "id": "opt_sgd_momentum",
+            "title": "SGD with Momentum",
+            "difficulty": "medium",
+            "description": "Implement SGD with momentum. v is the velocity, mu is momentum coefficient (e.g. 0.9).",
+            "code": "def sgd_momentum_step(param, grad, v, lr, mu=0.9):\n    v = {{b1}}\n    param = {{b2}}\n    return param, v",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "mu * ??? - lr * ???",
+                    "acceptable": ["mu * v - lr * grad"],
+                    "hint": "v = mu * v - lr * grad."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "param + ???",
+                    "acceptable": ["param + v"],
+                    "hint": "param = param + v."
+                }
+            ]
+        },
+        {
+            "id": "opt_pytorch_training",
+            "title": "PyTorch Training Loop Basics",
+            "difficulty": "easy",
+            "description": "Complete the standard PyTorch training loop steps: zero gradients, compute loss, backprop, step.",
+            "code": "for inputs, targets in dataloader:\n    {{b1}}\n    outputs = model(inputs)\n    loss = criterion(outputs, targets)\n    {{b2}}\n    {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": ["optimizer.zero_grad()"],
+                    "hint": "Zero out the gradients before each step."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "loss.???()",
+                    "acceptable": ["loss.backward()"],
+                    "hint": "Backpropagate the loss."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": ["optimizer.step()"],
+                    "hint": "Update the parameters."
+                }
+            ]
+        }
+    ]
+}

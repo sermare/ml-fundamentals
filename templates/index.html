@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Fundamentals</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h1 class="logo">ML Fundamentals</h1>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <p class="progress-text" id="progress-text">0 / 0 solved</p>
+
+            <input type="text" class="search-box" id="search-box" placeholder="Search questions...">
+
+            <div class="filter-row">
+                <button class="filter-btn active" data-difficulty="all">All</button>
+                <button class="filter-btn" data-difficulty="easy">Easy</button>
+                <button class="filter-btn" data-difficulty="medium">Medium</button>
+                <button class="filter-btn" data-difficulty="hard">Hard</button>
+            </div>
+
+            <nav class="question-list" id="question-list"></nav>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main">
+            <div class="welcome" id="welcome">
+                <h2>Welcome to ML Fundamentals</h2>
+                <p>Practice implementing core ML concepts by filling in the blanks.</p>
+                <p>Pick a question from the sidebar to get started.</p>
+            </div>
+
+            <div class="question-view hidden" id="question-view">
+                <div class="question-header">
+                    <span class="topic-badge" id="q-topic"></span>
+                    <span class="difficulty-badge" id="q-difficulty"></span>
+                </div>
+                <h2 id="q-title"></h2>
+                <p class="description" id="q-description"></p>
+
+                <div class="code-container" id="code-container"></div>
+
+                <div class="actions">
+                    <button class="btn btn-check" id="btn-check">Check Answer</button>
+                    <button class="btn btn-reset" id="btn-reset">Reset</button>
+                </div>
+
+                <div class="feedback hidden" id="feedback"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

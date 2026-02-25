@@ -1,0 +1,56 @@
+{
+    "topic": "Loss Functions",
+    "questions": [
+        {
+            "id": "loss_mse",
+            "title": "Mean Squared Error",
+            "difficulty": "easy",
+            "description": "Implement the Mean Squared Error loss function.",
+            "code": "import numpy as np\n\ndef mse(y_true, y_pred):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": ["np.mean((y_true - y_pred) ** 2)", "np.mean((y_pred - y_true) ** 2)"],
+                    "hint": "MSE = mean of (y_true - y_pred)^2."
+                }
+            ]
+        },
+        {
+            "id": "loss_bce",
+            "title": "Binary Cross-Entropy",
+            "difficulty": "medium",
+            "description": "Implement the binary cross-entropy loss. Assume y_pred is already a probability between 0 and 1.",
+            "code": "import numpy as np\n\ndef binary_cross_entropy(y_true, y_pred):\n    return -np.mean({{b1}} + {{b2}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "y_true * ???",
+                    "acceptable": ["y_true * np.log(y_pred)"],
+                    "hint": "First term: y * log(p)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(1 - y_true) * ???",
+                    "acceptable": ["(1 - y_true) * np.log(1 - y_pred)"],
+                    "hint": "Second term: (1 - y) * log(1 - p)."
+                }
+            ]
+        },
+        {
+            "id": "loss_ce",
+            "title": "Categorical Cross-Entropy",
+            "difficulty": "medium",
+            "description": "Implement categorical cross-entropy. y_true is one-hot encoded, y_pred are probabilities.",
+            "code": "import numpy as np\n\ndef cross_entropy(y_true, y_pred):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "-np.???",
+                    "acceptable": ["-np.sum(y_true * np.log(y_pred))", "-np.mean(np.sum(y_true * np.log(y_pred), axis=-1))"],
+                    "hint": "CE = -sum(y_true * log(y_pred))."
+                }
+            ]
+        }
+    ]
+}
