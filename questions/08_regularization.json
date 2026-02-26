@@ -74,6 +74,653 @@
                     "hint": "Scale and shift: gamma * x_hat + beta."
                 }
             ]
+        },
+        {
+            "id": "reg_new_l1",
+            "title": "L1 Regularization (Lasso)",
+            "difficulty": "easy",
+            "description": "Add L1 regularization to a loss value. L1 penalizes the sum of absolute weights, encouraging sparsity.",
+            "info": "L1 regularization, also known as Lasso (Least Absolute Shrinkage and Selection Operator), adds the sum of absolute weight values scaled by a regularization coefficient to the loss. Unlike L2, L1 drives many weights exactly to zero, effectively performing feature selection. This sparsity-inducing property makes L1 especially useful when you suspect only a subset of features are relevant. In a Bayesian interpretation, L1 corresponds to placing a Laplace prior on the weights. The non-differentiability at zero requires subgradient methods or proximal operators for exact optimization.",
+            "code": "import numpy as np\n\ndef l1_regularized_loss(loss, W, lambda_reg):\n    return loss + {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "lambda_reg * np.sum(np.???(W))",
+                    "acceptable": [
+                        "lambda_reg * np.sum(np.abs(W))",
+                        "lambda_reg * np.sum(np.absolute(W))"
+                    ],
+                    "hint": "L1 penalty = lambda * sum(|W|). Use np.abs for absolute values."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_elasticnet",
+            "title": "Elastic Net Regularization",
+            "difficulty": "medium",
+            "description": "Implement elastic net regularization, which combines L1 and L2 penalties. alpha controls the mix: alpha=1 is pure L1, alpha=0 is pure L2.",
+            "info": "Elastic net regularization linearly combines L1 and L2 penalties, controlled by a mixing parameter alpha. It inherits the sparsity-inducing property of L1 while also benefiting from the grouping effect of L2, where correlated features tend to receive similar weights. This makes elastic net more stable than pure L1 when features are highly correlated. Proposed by Zou and Hastie (2005), it is widely used in high-dimensional regression problems. The total penalty is lambda * (alpha * |W| + (1 - alpha) * W^2).",
+            "code": "import numpy as np\n\ndef elastic_net_loss(loss, W, lambda_reg, alpha=0.5):\n    l1 = np.sum(np.abs(W))\n    l2 = np.sum(W ** 2)\n    return loss + {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "lambda_reg * (alpha * ??? + (1 - alpha) * ???)",
+                    "acceptable": [
+                        "lambda_reg * (alpha * l1 + (1 - alpha) * l2)"
+                    ],
+                    "hint": "Combine L1 and L2: lambda * (alpha * L1 + (1 - alpha) * L2)."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_label_smoothing",
+            "title": "Label Smoothing",
+            "difficulty": "easy",
+            "description": "Convert hard one-hot labels to smoothed labels. num_classes is the number of classes and epsilon is the smoothing factor.",
+            "info": "Label smoothing replaces hard one-hot targets with a mixture of the original target and a uniform distribution over all classes. Instead of assigning probability 1.0 to the correct class, it assigns (1 - epsilon) to the correct class and epsilon / num_classes to all classes. This prevents the model from becoming overconfident and improves calibration by softening the training signal. Introduced by Szegedy et al. (2016) in the Inception-v3 paper, label smoothing has become a standard technique in image classification. It acts as a form of output regularization that penalizes low-entropy predictions.",
+            "code": "import numpy as np\n\ndef label_smoothing(one_hot_labels, num_classes, epsilon=0.1):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "one_hot_labels * (1 - ???) + ??? / num_classes",
+                    "acceptable": [
+                        "one_hot_labels * (1 - epsilon) + epsilon / num_classes",
+                        "(1 - epsilon) * one_hot_labels + epsilon / num_classes"
+                    ],
+                    "hint": "Smooth: target * (1 - eps) + eps / K, where K is num_classes."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_early_stopping",
+            "title": "Early Stopping Check",
+            "difficulty": "easy",
+            "description": "Implement early stopping logic: track the best validation loss and count epochs without improvement. Return True if training should stop (patience exceeded).",
+            "info": "Early stopping monitors a validation metric during training and halts when performance stops improving for a specified number of epochs (patience). It is one of the simplest and most effective forms of regularization, preventing the model from overfitting to the training data by limiting the effective number of training iterations. The best model checkpoint is typically saved and restored after stopping. Early stopping can be viewed as implicit regularization on the model complexity, analogous to restricting the parameter space reachable from initialization. It is nearly universal in modern deep learning practice.",
+            "code": "def should_stop(val_loss, best_val_loss, epochs_no_improve, patience):\n    if val_loss < best_val_loss:\n        return False, val_loss, 0\n    else:\n        epochs_no_improve += 1\n        return {{b1}}, best_val_loss, epochs_no_improve",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "epochs_no_improve ??? patience",
+                    "acceptable": [
+                        "epochs_no_improve >= patience",
+                        "epochs_no_improve > patience - 1"
+                    ],
+                    "hint": "Stop when the number of epochs without improvement reaches or exceeds patience."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_weight_clipping",
+            "title": "Weight Clipping / Constraint",
+            "difficulty": "easy",
+            "description": "Clip all weight values to lie within [-c, c]. This is used in WGANs and other settings to enforce a Lipschitz constraint.",
+            "info": "Weight clipping constrains all parameters to a fixed range [-c, c] after each optimization step, enforcing a hard bound on weight magnitudes. It was popularized by the original WGAN paper (Arjovsky et al., 2017) to enforce the Lipschitz constraint on the critic network. While simple to implement, it can lead to pathological behavior such as weights concentrating at the clip boundaries. More sophisticated alternatives like gradient penalty or spectral normalization have largely replaced naive clipping. Nevertheless, weight clipping remains a useful pedagogical example of explicit weight constraints as regularization.",
+            "code": "import numpy as np\n\ndef clip_weights(W, c):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???(W, ???, ???)",
+                    "acceptable": [
+                        "np.clip(W, -c, c)",
+                        "np.clamp(W, -c, c)"
+                    ],
+                    "hint": "Use np.clip to clamp all values between -c and c."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_spectral_norm",
+            "title": "Spectral Normalization",
+            "difficulty": "hard",
+            "description": "Normalize a weight matrix by its spectral norm (largest singular value) using one step of the power iteration method. u is the current estimate of the left singular vector.",
+            "info": "Spectral normalization constrains the spectral norm (largest singular value) of each weight matrix to be at most 1, enforcing a Lipschitz constraint on each layer. It was proposed by Miyato et al. (2018) to stabilize GAN training by controlling the discriminator's Lipschitz constant. The power iteration method efficiently approximates the largest singular value without computing a full SVD. One iteration alternates between computing v = W^T u / ||W^T u|| and u = W v / ||W v||, then divides W by sigma = u^T W v. Spectral normalization has become standard in GAN architectures and is also used in other generative models.",
+            "code": "import numpy as np\n\ndef spectral_norm(W, u):\n    v = W.T @ u\n    v = v / np.linalg.norm(v)\n    u_new = W @ v\n    u_new = u_new / np.linalg.norm(u_new)\n    sigma = {{b1}}\n    W_normalized = {{b2}}\n    return W_normalized, u_new",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "u_new ??? W ??? v",
+                    "acceptable": [
+                        "u_new @ W @ v",
+                        "u_new.T @ W @ v",
+                        "np.dot(u_new, W @ v)"
+                    ],
+                    "hint": "The spectral norm estimate is sigma = u^T W v."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "W / ???",
+                    "acceptable": [
+                        "W / sigma"
+                    ],
+                    "hint": "Divide W by the estimated spectral norm."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_gradient_penalty",
+            "title": "Gradient Penalty (WGAN-GP)",
+            "difficulty": "hard",
+            "description": "Compute the gradient penalty for WGAN-GP. Given the gradient of the critic's output with respect to interpolated inputs, penalize deviations from unit norm.",
+            "info": "The gradient penalty, introduced in the WGAN-GP paper (Gulrajani et al., 2017), replaces weight clipping with a soft constraint that encourages the critic's gradient norm to be close to 1 at interpolated points between real and fake samples. The penalty is computed as lambda * E[(||grad||_2 - 1)^2], where grad is the gradient of the critic output with respect to the interpolated input. This approach is more stable than weight clipping and avoids mode collapse or vanishing gradients. The interpolated points are sampled along straight lines between real and generated data. Gradient penalty has become the standard approach for enforcing Lipschitz constraints in Wasserstein GANs.",
+            "code": "import torch\n\ndef gradient_penalty(gradients, lambda_gp=10.0):\n    # gradients shape: (batch_size, ...)\n    grad_norm = gradients.view(gradients.size(0), -1).norm(2, dim=1)\n    penalty = {{b1}}\n    return penalty",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "lambda_gp * ((grad_norm - ???) ** 2).???()",
+                    "acceptable": [
+                        "lambda_gp * ((grad_norm - 1) ** 2).mean()",
+                        "lambda_gp * ((grad_norm - 1.0) ** 2).mean()",
+                        "lambda_gp * torch.mean((grad_norm - 1) ** 2)",
+                        "lambda_gp * torch.mean((grad_norm - 1.0) ** 2)"
+                    ],
+                    "hint": "Penalize squared deviation of gradient norm from 1: lambda * mean((||grad|| - 1)^2)."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_mixup",
+            "title": "Mixup Data Augmentation",
+            "difficulty": "medium",
+            "description": "Implement mixup: create virtual training examples by taking convex combinations of pairs of inputs and their labels. lam is sampled from Beta(alpha, alpha).",
+            "info": "Mixup (Zhang et al., 2018) is a data augmentation strategy that trains on convex combinations of pairs of training examples and their labels. Given two samples (x_i, y_i) and (x_j, y_j), the mixed sample is (lam * x_i + (1 - lam) * x_j, lam * y_i + (1 - lam) * y_j) where lam is drawn from Beta(alpha, alpha). Mixup encourages linear behavior between training examples, acting as a strong regularizer that reduces memorization and improves calibration. It has been shown to smooth decision boundaries and improve robustness to adversarial examples. The typical alpha value is between 0.1 and 0.4 for image classification tasks.",
+            "code": "import numpy as np\n\ndef mixup(x, y, alpha=0.2):\n    lam = np.random.beta(alpha, alpha)\n    batch_size = x.shape[0]\n    index = np.random.permutation(batch_size)\n    mixed_x = {{b1}}\n    mixed_y = {{b2}}\n    return mixed_x, mixed_y",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "lam * x + (1 - lam) * x[???]",
+                    "acceptable": [
+                        "lam * x + (1 - lam) * x[index]"
+                    ],
+                    "hint": "Linearly interpolate inputs: lam * x + (1 - lam) * x[shuffled_index]."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "lam * y + (1 - lam) * y[???]",
+                    "acceptable": [
+                        "lam * y + (1 - lam) * y[index]"
+                    ],
+                    "hint": "Apply the same interpolation to labels."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_cutout",
+            "title": "Cutout Augmentation",
+            "difficulty": "medium",
+            "description": "Implement cutout: randomly mask out a square region of the input image by setting it to zero. x has shape (H, W, C), and length is the side length of the square.",
+            "info": "Cutout (DeVries and Taylor, 2017) is a regularization technique that randomly masks out square regions of input images during training by setting pixel values to zero. By occluding parts of the image, the model is forced to attend to the full context rather than relying on a small discriminative region. Cutout is simple to implement and adds negligible computational overhead. It is particularly effective for object recognition tasks and complements other augmentation strategies. The mask size is typically chosen as a fraction of the image dimension, e.g., 16x16 for 32x32 CIFAR images.",
+            "code": "import numpy as np\n\ndef cutout(x, length):\n    h, w = x.shape[0], x.shape[1]\n    cx = np.random.randint(h)\n    cy = np.random.randint(w)\n    y1 = np.clip(cx - length // 2, 0, h)\n    y2 = np.clip(cx + length // 2, 0, h)\n    x1 = np.clip(cy - length // 2, 0, w)\n    x2 = np.clip(cy + length // 2, 0, w)\n    mask = np.ones_like(x)\n    {{b1}}\n    return x * mask",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "mask[???:???, ???:???, :] = ???",
+                    "acceptable": [
+                        "mask[y1:y2, x1:x2, :] = 0",
+                        "mask[y1:y2, x1:x2] = 0"
+                    ],
+                    "hint": "Set the rectangular region in the mask to 0."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_cutmix",
+            "title": "CutMix Augmentation",
+            "difficulty": "hard",
+            "description": "Implement CutMix: cut a patch from one image and paste it onto another, adjusting labels proportionally by area. lam is the ratio of the original image area retained.",
+            "info": "CutMix (Yun et al., 2019) combines elements of cutout and mixup by cutting a rectangular patch from one training image and pasting it onto another, with labels mixed proportionally to the area of the patch. Unlike cutout, no pixel information is wasted since the removed region is filled with content from another sample. The mixing ratio lam is adjusted to reflect the actual area of the retained region, not the sampled lambda, to account for boundary clipping. CutMix improves localization ability and model robustness compared to mixup alone. It has been widely adopted in state-of-the-art image classification pipelines like EfficientNet and CaiT.",
+            "code": "import numpy as np\n\ndef cutmix(x1, y1, x2, y2, alpha=1.0):\n    lam = np.random.beta(alpha, alpha)\n    H, W = x1.shape[0], x1.shape[1]\n    cut_rat = np.sqrt(1.0 - lam)\n    cut_h = int(H * cut_rat)\n    cut_w = int(W * cut_rat)\n    cx = np.random.randint(H)\n    cy = np.random.randint(W)\n    r1 = np.clip(cx - cut_h // 2, 0, H)\n    r2 = np.clip(cx + cut_h // 2, 0, H)\n    c1 = np.clip(cy - cut_w // 2, 0, W)\n    c2 = np.clip(cy + cut_w // 2, 0, W)\n    mixed = x1.copy()\n    {{b1}}\n    lam_adjusted = 1 - (r2 - r1) * (c2 - c1) / (H * W)\n    mixed_y = {{b2}}\n    return mixed, mixed_y",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "mixed[r1:r2, c1:c2, :] = ???[r1:r2, c1:c2, :]",
+                    "acceptable": [
+                        "mixed[r1:r2, c1:c2, :] = x2[r1:r2, c1:c2, :]"
+                    ],
+                    "hint": "Paste the patch from the second image into the first."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "lam_adjusted * y1 + (1 - ???) * y2",
+                    "acceptable": [
+                        "lam_adjusted * y1 + (1 - lam_adjusted) * y2"
+                    ],
+                    "hint": "Mix labels proportionally to the adjusted area ratio."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_random_flip",
+            "title": "Random Horizontal Flip",
+            "difficulty": "easy",
+            "description": "Randomly flip an image horizontally with probability p. x has shape (H, W, C).",
+            "info": "Random horizontal flipping is one of the most common and simplest data augmentation techniques for image classification. Each image is flipped left-to-right with a specified probability (typically 0.5), effectively doubling the apparent dataset size for horizontally symmetric tasks. It is appropriate for most natural image tasks where horizontal orientation is not semantically meaningful, but should be avoided for tasks like digit recognition where 6 and 9 differ only by orientation. Horizontal flipping is a near-universal component of training pipelines for CNNs. It adds virtually no computational overhead.",
+            "code": "import numpy as np\n\ndef random_hflip(x, p=0.5):\n    if np.random.rand() < p:\n        return {{b1}}\n    return x",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x[:, ???, :]",
+                    "acceptable": [
+                        "x[:, ::-1, :]",
+                        "np.flip(x, axis=1)",
+                        "np.fliplr(x)"
+                    ],
+                    "hint": "Flip along the width axis (axis=1). Use slicing [::-1] or np.flip."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_color_jitter",
+            "title": "Color Jitter (Brightness)",
+            "difficulty": "easy",
+            "description": "Apply random brightness adjustment to an image. The factor is sampled uniformly from [1-strength, 1+strength] and multiplied with the image.",
+            "info": "Color jitter randomly perturbs the brightness, contrast, saturation, or hue of training images to make models invariant to lighting conditions. Brightness jitter multiplies all pixel values by a random factor, simulating different exposure levels. This is a standard component of data augmentation pipelines in frameworks like torchvision, often combined with other color transformations. Color jitter helps prevent overfitting to specific color distributions present in the training set. It is especially important for tasks involving natural images captured under variable lighting.",
+            "code": "import numpy as np\n\ndef brightness_jitter(x, strength=0.2):\n    factor = np.random.uniform(1 - strength, 1 + strength)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.clip(??? * x, 0.0, 1.0)",
+                    "acceptable": [
+                        "np.clip(factor * x, 0.0, 1.0)",
+                        "np.clip(x * factor, 0.0, 1.0)"
+                    ],
+                    "hint": "Multiply by factor and clip to valid range [0, 1]."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_random_crop",
+            "title": "Random Crop with Padding",
+            "difficulty": "medium",
+            "description": "Pad the image with zeros on all sides, then take a random crop of the original size. x has shape (H, W, C) and pad_size is the number of pixels to pad on each side.",
+            "info": "Random cropping with padding is a fundamental data augmentation for image classification. The image is first zero-padded on all sides, then a crop of the original dimensions is taken at a random offset, effectively simulating small translations. This technique was critical in achieving state-of-the-art results on CIFAR-10 and ImageNet benchmarks. A common setting is 4 pixels of padding for 32x32 images. Random crop encourages translational invariance and is nearly always used alongside horizontal flipping in CNN training pipelines.",
+            "code": "import numpy as np\n\ndef random_crop_with_pad(x, pad_size=4):\n    H, W, C = x.shape\n    padded = np.pad(x, ((pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode='constant')\n    top = np.random.randint(0, 2 * pad_size)\n    left = np.random.randint(0, 2 * pad_size)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "padded[top:top+???, left:left+???, :]",
+                    "acceptable": [
+                        "padded[top:top+H, left:left+W, :]"
+                    ],
+                    "hint": "Crop from (top, left) with the original height H and width W."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_layer_norm",
+            "title": "Layer Normalization",
+            "difficulty": "medium",
+            "description": "Implement layer normalization for a 2D input (batch_size, features). Normalize each sample independently across its features.",
+            "info": "Layer normalization (Ba et al., 2016) normalizes across the feature dimension for each individual sample, unlike batch normalization which normalizes across the batch dimension. This makes it independent of batch size and suitable for recurrent networks and transformers where batch statistics are unreliable. Layer norm computes the mean and variance over all features of a single sample, then applies learnable scale (gamma) and shift (beta) parameters. It is the default normalization in transformer architectures like BERT and GPT. Layer norm stabilizes training by reducing the sensitivity of the loss surface to parameter initialization and learning rate.",
+            "code": "import numpy as np\n\ndef layer_norm(x, gamma, beta, eps=1e-5):\n    # x: (batch_size, features)\n    mean = {{b1}}\n    var = np.var(x, axis=1, keepdims=True)\n    x_hat = (x - mean) / np.sqrt(var + eps)\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.mean(x, axis=???, keepdims=True)",
+                    "acceptable": [
+                        "np.mean(x, axis=1, keepdims=True)",
+                        "x.mean(axis=1, keepdims=True)"
+                    ],
+                    "hint": "Compute mean across features (axis=1), keeping dims for broadcasting."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "gamma * ??? + beta",
+                    "acceptable": [
+                        "gamma * x_hat + beta"
+                    ],
+                    "hint": "Scale and shift the normalized output."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_group_norm",
+            "title": "Group Normalization",
+            "difficulty": "hard",
+            "description": "Implement group normalization for a 4D tensor (N, C, H, W). Divide channels into G groups and normalize within each group.",
+            "info": "Group normalization (Wu and He, 2018) divides channels into groups and normalizes within each group, providing a middle ground between layer norm (one group) and instance norm (one channel per group). It is independent of batch size, making it ideal for tasks with small batches such as object detection and segmentation. GN reshapes the channels into (N, G, C//G, H, W), computes mean and variance over the (C//G, H, W) dimensions, then reshapes back. Group normalization performs comparably to batch normalization on ImageNet with large batches and significantly better with small batches. A common default is G=32 groups.",
+            "code": "import numpy as np\n\ndef group_norm(x, G, gamma, beta, eps=1e-5):\n    N, C, H, W = x.shape\n    x = x.reshape(N, G, C // G, H, W)\n    mean = np.mean(x, axis={{b1}}, keepdims=True)\n    var = np.var(x, axis=(2, 3, 4), keepdims=True)\n    x = (x - mean) / np.sqrt(var + eps)\n    x = x.reshape(N, C, H, W)\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(2, ???, ???)",
+                    "acceptable": [
+                        "(2, 3, 4)"
+                    ],
+                    "hint": "Normalize over channels-per-group, height, width: axes (2, 3, 4)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "gamma * x + ???",
+                    "acceptable": [
+                        "gamma * x + beta"
+                    ],
+                    "hint": "Apply learnable scale and shift."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_instance_norm",
+            "title": "Instance Normalization",
+            "difficulty": "medium",
+            "description": "Implement instance normalization for a 4D tensor (N, C, H, W). Normalize each channel of each sample independently over spatial dimensions.",
+            "info": "Instance normalization (Ulyanov et al., 2016) normalizes each feature map (channel) of each sample independently over the spatial dimensions (H, W). It was originally proposed for style transfer, where removing instance-specific contrast information improves style transfer quality. Unlike batch norm, it does not depend on batch statistics, making it deterministic at both train and test time. Instance norm is equivalent to group norm with the number of groups equal to the number of channels. It is widely used in generative models and image-to-image translation tasks like CycleGAN.",
+            "code": "import numpy as np\n\ndef instance_norm(x, gamma, beta, eps=1e-5):\n    # x: (N, C, H, W)\n    mean = np.mean(x, axis={{b1}}, keepdims=True)\n    var = np.var(x, axis=(2, 3), keepdims=True)\n    x_hat = (x - mean) / np.sqrt(var + eps)\n    return gamma * x_hat + beta",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(???, ???)",
+                    "acceptable": [
+                        "(2, 3)"
+                    ],
+                    "hint": "Normalize over spatial dimensions H and W: axes (2, 3)."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_rms_norm",
+            "title": "RMS Normalization",
+            "difficulty": "medium",
+            "description": "Implement RMS normalization. Unlike layer norm, RMS norm does not center the activations (no mean subtraction) and normalizes by the root mean square.",
+            "info": "RMS normalization (Zhang and Sennrich, 2019) simplifies layer normalization by removing the mean-centering step and normalizing only by the root mean square of the activations. This reduces computational cost while achieving comparable performance to layer norm in many settings. The RMS is computed as sqrt(mean(x^2)), and the output is x / RMS * gamma. RMS norm has been adopted in modern large language models including LLaMA and PaLM due to its efficiency. It is particularly effective in transformer architectures where the mean-centering step of layer norm provides little benefit.",
+            "code": "import numpy as np\n\ndef rms_norm(x, gamma, eps=1e-5):\n    # x: (batch_size, features)\n    rms = {{b1}}\n    return gamma * x / rms",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sqrt(np.mean(x ** 2, axis=???, keepdims=True) + eps)",
+                    "acceptable": [
+                        "np.sqrt(np.mean(x ** 2, axis=1, keepdims=True) + eps)",
+                        "np.sqrt(np.mean(x ** 2, axis=-1, keepdims=True) + eps)",
+                        "np.sqrt(np.mean(x**2, axis=1, keepdims=True) + eps)",
+                        "np.sqrt(np.mean(x**2, axis=-1, keepdims=True) + eps)"
+                    ],
+                    "hint": "RMS = sqrt(mean(x^2) + eps). Compute over the feature axis."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_spatial_dropout",
+            "title": "Spatial Dropout (2D)",
+            "difficulty": "medium",
+            "description": "Implement spatial dropout for a 4D tensor (N, C, H, W). Drop entire channels (feature maps) rather than individual elements.",
+            "info": "Spatial dropout (Tompson et al., 2015) drops entire feature map channels rather than individual activations, which is more appropriate for convolutional layers where adjacent pixels are highly correlated. Standard dropout on conv layers is ineffective because neighboring activations convey the same information, so zeroing individual pixels has little regularization effect. By dropping full channels, spatial dropout forces the network to learn redundant representations across different feature maps. The dropout mask has shape (N, C, 1, 1) and is broadcast over the spatial dimensions. Like standard inverted dropout, surviving channels are scaled by 1/(1-p).",
+            "code": "import numpy as np\n\ndef spatial_dropout2d(x, p=0.5, training=True):\n    # x: (N, C, H, W)\n    if not training:\n        return x\n    N, C, H, W = x.shape\n    mask = {{b1}}\n    return x * mask / (1 - p)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(np.random.rand(N, C, ???, ???) > p).astype(np.float32)",
+                    "acceptable": [
+                        "(np.random.rand(N, C, 1, 1) > p).astype(np.float32)",
+                        "(np.random.random((N, C, 1, 1)) > p).astype(np.float32)"
+                    ],
+                    "hint": "Mask shape should be (N, C, 1, 1) so it broadcasts over spatial dims."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_dropblock",
+            "title": "DropBlock Mask",
+            "difficulty": "hard",
+            "description": "Create a DropBlock mask for a 2D feature map. DropBlock drops contiguous regions instead of individual elements. Given a binary seed mask (1=keep, 0=drop center), expand each drop center to a block_size x block_size region.",
+            "info": "DropBlock (Ghiasi et al., 2018) extends dropout to structured regions by dropping contiguous square blocks from feature maps. It first samples seed points to drop with some probability gamma, then expands each dropped seed into a block_size x block_size region. This is more effective than standard dropout for convolutional features because it removes spatially correlated information, forcing the network to look at broader context. DropBlock can be applied to any feature map and the block size controls the granularity of the dropped regions. It has been shown to consistently outperform standard dropout for ResNet and AmoebaNet architectures on ImageNet.",
+            "code": "import numpy as np\nfrom scipy.ndimage import maximum_filter\n\ndef make_dropblock_mask(seed_mask, block_size):\n    # seed_mask: (H, W), 1=keep, 0=drop-center\n    drop_centers = (seed_mask == 0).astype(np.float32)\n    drop_regions = maximum_filter(drop_centers, size={{b1}})\n    mask = {{b2}}\n    return mask",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "block_size",
+                        "(block_size, block_size)"
+                    ],
+                    "hint": "Expand each drop center to a block_size x block_size region."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "1.0 - ???",
+                    "acceptable": [
+                        "1.0 - drop_regions",
+                        "1 - drop_regions"
+                    ],
+                    "hint": "Invert: 0 where drop_regions is 1, and 1 elsewhere."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_droppath",
+            "title": "DropPath / Stochastic Depth",
+            "difficulty": "medium",
+            "description": "Implement DropPath (stochastic depth) for a residual block. Each sample in the batch is independently dropped (entire residual branch zeroed) with probability p.",
+            "info": "DropPath, also known as stochastic depth (Huang et al., 2016), randomly drops entire residual branches during training, effectively training an ensemble of networks with different depths. Each sample in a batch independently has its residual path dropped with probability p, with surviving paths scaled by 1/(1-p) to maintain expected output magnitude. The drop rate typically increases linearly from 0 at the first layer to a maximum (e.g., 0.2) at the last layer. Stochastic depth reduces training time, acts as a regularizer, and has become standard in Vision Transformers (ViT, DeiT, Swin). It can be viewed as an implicit ensemble of exponentially many sub-networks.",
+            "code": "import torch\n\ndef drop_path(x, residual, p=0.1, training=True):\n    if not training or p == 0.0:\n        return x + residual\n    keep_prob = 1 - p\n    shape = (x.shape[0],) + (1,) * (x.ndim - 1)\n    mask = {{b1}}\n    return x + residual * mask / keep_prob",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(torch.rand(shape, device=x.device) < ???).float()",
+                    "acceptable": [
+                        "(torch.rand(shape, device=x.device) < keep_prob).float()",
+                        "torch.bernoulli(torch.full(shape, keep_prob, device=x.device))"
+                    ],
+                    "hint": "Per-sample binary mask: keep each sample's residual with probability keep_prob."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_variational_dropout",
+            "title": "Variational Dropout (Locked Dropout)",
+            "difficulty": "medium",
+            "description": "Implement variational (locked) dropout for an RNN: sample one dropout mask and apply it identically across all time steps. x has shape (seq_len, batch_size, features).",
+            "info": "Variational dropout, also called locked dropout (Gal and Ghahramani, 2016), uses the same dropout mask across all time steps in a recurrent neural network, rather than sampling a new mask at each step. This is motivated by a Bayesian interpretation where dropout approximates variational inference with a Bernoulli approximate posterior over weights. Using a consistent mask prevents the network from simply memorizing which units are dropped at which time steps, leading to better regularization. Standard dropout applied independently at each time step tends to disrupt the RNN's ability to maintain long-term dependencies. Variational dropout is now standard practice in LSTM and GRU networks.",
+            "code": "import numpy as np\n\ndef locked_dropout(x, p=0.5, training=True):\n    # x: (seq_len, batch_size, features)\n    if not training or p == 0:\n        return x\n    mask = (np.random.rand(1, x.shape[1], x.shape[2]) > p).astype(np.float32)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x * mask / ???",
+                    "acceptable": [
+                        "x * mask / (1 - p)",
+                        "x * mask / (1.0 - p)"
+                    ],
+                    "hint": "Apply the same mask to all time steps and scale by 1/(1-p)."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_weight_standardization",
+            "title": "Weight Standardization",
+            "difficulty": "hard",
+            "description": "Implement weight standardization for a convolutional weight tensor of shape (out_channels, in_channels, kH, kW). Standardize each output filter to have zero mean and unit variance.",
+            "info": "Weight standardization (Qiao et al., 2019) normalizes the weights of convolutional layers by standardizing each filter (output channel) to have zero mean and unit variance. Unlike batch normalization which normalizes activations, weight standardization operates directly on the weight tensor. When combined with group normalization, it enables training with very small batch sizes while matching or exceeding batch normalization performance. Each output filter is standardized over its (in_channels, kH, kW) dimensions independently. Weight standardization smooths the loss landscape, making optimization easier and reducing the sensitivity to learning rate choices.",
+            "code": "import numpy as np\n\ndef weight_standardization(W, eps=1e-5):\n    # W: (out_channels, in_channels, kH, kW)\n    mean = np.mean(W, axis={{b1}}, keepdims=True)\n    var = np.var(W, axis=(1, 2, 3), keepdims=True)\n    return (W - mean) / np.sqrt(var + eps)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(???, ???, ???)",
+                    "acceptable": [
+                        "(1, 2, 3)"
+                    ],
+                    "hint": "Standardize over in_channels, kH, kW: axes (1, 2, 3)."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_flooding",
+            "title": "Flooding Regularization",
+            "difficulty": "easy",
+            "description": "Implement the flooding regularization technique. When the loss falls below a threshold b (the flood level), the gradient is reversed to push the loss back up.",
+            "info": "Flooding (Ishida et al., 2020) is a simple regularization technique that prevents the training loss from going below a specified threshold b (the flood level). When the loss is above b, training proceeds normally. When it dips below b, the effective loss is modified so that the gradient pushes the loss back up toward b. The formula is: flooded_loss = |loss - b| + b, which creates a V-shaped loss landscape around b. This keeps the model exploring flat minima in the loss landscape rather than overfitting to sharp minima. Flooding requires only one hyperparameter and can be combined with any existing training setup.",
+            "code": "import numpy as np\n\ndef flooding(loss, b):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.abs(loss - ???) + ???",
+                    "acceptable": [
+                        "np.abs(loss - b) + b",
+                        "abs(loss - b) + b",
+                        "np.absolute(loss - b) + b"
+                    ],
+                    "hint": "Flooding formula: |loss - b| + b."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_rdrop",
+            "title": "R-Drop KL Divergence Loss",
+            "difficulty": "hard",
+            "description": "Compute the R-Drop regularization loss: the symmetric KL divergence between two forward passes of the same input (with different dropout masks). p and q are log-softmax outputs.",
+            "info": "R-Drop (Liang et al., 2021) regularizes by minimizing the KL divergence between output distributions from two forward passes of the same input, which differ due to stochastic dropout. The total loss combines the task loss with a symmetric KL divergence penalty: L = L_task + alpha * (KL(p||q) + KL(q||p)) / 2. This forces the model to be consistent across different dropout masks, reducing the variance introduced by dropout. R-Drop is simple to implement, adds minimal overhead, and has shown improvements on NLP tasks like machine translation and text classification. It can be viewed as a self-distillation approach where each forward pass regularizes the other.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef rdrop_loss(logits_p, logits_q, alpha=1.0):\n    p = F.log_softmax(logits_p, dim=-1)\n    q = F.log_softmax(logits_q, dim=-1)\n    kl_pq = F.kl_div(p, q.exp(), reduction='batchmean')\n    kl_qp = F.kl_div(q, p.exp(), reduction='batchmean')\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "alpha * (??? + ???) / 2",
+                    "acceptable": [
+                        "alpha * (kl_pq + kl_qp) / 2",
+                        "alpha * (kl_pq + kl_qp) / 2.0"
+                    ],
+                    "hint": "Symmetric KL: alpha * (KL(p||q) + KL(q||p)) / 2."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_knowledge_distill",
+            "title": "Knowledge Distillation Loss",
+            "difficulty": "hard",
+            "description": "Compute the knowledge distillation loss combining hard label cross-entropy and soft target KL divergence. T is the temperature, alpha weights the soft loss.",
+            "info": "Knowledge distillation (Hinton et al., 2015) transfers knowledge from a large teacher model to a smaller student by training the student to match both the hard labels and the teacher's soft probability distribution. The soft targets are obtained by dividing logits by a temperature T before softmax, which reveals the teacher's uncertainty and inter-class similarity structure. The total loss is alpha * T^2 * KL(soft_student || soft_teacher) + (1 - alpha) * CE(student, hard_labels), where the T^2 factor compensates for the reduced gradient magnitude at higher temperatures. Distillation acts as regularization because the soft targets provide richer training signal than one-hot labels. It has been widely adopted for model compression and is a core component of DistilBERT and TinyBERT.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef distillation_loss(student_logits, teacher_logits, hard_labels, T=4.0, alpha=0.5):\n    soft_student = F.log_softmax(student_logits / T, dim=-1)\n    soft_teacher = F.softmax(teacher_logits / T, dim=-1)\n    soft_loss = F.kl_div(soft_student, soft_teacher, reduction='batchmean')\n    hard_loss = F.cross_entropy(student_logits, hard_labels)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "alpha * T**2 * ??? + (1 - alpha) * ???",
+                    "acceptable": [
+                        "alpha * T**2 * soft_loss + (1 - alpha) * hard_loss",
+                        "alpha * T ** 2 * soft_loss + (1 - alpha) * hard_loss"
+                    ],
+                    "hint": "Combine: alpha * T^2 * soft_loss + (1 - alpha) * hard_loss."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_shake_shake",
+            "title": "Shake-Shake Regularization (Forward)",
+            "difficulty": "hard",
+            "description": "Implement the forward pass of shake-shake regularization for a two-branch residual block. During training, use random alpha; during inference, use 0.5.",
+            "info": "Shake-shake regularization (Gastaldi, 2017) stochastically blends two residual branches during training using a random coefficient alpha sampled uniformly from [0, 1] for each sample. The forward pass computes x + alpha * branch1 + (1 - alpha) * branch2, and importantly, a different random coefficient is used in the backward pass, creating an asymmetry that acts as strong regularization. At inference time, both branches are averaged with equal weight (alpha=0.5). Shake-shake achieved state-of-the-art results on CIFAR-10 (2.86% error) and demonstrates that stochastic blending of parallel branches can be a powerful regularizer. It was a precursor to more general techniques like ShakeDrop and random path methods.",
+            "code": "import torch\n\ndef shake_shake_forward(x, branch1, branch2, training=True):\n    if training:\n        alpha = torch.rand(x.shape[0], 1, 1, 1, device=x.device)\n        return x + {{b1}}\n    else:\n        return x + {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "alpha * branch1 + ??? * branch2",
+                    "acceptable": [
+                        "alpha * branch1 + (1 - alpha) * branch2"
+                    ],
+                    "hint": "Random convex combination: alpha * branch1 + (1-alpha) * branch2."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? * branch1 + ??? * branch2",
+                    "acceptable": [
+                        "0.5 * branch1 + 0.5 * branch2",
+                        "0.5 * (branch1 + branch2)"
+                    ],
+                    "hint": "At inference, average both branches equally."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_dropout_pytorch",
+            "title": "Dropout with PyTorch (Manual)",
+            "difficulty": "easy",
+            "description": "Implement manual inverted dropout using PyTorch tensor operations during training.",
+            "info": "While PyTorch provides nn.Dropout, understanding the manual implementation reveals the mechanics: generate a Bernoulli mask with keep probability (1-p), multiply element-wise, and scale by 1/(1-p). The inverted scaling during training ensures that expected activation magnitudes are preserved, so no modification is needed at inference. PyTorch's torch.bernoulli can generate binary masks from a tensor of probabilities. Manual dropout implementations are useful for custom architectures or when you need non-standard dropout patterns. The training flag is crucial to ensure dropout is disabled during evaluation.",
+            "code": "import torch\n\ndef manual_dropout(x, p=0.5, training=True):\n    if not training:\n        return x\n    mask = {{b1}}\n    return x * mask / (1 - p)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.bernoulli(torch.full_like(x, ???))",
+                    "acceptable": [
+                        "torch.bernoulli(torch.full_like(x, 1 - p))",
+                        "torch.bernoulli(torch.ones_like(x) * (1 - p))",
+                        "(torch.rand_like(x) > p).float()",
+                        "(torch.rand_like(x) < (1 - p)).float()"
+                    ],
+                    "hint": "Create a binary mask where each element survives with probability (1-p)."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_weight_norm",
+            "title": "Weight Normalization",
+            "difficulty": "medium",
+            "description": "Implement weight normalization: reparametrize a weight vector as W = g * (v / ||v||), decoupling direction from magnitude.",
+            "info": "Weight normalization (Salimans and Kingma, 2016) reparametrizes each weight vector as W = g * v / ||v||, decoupling the magnitude g from the direction v/||v||. This reparametrization improves the conditioning of the optimization problem by removing the interplay between the length and direction of the weight vector. Unlike batch normalization, weight normalization introduces no dependencies between examples in a batch and adds minimal computational overhead. It is deterministic and can be applied to any parameterized layer including recurrent networks. Weight normalization is equivalent to projecting weights onto a sphere of radius g in parameter space.",
+            "code": "import numpy as np\n\ndef weight_norm(v, g):\n    # v: weight direction, g: scalar magnitude\n    v_norm = {{b1}}\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???(v)",
+                    "acceptable": [
+                        "np.linalg.norm(v)",
+                        "np.sqrt(np.sum(v ** 2))",
+                        "np.sqrt(np.sum(v**2))"
+                    ],
+                    "hint": "Compute the L2 norm of v."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "g * v / ???",
+                    "acceptable": [
+                        "g * v / v_norm",
+                        "g * (v / v_norm)"
+                    ],
+                    "hint": "W = g * v / ||v||."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_concrete_dropout",
+            "title": "Concrete Dropout Probability",
+            "difficulty": "hard",
+            "description": "Compute the dropout probability from the concrete (hard sigmoid) relaxation. logit_p is the learnable parameter, and temperature controls sharpness.",
+            "info": "Concrete dropout (Gal et al., 2017) makes the dropout rate a learnable parameter by using a continuous relaxation of the discrete Bernoulli distribution called the concrete distribution. The dropout probability is obtained by passing a learnable logit through a sigmoid: p = sigmoid(logit_p). During training, the mask is sampled using the concrete relaxation with a temperature parameter that controls the smoothness of the approximation. A regularization term derived from variational inference is added to the loss to prevent the dropout rate from collapsing to zero. This eliminates the need to tune dropout rates as hyperparameters, especially useful in Bayesian deep learning. Lower temperatures produce masks closer to binary, while higher temperatures give smoother approximations.",
+            "code": "import numpy as np\n\ndef concrete_dropout_prob(logit_p):\n    return {{b1}}\n\ndef concrete_mask(logit_p, shape, temperature=0.1):\n    p = concrete_dropout_prob(logit_p)\n    u = np.random.uniform(0, 1, shape)\n    z = np.log(p + 1e-8) - np.log(1 - p + 1e-8) + np.log(u + 1e-8) - np.log(1 - u + 1e-8)\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1.0 / (1.0 + np.exp(-???))",
+                    "acceptable": [
+                        "1.0 / (1.0 + np.exp(-logit_p))",
+                        "1 / (1 + np.exp(-logit_p))"
+                    ],
+                    "hint": "Apply sigmoid to the logit: sigma(logit_p) = 1 / (1 + exp(-logit_p))."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "1.0 / (1.0 + np.exp(-z / ???))",
+                    "acceptable": [
+                        "1.0 / (1.0 + np.exp(-z / temperature))",
+                        "1 / (1 + np.exp(-z / temperature))"
+                    ],
+                    "hint": "Apply sigmoid with temperature: sigma(z / temperature)."
+                }
+            ]
+        },
+        {
+            "id": "reg_new_batchnorm_training",
+            "title": "Batch Normalization (Training with Running Stats)",
+            "difficulty": "medium",
+            "description": "Implement the batch normalization training step that both normalizes the current batch and updates the running mean/variance using exponential moving average with momentum.",
+            "info": "During training, batch normalization computes per-batch mean and variance, normalizes, then updates running statistics via exponential moving average: running_mean = (1 - momentum) * running_mean + momentum * batch_mean. The running statistics are later used at inference time for deterministic behavior. A typical momentum value is 0.1, meaning 10% of the current batch statistics are blended into the running estimates each step. This dual behavior (batch stats for normalization, EMA for tracking) is a common source of bugs when switching between train and eval modes. The momentum convention varies between frameworks: PyTorch uses the blending weight for the new batch, while some others use 1 minus that value.",
+            "code": "import numpy as np\n\ndef batchnorm_train(x, gamma, beta, running_mean, running_var, momentum=0.1, eps=1e-5):\n    batch_mean = np.mean(x, axis=0)\n    batch_var = np.var(x, axis=0)\n    x_hat = (x - batch_mean) / np.sqrt(batch_var + eps)\n    out = gamma * x_hat + beta\n    running_mean = {{b1}}\n    running_var = (1 - momentum) * running_var + momentum * batch_var\n    return out, running_mean, running_var",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(1 - ???) * running_mean + ??? * batch_mean",
+                    "acceptable": [
+                        "(1 - momentum) * running_mean + momentum * batch_mean"
+                    ],
+                    "hint": "EMA update: (1 - momentum) * old + momentum * new."
+                }
+            ]
         }
     ]
 }

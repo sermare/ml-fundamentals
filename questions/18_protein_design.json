@@ -560,6 +560,846 @@
                     "hint": "Add the weighted coordinate displacement to the current positions."
                 }
             ]
+        },
+        {
+            "id": "prot_design_new_multistate",
+            "title": "Multistate Sequence Design Objective",
+            "difficulty": "hard",
+            "description": "Implement a multistate design loss that optimizes a single sequence to be compatible with multiple target backbone conformations, as used in designing proteins with conformational switches.",
+            "info": "Multistate protein design optimizes a single amino acid sequence to fold stably into multiple target conformations, enabling the design of conformational switches, allosteric proteins, and fold-switching proteins. The objective jointly minimizes the inverse folding loss across all target states, often with per-state weighting. Hershey et al. (2023) demonstrated multistate design using ProteinMPNN by averaging sequence logits across states. Earlier computational approaches by Davey & Bhatt (PNAS 2017) used Rosetta multistate design with genetic algorithms. The key challenge is balancing stability across states without creating frustrated sequences. Recent diffusion-based methods like multistate RFdiffusion extensions allow simultaneous backbone-sequence co-design for multiple conformations. Reference: Dauparas et al., Science 378, 49-56 (2022); Davey & Bhatt, PNAS 114, E1466-E1475 (2017).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef multistate_design_loss(model, seq_logits, backbone_states, state_weights=None):\n    \"\"\"Multistate design: optimize one sequence for multiple backbone conformations.\n    model: inverse folding model returning logits given backbone\n    seq_logits: (L, 20) learnable sequence logits\n    backbone_states: list of K backbone feature tensors, each (L, feat_dim)\n    state_weights: (K,) optional per-state weights, uniform if None\n    \"\"\"\n    K = len(backbone_states)\n    if state_weights is None:\n        state_weights = torch.ones(K) / K\n    # Soft sequence via Gumbel-softmax\n    soft_seq = F.gumbel_softmax(seq_logits, tau=0.1, hard=False)\n    total_loss = 0.0\n    for i, backbone in enumerate(backbone_states):\n        # Get predicted logits for this backbone state\n        pred_logits = model(backbone)  # (L, 20)\n        # Cross-entropy between predicted distribution and soft target\n        log_probs = {{b1}}\n        per_residue_loss = -(soft_seq * log_probs).sum(dim=-1)  # (L,)\n        state_loss = per_residue_loss.mean()\n        total_loss = total_loss + {{b2}}\n    return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "log softmax of predicted logits",
+                    "acceptable": ["F.log_softmax(pred_logits, dim=-1)", "torch.log_softmax(pred_logits, dim=-1)"],
+                    "hint": "Apply log_softmax to the predicted logits along the amino acid dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "weighted state loss",
+                    "acceptable": ["state_weights[i] * state_loss"],
+                    "hint": "Multiply the state loss by its corresponding weight from state_weights."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "return total multistate loss",
+                    "acceptable": ["total_loss"],
+                    "hint": "Return the accumulated weighted sum of losses across all states."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_symmetric",
+            "title": "Symmetric Protein Design with Tied Sequences",
+            "difficulty": "medium",
+            "description": "Implement sequence symmetry enforcement for homo-oligomeric protein design, where all chains in a symmetric assembly share the same designed sequence.",
+            "info": "Symmetric protein design is critical for creating homo-oligomeric assemblies such as dimers, trimers, and cages. ProteinMPNN (Dauparas et al., Science 2022) supports tied-residue design where corresponding positions across symmetric chains are constrained to have the same amino acid identity. This is achieved by averaging logits across symmetry-related positions before sampling. RFdiffusion (Watson et al., Nature 2023) demonstrated symmetric backbone generation for cyclic (Cn), dihedral (Dn), and higher symmetries by applying symmetry operations during diffusion. Chroma (Ingraham et al., Nature 2023) uses group-equivariant conditioners for point group symmetries. Experimental validation has confirmed high success rates for designed symmetric assemblies, including icosahedral nanocages. Reference: Dauparas et al., Science 378, 49-56 (2022); Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef symmetric_sequence_design(model, backbone_feats, symmetry_groups, temperature=0.1):\n    \"\"\"Design a symmetric homo-oligomer: all chains share one sequence.\n    backbone_feats: (N_total, feat_dim) features for all chains concatenated\n    symmetry_groups: list of lists, each inner list has indices of\n                     symmetry-equivalent residues across chains\n                     e.g., [[0,100,200], [1,101,201], ...] for a trimer\n    Returns: (N_total,) designed sequence with symmetry enforced\n    \"\"\"\n    # Get per-residue logits from the model\n    all_logits = model(backbone_feats)  # (N_total, 20)\n    # Average logits across symmetry-equivalent positions\n    averaged_logits = all_logits.clone()\n    for group in symmetry_groups:\n        group_idx = torch.tensor(group)\n        group_logits = all_logits[group_idx]  # (num_copies, 20)\n        mean_logits = {{b1}}\n        averaged_logits[group_idx] = mean_logits\n    # Sample sequence from averaged logits\n    probs = {{b2}}\n    sampled_seq = torch.multinomial(probs, num_samples=1).squeeze(-1)\n    # Enforce exact symmetry on sampled sequence\n    for group in symmetry_groups:\n        group_idx = torch.tensor(group)\n        {{b3}}\n    return sampled_seq",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "average logits across symmetric copies",
+                    "acceptable": ["group_logits.mean(dim=0)", "torch.mean(group_logits, dim=0)"],
+                    "hint": "Average the logits across symmetric copies (dim=0) to get consensus logits."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "temperature-scaled softmax",
+                    "acceptable": ["F.softmax(averaged_logits / temperature, dim=-1)", "torch.softmax(averaged_logits / temperature, dim=-1)"],
+                    "hint": "Apply softmax to the averaged logits divided by temperature."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "copy first chain residue to all copies",
+                    "acceptable": ["sampled_seq[group_idx] = sampled_seq[group_idx[0]]"],
+                    "hint": "Set all symmetry-equivalent positions to the amino acid sampled at the first position in the group."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_binder",
+            "title": "Binder Design: Interface Residue Selection",
+            "difficulty": "medium",
+            "description": "Implement the interface residue identification and contact-based loss for protein binder design, where a new protein is designed to bind a target surface.",
+            "info": "Protein binder design aims to create de novo proteins that bind specific target surfaces with high affinity. RFdiffusion (Watson et al., Nature 2023) achieved breakthrough results in binder design, generating binders for targets including insulin receptor, PD-L1, and viral proteins with experimental binding affinities in the nanomolar range. The key steps are: (1) identify target interface residues (hotspot residues), (2) generate a binder backbone conditioned on the target, (3) design the binder sequence. Interface contacts are defined by distance thresholds (typically 8-10 Angstroms between C-beta atoms). The contact loss encourages designed residues to make favorable interactions with the target surface. RFdiffusion achieved up to 15% experimental success rates for de novo binder design. Reference: Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef identify_interface_residues(binder_coords, target_coords, distance_threshold=10.0):\n    \"\"\"Find interface residues between binder and target.\n    binder_coords: (N_b, 3) C-beta coords of binder\n    target_coords: (N_t, 3) C-beta coords of target\n    Returns: boolean masks for interface residues on both sides\n    \"\"\"\n    # Compute inter-chain distance matrix\n    dist_matrix = {{b1}}\n    # Binder interface: any residue within threshold of any target residue\n    binder_interface = dist_matrix.min(dim=1).values < distance_threshold\n    # Target interface: any residue within threshold of any binder residue\n    target_interface = dist_matrix.min(dim=0).values < distance_threshold\n    return binder_interface, target_interface\n\ndef interface_contact_loss(binder_coords, target_coords,\n                           target_hotspots, desired_contacts=5):\n    \"\"\"Loss encouraging binder to make contacts with target hotspot residues.\n    target_hotspots: (N_h,) indices of hotspot residues on target\n    \"\"\"\n    hotspot_coords = target_coords[target_hotspots]  # (N_h, 3)\n    # Distances from all binder residues to hotspot residues\n    dist = torch.cdist(binder_coords, hotspot_coords)  # (N_b, N_h)\n    # Count soft contacts (using sigmoid)\n    soft_contacts = {{b2}}\n    total_contacts = soft_contacts.sum()\n    # Loss: penalize if fewer contacts than desired\n    loss = {{b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "pairwise distances between chains",
+                    "acceptable": ["torch.cdist(binder_coords, target_coords)", "torch.cdist(binder_coords.unsqueeze(0), target_coords.unsqueeze(0)).squeeze(0)"],
+                    "hint": "Use torch.cdist to compute pairwise Euclidean distances between binder and target coordinates."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "soft contact count via sigmoid",
+                    "acceptable": ["torch.sigmoid(5.0 - dist)", "torch.sigmoid(8.0 - dist)", "torch.sigmoid(-(dist - 8.0))"],
+                    "hint": "Apply sigmoid to a threshold minus distance, so close residues contribute ~1 and distant ones ~0."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "penalize insufficient contacts",
+                    "acceptable": ["F.relu(desired_contacts - total_contacts)", "torch.clamp(desired_contacts - total_contacts, min=0)", "F.relu(torch.tensor(desired_contacts) - total_contacts)"],
+                    "hint": "Use ReLU or clamp to create a hinge loss that is zero when contacts exceed the desired number."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_cdr_loop",
+            "title": "Antibody CDR Loop Generation",
+            "difficulty": "hard",
+            "description": "Implement a diffusion-based CDR loop generation module for antibody design, where the CDR-H3 loop is generated conditioned on the antibody framework region.",
+            "info": "Antibody design focuses on generating complementarity-determining region (CDR) loops, particularly the highly variable CDR-H3 loop, which is the primary determinant of antigen binding specificity. DiffAb (Luo et al., ICLR 2023) uses an equivariant diffusion model to jointly generate CDR loop sequences, structures, and orientations conditioned on the antibody framework. The model operates on residue-level features and uses SE(3)-equivariant attention to maintain geometric consistency. CDR-H3 loops range from 5-25 residues and adopt diverse conformations, making them challenging to model. IgFold (Ruffolo et al., Nature Communications 2023) uses language model embeddings for fast antibody structure prediction. AbDiffuser (Martinkus et al., NeurIPS 2023) extends full-atom diffusion to antibody CDR design with side-chain generation. Reference: Luo et al., 'Antigen-Specific Antibody Design and Optimization with Diffusion-Based Generative Models', ICLR 2023.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass CDRLoopGenerator(nn.Module):\n    \"\"\"Diffusion-based CDR loop generator conditioned on framework.\"\"\"\n    def __init__(self, node_dim=256, num_layers=6):\n        super().__init__()\n        self.framework_encoder = nn.Sequential(\n            nn.Linear(node_dim, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, node_dim)\n        )\n        self.cdr_denoiser = nn.Sequential(\n            nn.Linear(node_dim + 3 + 1, node_dim),  # +3 for coords, +1 for timestep\n            nn.ReLU(),\n            nn.Linear(node_dim, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, 3 + 20)  # predict coords (3) + seq logits (20)\n        )\n        self.cross_attn = nn.MultiheadAttention(node_dim, 8, batch_first=True)\n\n    def forward(self, framework_feats, cdr_noisy_coords, cdr_mask, t):\n        \"\"\"Denoise CDR loop coordinates and predict sequence.\n        framework_feats: (L_fw, node_dim) framework residue features\n        cdr_noisy_coords: (L_cdr, 3) noisy CDR coordinates\n        cdr_mask: (L_total,) boolean mask indicating CDR positions\n        t: scalar timestep\n        \"\"\"\n        L_cdr = cdr_noisy_coords.shape[0]\n        # Encode framework context\n        fw_encoded = self.framework_encoder(framework_feats)  # (L_fw, node_dim)\n        # Prepare CDR input: concat noisy coords with timestep embedding\n        t_embed = torch.full((L_cdr, 1), t / 1000.0)\n        cdr_input = torch.cat([torch.zeros(L_cdr, fw_encoded.shape[-1]),\n                               cdr_noisy_coords, t_embed], dim=-1)\n        cdr_feats = self.cdr_denoiser[:3](cdr_input)  # first 2 layers -> (L_cdr, node_dim)\n        # Cross-attend to framework\n        cdr_feats_q = cdr_feats.unsqueeze(0)\n        fw_kv = fw_encoded.unsqueeze(0)\n        attended, _ = {{b1}}\n        cdr_feats = cdr_feats + attended.squeeze(0)\n        # Predict clean coords and sequence logits\n        output = self.cdr_denoiser[3:](cdr_feats)  # (L_cdr, 23)\n        pred_coords = {{b2}}\n        seq_logits = {{b3}}\n        return pred_coords, seq_logits",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "cross-attention CDR to framework",
+                    "acceptable": ["self.cross_attn(cdr_feats_q, fw_kv, fw_kv)"],
+                    "hint": "CDR features are the query, framework features are both key and value in cross-attention."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "extract coordinate predictions",
+                    "acceptable": ["output[:, :3]"],
+                    "hint": "The first 3 channels of the output correspond to predicted x, y, z coordinates."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "extract sequence logits",
+                    "acceptable": ["output[:, 3:]"],
+                    "hint": "The last 20 channels of the output correspond to amino acid logits."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_enzyme_active_site",
+            "title": "Enzyme Active Site Scaffolding Loss",
+            "difficulty": "hard",
+            "description": "Implement the loss function for enzyme design that enforces catalytic geometry constraints on active site residues while optimizing overall protein stability.",
+            "info": "Computational enzyme design aims to create proteins with novel catalytic activities by scaffolding precisely arranged catalytic residues. The theozyme (theoretical enzyme) approach defines ideal geometric constraints for catalytic residues, including distances, angles, and dihedrals relative to a transition state analog. RFdiffusion (Watson et al., Nature 2023) and earlier Rosetta-based methods (Rothlisberger et al., Nature 2008) scaffold these constrained active sites within de novo protein folds. Key geometric constraints include catalytic residue-substrate distances (typically 2-4 Angstroms for hydrogen bonds), angle constraints for orbital alignment, and dihedral constraints for proper orientation. The loss balances geometric satisfaction with overall backbone quality. Recent work by Wang et al. (2024) demonstrated enzyme design with RFdiffusion achieving catalytic activities rivaling natural enzymes. Reference: Watson et al., Nature 620, 1089-1100 (2023); Rothlisberger et al., Nature 453, 190-195 (2008).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef enzyme_design_loss(pred_coords, catalytic_residues, target_distances,\n                      target_angles, substrate_position):\n    \"\"\"Loss for enzyme active site geometry.\n    pred_coords: (N, 3) predicted backbone coordinates\n    catalytic_residues: list of residue indices forming the active site\n    target_distances: dict of (res_i, res_j) -> target distance in Angstroms\n    target_angles: dict of (res_i, res_j, res_k) -> target angle in radians\n    substrate_position: (3,) target substrate/transition state position\n    \"\"\"\n    # Distance constraints between catalytic residues and substrate\n    dist_loss = 0.0\n    for (i, j), target_d in target_distances.items():\n        actual_d = torch.norm(pred_coords[i] - pred_coords[j], dim=-1)\n        dist_loss = dist_loss + {{b1}}\n    # Angle constraints for catalytic geometry\n    angle_loss = 0.0\n    for (i, j, k), target_a in target_angles.items():\n        v1 = F.normalize(pred_coords[i] - pred_coords[j], dim=-1)\n        v2 = F.normalize(pred_coords[k] - pred_coords[j], dim=-1)\n        cos_angle = {{b2}}\n        actual_angle = torch.acos(torch.clamp(cos_angle, -0.999, 0.999))\n        angle_loss = angle_loss + (actual_angle - target_a) ** 2\n    # Substrate proximity loss: catalytic residues should be near substrate\n    cat_coords = pred_coords[catalytic_residues]\n    sub_dists = torch.norm(cat_coords - substrate_position.unsqueeze(0), dim=-1)\n    proximity_loss = {{b3}}\n    return dist_loss + angle_loss + proximity_loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "squared distance deviation",
+                    "acceptable": ["(actual_d - target_d) ** 2"],
+                    "hint": "Compute the squared difference between actual and target distances."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "cosine of angle between vectors",
+                    "acceptable": ["torch.dot(v1, v2)", "(v1 * v2).sum(dim=-1)", "torch.sum(v1 * v2)"],
+                    "hint": "The cosine of the angle is the dot product of the two unit vectors."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "mean substrate distance for catalytic residues",
+                    "acceptable": ["sub_dists.mean()", "torch.mean(sub_dists)"],
+                    "hint": "Average the distances from catalytic residues to the substrate position."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_interface_energy",
+            "title": "Protein-Protein Interface Energy Scoring",
+            "difficulty": "medium",
+            "description": "Implement a differentiable interface energy score for protein-protein interaction design, computing van der Waals and electrostatic contributions at the binding interface.",
+            "info": "Protein-protein interface design requires scoring the energetic favorability of designed interfaces. The binding energy (ddG) combines van der Waals interactions, electrostatics, hydrogen bonding, and desolvation penalties. Rosetta's interface energy function (Leaver-Fay et al., Methods in Enzymology 2011) uses a Lennard-Jones potential for van der Waals and a Coulombic term with distance-dependent dielectric for electrostatics. Modern differentiable scoring functions like AttnPacker (McPartlon & Bhatt, ICLR 2023) learn these energy terms as neural network potentials. The shape complementarity at the interface is quantified by the Lawrence & Colman Sc metric (1993), which measures geometric surface matching. Interface-designed proteins from RFdiffusion show high shape complementarity (Sc > 0.6) and favorable computed binding energies. Reference: Leaver-Fay et al., Methods in Enzymology 487, 545-574 (2011); Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\n\ndef interface_energy_score(binder_atoms, target_atoms,\n                          binder_charges, target_charges,\n                          vdw_radii_b, vdw_radii_t,\n                          epsilon=1.0, dielectric=4.0):\n    \"\"\"Differentiable interface energy between binder and target.\n    binder_atoms: (N_b, 3) binder atom coordinates\n    target_atoms: (N_t, 3) target atom coordinates\n    binder_charges, target_charges: (N_b,), (N_t,) partial charges\n    vdw_radii_b, vdw_radii_t: (N_b,), (N_t,) van der Waals radii\n    \"\"\"\n    # Pairwise distances between binder and target atoms\n    dist = torch.cdist(binder_atoms, target_atoms)  # (N_b, N_t)\n    dist = torch.clamp(dist, min=0.1)  # avoid division by zero\n    # Van der Waals: simplified Lennard-Jones 12-6 potential\n    sigma = (vdw_radii_b.unsqueeze(1) + vdw_radii_t.unsqueeze(0)) / 2\n    ratio = sigma / dist\n    vdw_energy = {{b1}}\n    # Electrostatic: Coulombic with distance-dependent dielectric\n    charge_product = binder_charges.unsqueeze(1) * target_charges.unsqueeze(0)\n    elec_energy = {{b2}}\n    # Total interface energy (only count close contacts < 10 Angstroms)\n    contact_mask = (dist < 10.0).float()\n    total_energy = {{b3}}\n    return total_energy",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "Lennard-Jones 12-6 potential",
+                    "acceptable": ["4 * epsilon * (ratio ** 12 - ratio ** 6)", "4.0 * epsilon * (ratio ** 12 - ratio ** 6)", "epsilon * 4 * (ratio**12 - ratio**6)"],
+                    "hint": "The LJ potential is 4*epsilon*(sigma/r)^12 - (sigma/r)^6)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "Coulombic energy with dielectric",
+                    "acceptable": ["charge_product / (dielectric * dist)", "332.0 * charge_product / (dielectric * dist)"],
+                    "hint": "Electrostatic energy is proportional to q1*q2 / (dielectric * r)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "sum masked interface energy",
+                    "acceptable": ["(contact_mask * (vdw_energy + elec_energy)).sum()", "((vdw_energy + elec_energy) * contact_mask).sum()"],
+                    "hint": "Sum the van der Waals and electrostatic energies, weighted by the contact mask."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_hotspot_constraint",
+            "title": "Hotspot-Constrained Binder Generation",
+            "difficulty": "medium",
+            "description": "Implement hotspot residue constraints for conditional binder design, where specific target surface residues must be contacted by the designed binder.",
+            "info": "Hotspot-constrained generation is a key capability of RFdiffusion (Watson et al., Nature 2023) for binder design. Hotspot residues are target surface residues that must be contacted by the designed binder, typically chosen because they are functionally important epitope residues or experimentally validated binding sites. During diffusion, the model receives hotspot information as conditioning, and the loss function penalizes designs that fail to make contacts with specified hotspots. This approach was used to design binders targeting specific epitopes on SARS-CoV-2 spike protein and influenza hemagglutinin. The hotspot potential is applied as a guidance term during reverse diffusion, steering the generation toward structures with the desired contacts. Cao et al. (Nature 2022) demonstrated that hotspot-focused design yields higher experimental success rates. Reference: Watson et al., Nature 620, 1089-1100 (2023); Cao et al., Nature 605, 551-560 (2022).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef hotspot_guidance_potential(binder_coords, target_coords,\n                               hotspot_indices, contact_threshold=8.0):\n    \"\"\"Compute guidance potential for hotspot-constrained binder design.\n    binder_coords: (N_b, 3) current binder coordinates (during diffusion)\n    target_coords: (N_t, 3) fixed target coordinates\n    hotspot_indices: list of target residue indices that must be contacted\n    contact_threshold: distance cutoff for contacts in Angstroms\n    \"\"\"\n    hotspot_coords = target_coords[hotspot_indices]  # (N_h, 3)\n    # Distance from every binder residue to every hotspot\n    dist = torch.cdist(binder_coords, hotspot_coords)  # (N_b, N_h)\n    # For each hotspot, find the minimum distance to any binder residue\n    min_dist_per_hotspot = {{b1}}\n    # Penalize hotspots that are not contacted\n    uncontacted_penalty = {{b2}}\n    # Total potential: sum of penalties for uncontacted hotspots\n    potential = {{b3}}\n    return potential",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "minimum binder distance per hotspot",
+                    "acceptable": ["dist.min(dim=0).values", "torch.min(dist, dim=0).values"],
+                    "hint": "Take the minimum distance over binder residues (dim=0) for each hotspot."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "penalize uncontacted hotspots",
+                    "acceptable": ["F.relu(min_dist_per_hotspot - contact_threshold)", "torch.clamp(min_dist_per_hotspot - contact_threshold, min=0)"],
+                    "hint": "Use ReLU to penalize only hotspots whose minimum distance exceeds the contact threshold."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "sum penalty across hotspots",
+                    "acceptable": ["uncontacted_penalty.sum()", "torch.sum(uncontacted_penalty)"],
+                    "hint": "Sum the penalties across all hotspot residues."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_topology_constraint",
+            "title": "Topology-Constrained Backbone Generation",
+            "difficulty": "hard",
+            "description": "Implement topology constraints for protein backbone generation, enforcing a specified secondary structure connectivity pattern (e.g., beta-alpha-beta motif) during diffusion sampling.",
+            "info": "Topology-constrained protein design generates backbones with specified arrangements of secondary structure elements (SSEs). Chroma (Ingraham et al., Nature 2023) demonstrated topology conditioning using programmatic conditioners that specify the number and connectivity of helices and strands. SCUBA (Trippe et al., ICML 2023) uses a diffusion model with explicit secondary structure conditioning, achieving generation of diverse topologies including TIM barrels and beta-propellers. The topology is typically encoded as a sequence of SSE types (helix, strand, loop) with connectivity information. Constraints are enforced by penalizing deviations from expected inter-SSE distances and orientations. Blueprint-based design from Rosetta (Huang et al., Nature 2016) originally introduced the concept of topology-level control, specifying backbone torsion preferences for each SSE. Reference: Ingraham et al., Nature 623, 1070-1078 (2023); Trippe et al., ICML 2023.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef topology_constraint_loss(coords, ss_assignment, topology_spec):\n    \"\"\"Enforce topology constraints on generated backbone.\n    coords: (N, 3) C-alpha coordinates\n    ss_assignment: (N,) integer, 0=loop, 1=helix, 2=strand\n    topology_spec: list of dicts with 'type', 'start', 'end' for each SSE\n    \"\"\"\n    total_loss = 0.0\n    # Helix constraint: residues i, i+4 should be ~6.0 Angstroms apart\n    helix_mask = (ss_assignment == 1)\n    helix_indices = torch.where(helix_mask)[0]\n    if len(helix_indices) > 4:\n        helix_coords = coords[helix_indices]\n        d_i4 = torch.norm(helix_coords[4:] - helix_coords[:-4], dim=-1)\n        helix_loss = {{b1}}\n        total_loss = total_loss + helix_loss\n    # Strand constraint: adjacent residues in strand should be ~3.3-3.5 A apart\n    strand_mask = (ss_assignment == 2)\n    strand_indices = torch.where(strand_mask)[0]\n    if len(strand_indices) > 1:\n        strand_coords = coords[strand_indices]\n        d_consecutive = torch.norm(strand_coords[1:] - strand_coords[:-1], dim=-1)\n        strand_loss = {{b2}}\n        total_loss = total_loss + strand_loss\n    # SSE contact constraint: consecutive SSEs should be in contact\n    for k in range(len(topology_spec) - 1):\n        sse1_center = coords[topology_spec[k]['start']:topology_spec[k]['end']].mean(dim=0)\n        sse2_center = coords[topology_spec[k+1]['start']:topology_spec[k+1]['end']].mean(dim=0)\n        inter_sse_dist = {{b3}}\n        total_loss = total_loss + F.relu(inter_sse_dist - 15.0)  # penalize if > 15A apart\n    return total_loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "helix i,i+4 distance constraint",
+                    "acceptable": ["((d_i4 - 6.0) ** 2).mean()", "F.mse_loss(d_i4, torch.full_like(d_i4, 6.0))"],
+                    "hint": "Penalize deviations from the ideal 6.0 Angstrom distance for i,i+4 helix contacts."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "strand consecutive distance constraint",
+                    "acceptable": ["((d_consecutive - 3.4) ** 2).mean()", "F.mse_loss(d_consecutive, torch.full_like(d_consecutive, 3.4))"],
+                    "hint": "Penalize deviations from ~3.4 Angstrom ideal distance between consecutive strand residues."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "distance between SSE centers",
+                    "acceptable": ["torch.norm(sse1_center - sse2_center)", "(sse1_center - sse2_center).norm()"],
+                    "hint": "Compute the Euclidean distance between the centers of mass of consecutive SSEs."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_ss_conditioning",
+            "title": "Secondary Structure Conditioning for Diffusion",
+            "difficulty": "easy",
+            "description": "Implement secondary structure conditioning for a protein backbone diffusion model, where the denoiser receives per-residue secondary structure labels as input.",
+            "info": "Secondary structure conditioning allows protein diffusion models to generate backbones with specified helix, strand, and loop content. Chroma (Ingraham et al., Nature 2023) and SCUBA (Trippe et al., ICML 2023) support conditioning on secondary structure annotations. The conditioning is implemented by embedding the per-residue secondary structure labels (helix=H, strand=E, coil=C from DSSP) and adding them to the node features of the denoiser network. This simple conditioning mechanism provides coarse-grained control over the generated topology. FrameFlow (Yim et al., NeurIPS 2023) extends this with flow matching on SE(3) and demonstrates that secondary structure conditioning significantly improves designability of generated structures. The three-class encoding is typically expanded to 8-class DSSP or further refined with phi/psi angle constraints. Reference: Ingraham et al., Nature 623, 1070-1078 (2023); Trippe et al., ICML 2023.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SSConditionedDenoiser(nn.Module):\n    \"\"\"Protein backbone denoiser with secondary structure conditioning.\"\"\"\n    def __init__(self, node_dim=256, num_ss_types=3):\n        super().__init__()\n        # Secondary structure embedding: H(0), E(1), C(2)\n        self.ss_embedding = {{b1}}\n        self.coord_encoder = nn.Linear(3, node_dim)\n        self.time_embed = nn.Sequential(\n            nn.Linear(1, node_dim),\n            nn.SiLU(),\n            nn.Linear(node_dim, node_dim)\n        )\n        self.denoise_net = nn.Sequential(\n            nn.Linear(node_dim, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, 3)  # predict clean coords\n        )\n\n    def forward(self, noisy_coords, ss_labels, t):\n        \"\"\"Denoise coordinates conditioned on secondary structure.\n        noisy_coords: (N, 3) noisy C-alpha positions\n        ss_labels: (N,) integer labels, 0=H, 1=E, 2=C\n        t: scalar timestep\n        \"\"\"\n        # Encode inputs\n        coord_feats = self.coord_encoder(noisy_coords)  # (N, node_dim)\n        ss_feats = {{b2}}\n        t_feats = self.time_embed(torch.tensor([[t / 1000.0]])).expand(noisy_coords.shape[0], -1)\n        # Combine features: add coordinate, SS, and time features\n        combined = {{b3}}\n        # Predict denoised coordinates\n        pred_clean = self.denoise_net(combined)\n        return pred_clean",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "embedding layer for SS types",
+                    "acceptable": ["nn.Embedding(num_ss_types, node_dim)", "nn.Embedding(3, node_dim)"],
+                    "hint": "Create an nn.Embedding that maps each of the 3 secondary structure types to a node_dim-dimensional vector."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "embed secondary structure labels",
+                    "acceptable": ["self.ss_embedding(ss_labels)"],
+                    "hint": "Pass the integer secondary structure labels through the embedding layer."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "sum all feature contributions",
+                    "acceptable": ["coord_feats + ss_feats + t_feats"],
+                    "hint": "Add the coordinate features, secondary structure features, and timestep features element-wise."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_inpainting",
+            "title": "Protein Backbone Inpainting",
+            "difficulty": "medium",
+            "description": "Implement protein backbone inpainting where a contiguous region of a protein structure is masked out and regenerated by a diffusion model while keeping the surrounding context fixed.",
+            "info": "Protein inpainting enables local redesign of protein structures by regenerating specified regions conditioned on the surrounding structural context. RFdiffusion (Watson et al., Nature 2023) supports inpainting by masking selected residue positions and denoising only those positions during reverse diffusion. This is analogous to image inpainting in computer vision diffusion models. Applications include loop redesign, insertion/deletion of structural elements, and grafting functional motifs into existing scaffolds. The masked region can be contiguous (e.g., a loop) or disjoint (e.g., multiple surface patches). During each denoising step, the unmasked context coordinates are held fixed at their ground-truth positions while the masked positions are updated by the denoiser. ProteinGenerator (Lisanza et al., 2023) extended this to joint sequence-structure inpainting. Reference: Watson et al., Nature 620, 1089-1100 (2023); Lisanza et al., bioRxiv 2023.",
+            "code": "import torch\n\ndef inpainting_denoise_step(denoiser, full_coords, inpaint_mask, t, noise_schedule):\n    \"\"\"One reverse diffusion step for protein inpainting.\n    full_coords: (N, 3) current coordinates (mix of clean context and noisy inpaint)\n    inpaint_mask: (N,) boolean, True for positions to inpaint\n    t: current timestep\n    \"\"\"\n    alpha_bar_t = noise_schedule['alpha_bar'][t]\n    # Store clean context coordinates\n    context_coords = full_coords[~inpaint_mask].clone()\n    # Run denoiser on full structure (context + noisy inpaint region)\n    predicted_clean = denoiser(full_coords, t)\n    # Only update inpainted positions\n    output_coords = full_coords.clone()\n    output_coords[inpaint_mask] = {{b1}}\n    # Restore context positions exactly\n    output_coords[~inpaint_mask] = {{b2}}\n    # Add noise for next step (only to inpaint region, not at t=0)\n    if t > 0:\n        alpha_bar_prev = noise_schedule['alpha_bar'][t - 1]\n        noise = torch.randn_like(output_coords[inpaint_mask])\n        output_coords[inpaint_mask] = {{b3}}\n    return output_coords",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "update inpaint region from denoiser",
+                    "acceptable": ["predicted_clean[inpaint_mask]"],
+                    "hint": "Replace the inpainted positions with the denoiser's predicted clean coordinates at those positions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "restore context coordinates",
+                    "acceptable": ["context_coords"],
+                    "hint": "Restore the unmasked context positions to their original (clean) coordinates."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "add calibrated noise for next step",
+                    "acceptable": ["torch.sqrt(alpha_bar_prev) * output_coords[inpaint_mask] + torch.sqrt(1 - alpha_bar_prev) * noise"],
+                    "hint": "Apply the forward diffusion formula at timestep t-1: sqrt(alpha_bar_{t-1}) * x_0 + sqrt(1 - alpha_bar_{t-1}) * noise."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_allatom_diffusion",
+            "title": "All-Atom Diffusion: Backbone and Side Chains",
+            "difficulty": "hard",
+            "description": "Implement the forward noising process for an all-atom protein diffusion model that jointly diffuses backbone and side-chain atom positions, as in AlphaFold3-style generative models.",
+            "info": "All-atom diffusion models generate complete protein structures including side chains, going beyond backbone-only methods. AlphaFold3 (Abramson et al., Nature 2024) uses a diffusion module that operates on all heavy atoms, predicting denoised atomic coordinates from noisy inputs. The forward process adds Gaussian noise to all atom positions simultaneously, with per-atom noise levels that may vary by atom type (backbone vs. side chain). AbDiffuser (Martinkus et al., NeurIPS 2023) demonstrated all-atom diffusion for antibody design with joint backbone and side chain generation. The challenge is handling the variable number of atoms per residue (glycine has 4 heavy atoms, tryptophan has 14) and maintaining chemical validity. Atom-level diffusion requires larger models and more diffusion steps but produces directly usable structures without separate side-chain packing. Reference: Abramson et al., 'Accurate structure prediction of biomolecular interactions with AlphaFold 3', Nature 630, 493-500 (2024).",
+            "code": "import torch\n\ndef all_atom_forward_diffusion(atom_coords, atom_mask, alpha_bar_t,\n                               noise_scale_backbone=1.0, noise_scale_sidechain=1.0,\n                               backbone_atom_mask=None):\n    \"\"\"Forward diffusion on all protein atoms (backbone + side chains).\n    atom_coords: (N_res, max_atoms, 3) atom positions per residue\n    atom_mask: (N_res, max_atoms) boolean, True for existing atoms\n    alpha_bar_t: scalar noise level\n    backbone_atom_mask: (N_res, max_atoms) True for backbone atoms (N, CA, C, O)\n    \"\"\"\n    noise = torch.randn_like(atom_coords)\n    # Different noise scales for backbone and sidechain atoms\n    noise_scales = torch.ones_like(atom_coords[:, :, 0:1])\n    if backbone_atom_mask is not None:\n        noise_scales[backbone_atom_mask] = noise_scale_backbone\n        noise_scales[~backbone_atom_mask] = noise_scale_sidechain\n    scaled_noise = noise * noise_scales\n    # Forward diffusion: x_t = sqrt(alpha_bar) * x_0 + sqrt(1 - alpha_bar) * noise\n    signal_rate = {{b1}}\n    noise_rate = torch.sqrt(1.0 - alpha_bar_t)\n    noisy_coords = signal_rate * atom_coords + noise_rate * scaled_noise\n    # Zero out positions for non-existent atoms\n    noisy_coords = {{b2}}\n    return noisy_coords, scaled_noise\n\ndef all_atom_loss(predicted_coords, true_coords, atom_mask):\n    \"\"\"Per-atom MSE loss for all-atom diffusion, masked for valid atoms.\"\"\"\n    diff = (predicted_coords - true_coords) ** 2\n    per_atom_mse = diff.sum(dim=-1)  # sum over xyz -> (N_res, max_atoms)\n    masked_mse = per_atom_mse * atom_mask.float()\n    loss = {{b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "signal retention rate",
+                    "acceptable": ["torch.sqrt(alpha_bar_t)"],
+                    "hint": "The signal rate in the forward diffusion process is sqrt(alpha_bar_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "mask non-existent atoms",
+                    "acceptable": ["noisy_coords * atom_mask.unsqueeze(-1).float()", "noisy_coords * atom_mask.unsqueeze(-1)"],
+                    "hint": "Multiply noisy coordinates by the atom mask (unsqueezed to broadcast over xyz) to zero out non-existent atoms."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "average over valid atoms",
+                    "acceptable": ["masked_mse.sum() / atom_mask.sum()", "masked_mse.sum() / atom_mask.float().sum()"],
+                    "hint": "Sum the masked MSE and divide by the number of valid atoms."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_sidechain_packing",
+            "title": "Side Chain Packing with Rotamer Sampling",
+            "difficulty": "medium",
+            "description": "Implement a neural network-based side chain packing module that predicts chi dihedral angles for each residue given the backbone structure and sequence.",
+            "info": "Side chain packing determines the 3D positions of amino acid side chain atoms given a fixed backbone and sequence. Classical methods like Rosetta's Packer (Leaver-Fay et al., Methods in Enzymology 2011) use rotamer libraries and Monte Carlo optimization. AttnPacker (McPartlon & Bhatt, ICLR 2023) uses a neural network to directly predict chi angles, achieving accuracy competitive with physics-based methods at much faster speeds. DLPacker (Misiura et al., 2022) uses 3D convolutions on density maps. Side chains are parameterized by up to 4 chi dihedral angles depending on residue type. The prediction is typically decomposed into per-residue chi angle predictions, conditioned on backbone geometry and neighboring residue identities. Accurate side chain packing is essential for evaluating designed protein stability and computing binding energies. Reference: McPartlon & Bhatt, 'An end-to-end equivariant model for protein side-chain packing', ICLR 2023; Leaver-Fay et al., Methods in Enzymology 487, 545-574 (2011).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass SideChainPacker(nn.Module):\n    \"\"\"Neural side chain packing: predict chi angles from backbone + sequence.\"\"\"\n    def __init__(self, node_dim=256, num_chi_bins=36):\n        super().__init__()\n        self.num_chi_bins = num_chi_bins  # discretize each chi into 36 bins (10 deg each)\n        self.seq_embed = nn.Embedding(20, node_dim)\n        self.backbone_encoder = nn.Linear(9, node_dim)  # N, CA, C coords flattened\n        self.predictor = nn.Sequential(\n            nn.Linear(node_dim * 2, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, 4 * num_chi_bins)  # 4 chi angles, each with num_bins logits\n        )\n\n    def forward(self, backbone_coords, seq_indices, chi_mask):\n        \"\"\"Predict chi angles for side chain packing.\n        backbone_coords: (N, 3, 3) N, CA, C atom coords per residue\n        seq_indices: (N,) amino acid indices 0-19\n        chi_mask: (N, 4) boolean, which chi angles exist for each residue\n        \"\"\"\n        N = seq_indices.shape[0]\n        seq_feats = {{b1}}\n        bb_feats = self.backbone_encoder(backbone_coords.reshape(N, -1))  # (N, node_dim)\n        combined = torch.cat([seq_feats, bb_feats], dim=-1)  # (N, 2*node_dim)\n        logits = self.predictor(combined)  # (N, 4 * num_chi_bins)\n        logits = logits.reshape(N, 4, self.num_chi_bins)  # (N, 4, num_bins)\n        # Convert bin predictions to angles (bin centers)\n        bin_centers = torch.linspace(-180, 180, self.num_chi_bins + 1)[:-1] + 5.0  # degrees\n        probs = {{b2}}\n        pred_chi = (probs * bin_centers.unsqueeze(0).unsqueeze(0)).sum(dim=-1)  # (N, 4)\n        # Mask out non-existent chi angles\n        pred_chi = {{b3}}\n        return pred_chi, logits",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "embed amino acid sequence",
+                    "acceptable": ["self.seq_embed(seq_indices)"],
+                    "hint": "Pass the amino acid indices through the sequence embedding layer."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "softmax over chi angle bins",
+                    "acceptable": ["F.softmax(logits, dim=-1)", "torch.softmax(logits, dim=-1)"],
+                    "hint": "Apply softmax over the bin dimension (dim=-1) to get a probability distribution over chi angle bins."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "mask invalid chi angles",
+                    "acceptable": ["pred_chi * chi_mask.float()", "pred_chi * chi_mask"],
+                    "hint": "Multiply predicted chi angles by the chi mask to zero out non-existent chi angles."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_rosetta_score",
+            "title": "Differentiable Rosetta-Style Energy Function",
+            "difficulty": "hard",
+            "description": "Implement key terms of a differentiable Rosetta-style energy function for protein design, including van der Waals, backbone hydrogen bonding, and solvation terms.",
+            "info": "The Rosetta energy function (REF2015) is the standard physics-based scoring function for protein design, combining van der Waals interactions (fa_atr, fa_rep), backbone hydrogen bonds (hbond_sr_bb, hbond_lr_bb), solvation (fa_sol), electrostatics (fa_elec), and reference energies (ref). Leaver-Fay et al. (Methods in Enzymology 2011) describes the architecture of the scoring framework. The van der Waals term uses a modified Lennard-Jones potential with linear repulsion below a distance threshold. Hydrogen bond scoring uses an orientation-dependent function considering donor-acceptor distance, angles, and planarity. Making these terms differentiable enables gradient-based sequence optimization as in MCMC-free design. TERMinator (Li et al., NeurIPS 2023) learned differentiable approximations of Rosetta energy terms using neural networks. Reference: Leaver-Fay et al., Methods in Enzymology 487, 545-574 (2011); Park et al., J. Chem. Theory Comput. 12, 6201-6212 (2016).",
+            "code": "import torch\n\ndef rosetta_vdw_term(atom_coords, atom_radii, well_depth, clash_threshold=0.6):\n    \"\"\"Differentiable van der Waals energy (fa_atr + fa_rep).\n    atom_coords: (M, 3) all atom coordinates\n    atom_radii: (M,) van der Waals radii\n    well_depth: (M,) LJ well depth per atom\n    \"\"\"\n    dist = torch.cdist(atom_coords, atom_coords)  # (M, M)\n    dist = torch.clamp(dist, min=0.01)\n    sigma = atom_radii.unsqueeze(0) + atom_radii.unsqueeze(1)  # (M, M)\n    eps = torch.sqrt(well_depth.unsqueeze(0) * well_depth.unsqueeze(1))\n    ratio = sigma / dist\n    # Attractive term (standard LJ attractive)\n    fa_atr = {{b1}}\n    # Repulsive: linear ramp below clash threshold\n    clash_dist = clash_threshold * sigma\n    fa_rep = torch.where(\n        dist < clash_dist,\n        10.0 * (clash_dist - dist) / clash_dist,\n        torch.zeros_like(dist)\n    )\n    # Mask self-interactions (diagonal)\n    mask = 1.0 - torch.eye(atom_coords.shape[0])\n    return (mask * (fa_atr + fa_rep)).sum() / 2\n\ndef hbond_energy(donor_coords, acceptor_coords, donor_H_coords, ideal_dist=2.0):\n    \"\"\"Backbone hydrogen bond energy.\"\"\"\n    d_ha = torch.norm(donor_H_coords - acceptor_coords, dim=-1)  # H-A distance\n    d_da = torch.norm(donor_coords - acceptor_coords, dim=-1)  # D-A distance\n    # Distance-dependent score\n    dist_score = {{b2}}\n    # Angle-dependent: D-H...A angle should be near 180 degrees\n    v_dh = donor_H_coords - donor_coords\n    v_ha = acceptor_coords - donor_H_coords\n    cos_angle = {{b3}}\n    angle_score = (cos_angle + 1.0) / 2.0  # 1 when linear, 0 when bent\n    return -(dist_score * angle_score).sum()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "LJ attractive term",
+                    "acceptable": ["-eps * ratio ** 6", "-eps * (ratio ** 6)"],
+                    "hint": "The attractive Lennard-Jones term is -epsilon * (sigma/r)^6."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "Gaussian distance score for H-bond",
+                    "acceptable": ["torch.exp(-((d_ha - ideal_dist) ** 2) / 0.5)", "torch.exp(-(d_ha - ideal_dist) ** 2)"],
+                    "hint": "Use a Gaussian centered at the ideal H-bond distance to score the hydrogen-acceptor distance."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "cosine of D-H-A angle",
+                    "acceptable": ["F.cosine_similarity(v_dh, v_ha, dim=-1)", "torch.sum(F.normalize(v_dh, dim=-1) * F.normalize(v_ha, dim=-1), dim=-1)"],
+                    "hint": "Compute the cosine of the angle between D-H and H-A vectors using cosine similarity."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_mcmc_optimization",
+            "title": "MCMC Sequence Optimization with Metropolis-Hastings",
+            "difficulty": "medium",
+            "description": "Implement Metropolis-Hastings MCMC sequence optimization for protein design, where single amino acid mutations are proposed and accepted based on an energy function.",
+            "info": "Markov Chain Monte Carlo (MCMC) sequence optimization is a classical approach to protein design used extensively in Rosetta (Kuhlman et al., Science 2003). The Metropolis-Hastings algorithm proposes random single-residue mutations and accepts or rejects them based on the Boltzmann criterion: accept if the energy decreases, or with probability exp(-dE/kT) if it increases. Simulated annealing improves convergence by gradually decreasing the temperature. Modern hybrid approaches combine MCMC with neural network energy functions: for example, using ProteinMPNN pseudo-log-likelihoods as the scoring function instead of Rosetta energies. Norn et al. (PNAS 2021) used MCMC with trRosetta-predicted distance maps as the objective, achieving hallucination of novel protein structures. The temperature schedule and mutation strategy strongly influence convergence and diversity. Reference: Kuhlman et al., Science 302, 1364-1368 (2003); Norn et al., PNAS 118, e2017228118 (2021).",
+            "code": "import torch\nimport random\nimport math\n\ndef mcmc_sequence_design(energy_fn, backbone, initial_seq, num_steps=10000,\n                        T_init=2.0, T_final=0.1):\n    \"\"\"MCMC sequence optimization with simulated annealing.\n    energy_fn: function(backbone, sequence) -> scalar energy\n    backbone: fixed backbone features\n    initial_seq: (L,) starting amino acid indices\n    \"\"\"\n    L = initial_seq.shape[0]\n    current_seq = initial_seq.clone()\n    current_energy = energy_fn(backbone, current_seq)\n    best_seq = current_seq.clone()\n    best_energy = current_energy\n    for step in range(num_steps):\n        # Simulated annealing temperature\n        T = T_init * (T_final / T_init) ** (step / num_steps)\n        # Propose mutation: random position, random amino acid\n        pos = random.randint(0, L - 1)\n        new_aa = random.randint(0, 19)\n        proposed_seq = current_seq.clone()\n        proposed_seq[pos] = new_aa\n        # Evaluate proposed sequence\n        proposed_energy = energy_fn(backbone, proposed_seq)\n        delta_E = {{b1}}\n        # Metropolis criterion\n        if delta_E < 0 or random.random() < {{b2}}:\n            current_seq = proposed_seq\n            current_energy = proposed_energy\n            if current_energy < best_energy:\n                best_seq = current_seq.clone()\n                best_energy = {{b3}}\n    return best_seq, best_energy",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "energy difference",
+                    "acceptable": ["proposed_energy - current_energy"],
+                    "hint": "Compute the energy change: proposed minus current energy."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "Boltzmann acceptance probability",
+                    "acceptable": ["math.exp(-delta_E / T)", "torch.exp(-delta_E / T).item()"],
+                    "hint": "The Boltzmann acceptance probability is exp(-delta_E / T)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "update best energy",
+                    "acceptable": ["current_energy"],
+                    "hint": "Update the best energy to the current energy value."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_gradient_optimization",
+            "title": "Gradient-Based Continuous Sequence Optimization",
+            "difficulty": "medium",
+            "description": "Implement gradient-based sequence optimization using a continuous relaxation of the discrete amino acid sequence, with straight-through estimator for gradient flow.",
+            "info": "Gradient-based sequence optimization uses backpropagation through differentiable structure prediction or energy models to optimize sequences. Unlike MCMC, which explores discrete sequence space, gradient methods operate on a continuous relaxation (softmax logits over amino acids). The straight-through Gumbel-softmax estimator (Jang et al., ICLR 2017) enables gradient flow through discrete sampling. Moffat et al. (Cell Systems 2024) demonstrated gradient-based design using ESMFold as a differentiable oracle. SPIN-DIFFUSION (Alamdari et al., 2023) uses gradient-guided diffusion for sequence optimization. Key tricks include entropy regularization to prevent premature collapse to a single amino acid and diversity-promoting losses. The continuous relaxation allows joint optimization of multiple objectives (stability, binding, solubility) with gradient descent. Reference: Jang et al., 'Categorical Reparameterization with Gumbel-Softmax', ICLR 2017; Moffat et al., Cell Systems 15, 2024.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\ndef gradient_sequence_optimization(oracle, backbone, seq_length,\n                                   num_steps=300, lr=0.1,\n                                   entropy_weight=0.01):\n    \"\"\"Optimize sequence via gradient descent on continuous relaxation.\n    oracle: differentiable function(backbone, soft_seq) -> energy (lower = better)\n    backbone: fixed backbone features\n    \"\"\"\n    # Initialize learnable logits\n    logits = nn.Parameter(torch.randn(seq_length, 20))\n    optimizer = torch.optim.Adam([logits], lr=lr)\n    for step in range(num_steps):\n        optimizer.zero_grad()\n        # Temperature annealing: start soft, end hard\n        tau = max(0.1, 1.0 - step / num_steps)\n        # Straight-through Gumbel-softmax\n        soft_seq = F.gumbel_softmax(logits, tau=tau, hard=True)\n        # Compute energy\n        energy = oracle(backbone, soft_seq)\n        # Entropy regularization to maintain diversity\n        probs = F.softmax(logits, dim=-1)\n        entropy = {{b1}}\n        # Total loss: energy minus entropy bonus\n        loss = {{b2}}\n        loss.backward()\n        optimizer.step()\n    # Final discrete sequence\n    final_seq = {{b3}}\n    return final_seq",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "Shannon entropy of distribution",
+                    "acceptable": ["-(probs * torch.log(probs + 1e-8)).sum(dim=-1).mean()", "-(probs * probs.log()).sum(dim=-1).mean()"],
+                    "hint": "Shannon entropy is -sum(p * log(p)) per position, then averaged over positions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "energy minus entropy bonus",
+                    "acceptable": ["energy - entropy_weight * entropy"],
+                    "hint": "Subtract the weighted entropy from the energy to encourage diversity."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "argmax to get discrete sequence",
+                    "acceptable": ["torch.argmax(logits, dim=-1)", "logits.argmax(dim=-1)"],
+                    "hint": "Take the argmax over amino acid logits to obtain the final discrete sequence."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_diversity_metrics",
+            "title": "Diversity Metrics for Generated Protein Ensembles",
+            "difficulty": "easy",
+            "description": "Implement diversity metrics for evaluating a set of generated protein structures, including pairwise TM-score diversity, sequence diversity, and cluster count.",
+            "info": "Evaluating diversity is critical for protein generative models: a model that generates diverse, novel proteins is more useful than one producing near-identical outputs. Key metrics include: (1) pairwise TM-score, where lower average pairwise TM-score indicates greater structural diversity; (2) sequence identity, measured as the fraction of identical residues between aligned sequences; (3) cluster count, the number of structural clusters at a given TM-score threshold. Chroma (Ingraham et al., Nature 2023) demonstrated generation of over 2000 unique topologies, while RFdiffusion (Watson et al., Nature 2023) showed broad coverage of the fold space. FoldSeek (van Kempen et al., Nature Biotechnology 2024) provides fast structural clustering for large-scale diversity analysis. Diversity-designability tradeoffs are common: higher sampling temperatures increase diversity but may decrease designability. Reference: Ingraham et al., Nature 623, 1070-1078 (2023); Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\nimport numpy as np\n\ndef sequence_identity(seq1, seq2):\n    \"\"\"Fraction of identical residues between two sequences.\n    seq1, seq2: (L,) integer tensors of amino acid indices\n    \"\"\"\n    assert seq1.shape == seq2.shape\n    return {{b1}}\n\ndef pairwise_diversity(sequences):\n    \"\"\"Compute average pairwise sequence diversity for a set of sequences.\n    sequences: list of (L,) integer tensors\n    Returns: average (1 - sequence_identity) over all pairs\n    \"\"\"\n    n = len(sequences)\n    total_div = 0.0\n    num_pairs = 0\n    for i in range(n):\n        for j in range(i + 1, n):\n            identity = sequence_identity(sequences[i], sequences[j])\n            total_div += {{b2}}\n            num_pairs += 1\n    return total_div / num_pairs if num_pairs > 0 else 0.0\n\ndef cluster_count(tm_score_matrix, threshold=0.5):\n    \"\"\"Count number of structural clusters by greedy clustering.\n    tm_score_matrix: (N, N) pairwise TM-scores\n    threshold: TM-score cutoff for same cluster\n    \"\"\"\n    N = tm_score_matrix.shape[0]\n    assigned = [False] * N\n    num_clusters = 0\n    for i in range(N):\n        if not assigned[i]:\n            num_clusters += 1\n            assigned[i] = True\n            for j in range(i + 1, N):\n                if not assigned[j] and {{b3}}:\n                    assigned[j] = True\n    return num_clusters",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "fraction of matching residues",
+                    "acceptable": ["(seq1 == seq2).float().mean().item()", "(seq1 == seq2).float().mean()", "(seq1 == seq2).sum().item() / len(seq1)"],
+                    "hint": "Compute the fraction of positions where the two sequences have the same amino acid."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "diversity from identity",
+                    "acceptable": ["1.0 - identity", "1 - identity"],
+                    "hint": "Diversity is 1 minus the sequence identity."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "check if j belongs to cluster i",
+                    "acceptable": ["tm_score_matrix[i, j] >= threshold", "tm_score_matrix[i][j] >= threshold"],
+                    "hint": "Assign j to the same cluster as i if their TM-score is above the threshold."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_novelty_metrics",
+            "title": "Novelty Metrics: Max TM-Score to Training Set",
+            "difficulty": "easy",
+            "description": "Implement novelty metrics that measure how different generated protein structures are from known structures in the PDB, using maximum TM-score to the training set.",
+            "info": "Novelty evaluation determines whether generated proteins represent genuinely new folds rather than memorized training examples. The standard metric is max-TM: for each generated structure, compute its TM-score against all structures in the training set (or PDB) and report the maximum. A max-TM below 0.5 indicates a novel fold not present in the training data. FoldSeek (van Kempen et al., Nature Biotechnology 2024) enables fast structural search against millions of PDB entries. RFdiffusion (Watson et al., Nature 2023) demonstrated generation of structures with max-TM < 0.5 to the PDB, representing genuinely novel folds. Chroma (Ingraham et al., Nature 2023) reported generating proteins spanning diverse topology classes beyond training data coverage. The SCOP/CATH classification databases provide hierarchical fold classification for assessing coverage of fold space. Reference: Watson et al., Nature 620, 1089-1100 (2023); van Kempen et al., Nature Biotechnology 42, 243-246 (2024).",
+            "code": "import torch\nimport numpy as np\n\ndef compute_max_tm(generated_coords, training_set_coords, tm_score_fn):\n    \"\"\"Compute max TM-score of a generated structure against a training set.\n    generated_coords: (L_gen, 3) coordinates of generated structure\n    training_set_coords: list of (L_i, 3) coordinate arrays from training set\n    tm_score_fn: function(coords1, coords2) -> TM-score\n    Returns: max TM-score (float), index of most similar training structure\n    \"\"\"\n    max_tm = 0.0\n    max_idx = -1\n    for idx, train_coords in enumerate(training_set_coords):\n        tm = tm_score_fn(generated_coords, train_coords)\n        if tm > max_tm:\n            max_tm = tm\n            max_idx = idx\n    return max_tm, max_idx\n\ndef novelty_report(generated_structures, training_set, tm_score_fn,\n                  novelty_threshold=0.5):\n    \"\"\"Generate a novelty report for a batch of generated structures.\n    Returns: fraction novel, per-structure max-TM scores\n    \"\"\"\n    max_tms = []\n    for gen_coords in generated_structures:\n        max_tm, _ = compute_max_tm(gen_coords, training_set, tm_score_fn)\n        max_tms.append(max_tm)\n    max_tms = {{b1}}\n    # Fraction of generated structures that are novel (below threshold)\n    novel_mask = {{b2}}\n    fraction_novel = {{b3}}\n    return fraction_novel, max_tms",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "convert to numpy array",
+                    "acceptable": ["np.array(max_tms)", "torch.tensor(max_tms)"],
+                    "hint": "Convert the list of max TM-scores to a numpy array or tensor for vectorized operations."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "identify novel structures",
+                    "acceptable": ["max_tms < novelty_threshold"],
+                    "hint": "A structure is novel if its max TM-score to the training set is below the threshold."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "fraction of novel structures",
+                    "acceptable": ["novel_mask.mean()", "np.mean(novel_mask)", "novel_mask.sum() / len(novel_mask)"],
+                    "hint": "Compute the fraction of generated structures that are novel."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_ramachandran",
+            "title": "Ramachandran Plot Validation for Generated Backbones",
+            "difficulty": "easy",
+            "description": "Implement Ramachandran plot analysis for validating generated protein backbones by computing phi/psi dihedral angles and checking whether they fall in allowed regions.",
+            "info": "The Ramachandran plot (Ramachandran et al., J. Mol. Biol. 1963) maps backbone dihedral angles phi and psi for each residue, and is a fundamental validation tool for protein structures. Allowed regions in the plot correspond to sterically feasible backbone conformations: alpha-helix (phi~-60, psi~-45), beta-sheet (phi~-120, psi~130), and left-handed helix (phi~60, psi~45). Generated protein structures should have >90% of residues in favored regions and <1% in outlier regions, as assessed by tools like MolProbity (Williams et al., Protein Science 2018). Diffusion-generated backbones from RFdiffusion and Chroma consistently achieve >95% Ramachandran-favored residues, demonstrating that these models learn valid backbone geometry. Glycine and proline have distinct allowed regions due to their unique side chain properties. Reference: Ramachandran et al., J. Mol. Biol. 7, 95-99 (1963); Williams et al., Protein Science 27, 293-315 (2018).",
+            "code": "import torch\nimport math\n\ndef compute_dihedral(p0, p1, p2, p3):\n    \"\"\"Compute dihedral angle between four points.\n    Returns angle in degrees.\n    \"\"\"\n    b1 = p1 - p0\n    b2 = p2 - p1\n    b3 = p3 - p2\n    n1 = torch.cross(b1, b2)\n    n2 = torch.cross(b2, b3)\n    n1 = n1 / (n1.norm(dim=-1, keepdim=True) + 1e-8)\n    n2 = n2 / (n2.norm(dim=-1, keepdim=True) + 1e-8)\n    cos_angle = (n1 * n2).sum(dim=-1).clamp(-1, 1)\n    sin_angle = (torch.cross(n1, n2) * b2 / (b2.norm(dim=-1, keepdim=True) + 1e-8)).sum(dim=-1)\n    return torch.atan2(sin_angle, cos_angle) * 180.0 / math.pi\n\ndef compute_phi_psi(N_coords, CA_coords, C_coords):\n    \"\"\"Compute phi and psi angles for a protein backbone.\n    N_coords, CA_coords, C_coords: each (L, 3)\n    Returns: phi (L-2,), psi (L-2,) in degrees\n    \"\"\"\n    # Phi: C(i-1) - N(i) - CA(i) - C(i)\n    phi = {{b1}}\n    # Psi: N(i) - CA(i) - C(i) - N(i+1)\n    psi = {{b2}}\n    # Trim to matching length\n    min_len = min(len(phi), len(psi))\n    return phi[:min_len], psi[:min_len]\n\ndef ramachandran_favored_fraction(phi, psi):\n    \"\"\"Fraction of residues in Ramachandran favored regions.\"\"\"\n    # Simplified favored regions: alpha-helix and beta-sheet\n    alpha_helix = (phi > -100) & (phi < -30) & (psi > -67) & (psi < -7)\n    beta_sheet = (phi > -160) & (phi < -60) & (psi > 90) & (psi < 180)\n    favored = {{b3}}\n    return favored.float().mean()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "phi dihedral: C(i-1)-N(i)-CA(i)-C(i)",
+                    "acceptable": ["compute_dihedral(C_coords[:-1], N_coords[1:], CA_coords[1:], C_coords[1:])"],
+                    "hint": "Phi is the dihedral defined by C of the previous residue, and N, CA, C of the current residue."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "psi dihedral: N(i)-CA(i)-C(i)-N(i+1)",
+                    "acceptable": ["compute_dihedral(N_coords[:-1], CA_coords[:-1], C_coords[:-1], N_coords[1:])"],
+                    "hint": "Psi is the dihedral defined by N, CA, C of the current residue and N of the next residue."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "union of favored regions",
+                    "acceptable": ["alpha_helix | beta_sheet", "torch.logical_or(alpha_helix, beta_sheet)"],
+                    "hint": "A residue is in a favored region if it falls in either the alpha-helix or beta-sheet region."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_clash_score",
+            "title": "Steric Clash Score for Structure Validation",
+            "difficulty": "easy",
+            "description": "Implement a steric clash score that counts the number of atom pairs with van der Waals overlap, used to validate generated protein structures.",
+            "info": "The clash score counts the number of serious steric overlaps per 1000 atoms, where an overlap is defined as two non-bonded atoms closer than the sum of their van der Waals radii minus a tolerance (typically 0.4 Angstroms). MolProbity (Williams et al., Protein Science 2018) defines clashes as atom pairs with overlap >= 0.4A. A good structure should have a clash score below 10 (clashes per 1000 atoms). Generated structures from diffusion models typically have low clash scores after energy minimization, but may have clashes before refinement. RFdiffusion (Watson et al., Nature 2023) outputs are typically refined with Rosetta FastRelax to resolve clashes. The clash score is complementary to the Ramachandran analysis: together they assess both backbone validity and packing quality. Higher clash scores indicate physically unrealizable structures that would require further optimization. Reference: Williams et al., Protein Science 27, 293-315 (2018); Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\n\ndef compute_clash_score(atom_coords, vdw_radii, bond_mask,\n                       overlap_threshold=0.4):\n    \"\"\"Compute steric clash score for a protein structure.\n    atom_coords: (M, 3) all atom coordinates\n    vdw_radii: (M,) van der Waals radius per atom\n    bond_mask: (M, M) boolean, True for bonded atom pairs (excluded from clashes)\n    overlap_threshold: minimum overlap in Angstroms to count as clash\n    \"\"\"\n    M = atom_coords.shape[0]\n    # Pairwise distances\n    dist = torch.cdist(atom_coords, atom_coords)  # (M, M)\n    # Sum of VDW radii for each pair\n    sum_radii = {{b1}}\n    # Overlap = sum_radii - distance (positive means overlap)\n    overlap = sum_radii - dist\n    # Identify clashes: overlap above threshold, not bonded, not self\n    self_mask = torch.eye(M, dtype=torch.bool)\n    clash_mask = {{b2}}\n    # Count clashes (each pair counted once, so divide by 2)\n    num_clashes = clash_mask.sum().item() / 2\n    # Normalize to clashes per 1000 atoms\n    clash_score = {{b3}}\n    return clash_score",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "pairwise sum of VDW radii",
+                    "acceptable": ["vdw_radii.unsqueeze(0) + vdw_radii.unsqueeze(1)", "vdw_radii[:, None] + vdw_radii[None, :]"],
+                    "hint": "Add VDW radii of all pairs by broadcasting: unsqueeze along different dimensions and add."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "identify clashing pairs",
+                    "acceptable": ["(overlap > overlap_threshold) & (~bond_mask) & (~self_mask)"],
+                    "hint": "A clash occurs when overlap exceeds the threshold AND the atoms are not bonded AND they are not the same atom."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "normalize to per-1000-atoms",
+                    "acceptable": ["num_clashes / M * 1000", "num_clashes * 1000 / M", "(num_clashes / M) * 1000"],
+                    "hint": "Divide the number of clashes by the total atoms and multiply by 1000."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_flow_matching",
+            "title": "Flow Matching for Protein Backbone Generation",
+            "difficulty": "hard",
+            "description": "Implement the flow matching training objective for protein backbone generation, where the model learns a velocity field that transports noise to data along straight-line paths.",
+            "info": "Flow matching (Lipman et al., ICLR 2023) offers an alternative to score-based diffusion for protein generation, learning a time-dependent velocity field that maps a noise distribution to the data distribution. FrameFlow (Yim et al., NeurIPS 2023) applies flow matching on SE(3) for protein backbone generation, achieving performance comparable to diffusion-based methods with simpler training objectives. The key idea is that data and noise are connected by straight-line (optimal transport) paths: x_t = (1-t)*x_0 + t*x_1, and the velocity is simply u_t = x_1 - x_0. The model learns to predict this velocity at any point along the path. Flow matching avoids the need for noise schedule tuning and provides a more direct generative process. FoldFlow (Bose et al., ICML 2024) extends flow matching with Riemannian geometry on SE(3) for improved protein generation. Reference: Lipman et al., ICLR 2023; Yim et al., 'Fast protein backbone generation with SE(3) flow matching', NeurIPS 2023.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef flow_matching_interpolant(x_data, x_noise, t):\n    \"\"\"Compute the interpolant x_t along a straight-line path.\n    x_data: (N, 3) clean protein coordinates (x_1)\n    x_noise: (N, 3) noise sample (x_0)\n    t: scalar in [0, 1], where t=0 is noise and t=1 is data\n    \"\"\"\n    x_t = {{b1}}\n    return x_t\n\ndef flow_matching_target(x_data, x_noise):\n    \"\"\"Compute the target velocity field (constant along straight paths).\"\"\"\n    return {{b2}}\n\ndef flow_matching_loss(velocity_model, x_data, x_noise, t):\n    \"\"\"Flow matching training loss: predict the velocity at (x_t, t).\n    velocity_model: network that predicts velocity given (x_t, t)\n    \"\"\"\n    x_t = flow_matching_interpolant(x_data, x_noise, t)\n    target_velocity = flow_matching_target(x_data, x_noise)\n    pred_velocity = velocity_model(x_t, t)\n    loss = {{b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "linear interpolation between noise and data",
+                    "acceptable": ["(1 - t) * x_noise + t * x_data", "t * x_data + (1 - t) * x_noise"],
+                    "hint": "The interpolant is (1-t)*x_noise + t*x_data, a straight line from noise (t=0) to data (t=1)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "constant velocity along path",
+                    "acceptable": ["x_data - x_noise"],
+                    "hint": "The target velocity along a straight-line path is simply the direction: x_data - x_noise."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "MSE between predicted and target velocity",
+                    "acceptable": ["torch.mean((pred_velocity - target_velocity) ** 2)", "((pred_velocity - target_velocity) ** 2).mean()", "F.mse_loss(pred_velocity, target_velocity)"],
+                    "hint": "Compute the mean squared error between the predicted and target velocity fields."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_plddt_filter",
+            "title": "pLDDT-Based Confidence Filtering for Designs",
+            "difficulty": "easy",
+            "description": "Implement a confidence-based filtering pipeline for generated protein designs using predicted local distance difference test (pLDDT) scores from structure prediction models.",
+            "info": "The predicted local distance difference test (pLDDT) is a per-residue confidence score output by AlphaFold2 (Jumper et al., Nature 2021) and ESMFold (Lin et al., Science 2023), ranging from 0-100. Higher pLDDT indicates greater confidence that the predicted structure is correct at that position. In protein design workflows, pLDDT filtering removes low-confidence designs: a design is typically accepted if its mean pLDDT exceeds 70-80 and if less than 10% of residues have pLDDT below 50. Watson et al. (Nature 2023) used pLDDT > 80 as a quality filter for RFdiffusion outputs. pLDDT correlates with structural accuracy and local packing quality. Low pLDDT regions often correspond to disordered loops, poorly packed cores, or regions with backbone strain. Combined with scTM filtering, pLDDT provides a comprehensive quality assessment pipeline. Reference: Jumper et al., Nature 596, 583-589 (2021); Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\n\ndef plddt_filter(plddt_scores, mean_threshold=80.0, min_threshold=50.0,\n                 max_low_fraction=0.1):\n    \"\"\"Filter protein designs based on pLDDT confidence scores.\n    plddt_scores: (L,) per-residue pLDDT scores (0-100)\n    Returns: (passed: bool, stats: dict)\n    \"\"\"\n    mean_plddt = {{b1}}\n    low_confidence = plddt_scores < min_threshold\n    fraction_low = {{b2}}\n    passed = (mean_plddt >= mean_threshold) and (fraction_low <= max_low_fraction)\n    stats = {\n        'mean_plddt': mean_plddt.item(),\n        'min_plddt': plddt_scores.min().item(),\n        'max_plddt': plddt_scores.max().item(),\n        'fraction_low': fraction_low.item(),\n        'passed': passed\n    }\n    return passed, stats\n\ndef batch_filter(designs, plddt_fn, mean_threshold=80.0):\n    \"\"\"Filter a batch of designs, returning only those passing pLDDT filter.\n    designs: list of design dicts with 'sequence' and 'backbone' keys\n    plddt_fn: function(sequence) -> pLDDT scores\n    \"\"\"\n    passed_designs = []\n    for design in designs:\n        plddt = plddt_fn(design['sequence'])\n        passed, stats = plddt_filter(plddt, mean_threshold=mean_threshold)\n        if passed:\n            design['plddt_stats'] = stats\n            passed_designs.append(design)\n    pass_rate = {{b3}}\n    return passed_designs, pass_rate",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "compute mean pLDDT",
+                    "acceptable": ["plddt_scores.mean()", "torch.mean(plddt_scores)"],
+                    "hint": "Take the mean of pLDDT scores across all residues."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "fraction of low-confidence residues",
+                    "acceptable": ["low_confidence.float().mean()", "low_confidence.sum().float() / len(plddt_scores)"],
+                    "hint": "Compute the fraction of residues with pLDDT below the minimum threshold."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "compute pass rate",
+                    "acceptable": ["len(passed_designs) / len(designs)", "len(passed_designs) / len(designs) if len(designs) > 0 else 0.0"],
+                    "hint": "Divide the number of passing designs by the total number of designs."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_residue_featurizer",
+            "title": "Backbone Geometry Featurizer for Protein Design",
+            "difficulty": "medium",
+            "description": "Implement a backbone geometry featurizer that computes torsion angles (phi, psi, omega) and inter-residue orientations from N, CA, C atom coordinates for use in protein design GNNs.",
+            "info": "Backbone geometry features are the primary input to structure-based protein design models. ProteinMPNN (Dauparas et al., Science 2022) uses backbone torsion angles (phi, psi, omega), inter-residue distances, and unit direction vectors between backbone atoms. The local coordinate frame at each residue is defined by the N-CA-C triangle, enabling computation of rotation-invariant relative orientations. GVP-GNN (Jing et al., ICLR 2021) additionally uses virtual C-beta positions computed from backbone geometry. The inter-residue orientation features include the quaternion or Euler angle representation of the relative rotation between local frames, which captures the 3D spatial relationship between residues beyond simple distance. These features are critical for the model to understand secondary structure, backbone curvature, and inter-residue packing geometry. Reference: Dauparas et al., Science 378, 49-56 (2022); Jing et al., ICLR 2021.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef compute_local_frames(N_coords, CA_coords, C_coords):\n    \"\"\"Compute local coordinate frame at each residue from backbone atoms.\n    Returns: rotation matrices (L, 3, 3) and origins (L, 3)\n    \"\"\"\n    # X-axis: CA -> C direction\n    x_axis = F.normalize(C_coords - CA_coords, dim=-1)\n    # Temporary vector: CA -> N\n    v = N_coords - CA_coords\n    # Z-axis: perpendicular to x_axis and v\n    z_axis = {{b1}}\n    z_axis = F.normalize(z_axis, dim=-1)\n    # Y-axis: completes right-handed frame\n    y_axis = torch.cross(z_axis, x_axis, dim=-1)\n    # Stack into rotation matrix (L, 3, 3)\n    R = torch.stack([x_axis, y_axis, z_axis], dim=-1)  # columns are axes\n    return R, CA_coords  # origin at CA\n\ndef compute_relative_orientation(R_i, t_i, R_j, t_j):\n    \"\"\"Compute relative rotation and translation between two frames.\n    R_i, R_j: (3, 3) rotation matrices\n    t_i, t_j: (3,) translation vectors\n    Returns: relative rotation (3, 3), relative translation (3,)\n    \"\"\"\n    # Express frame j in the coordinate system of frame i\n    R_rel = {{b2}}\n    t_rel = R_i.T @ (t_j - t_i)\n    return R_rel, t_rel\n\ndef featurize_backbone(N_coords, CA_coords, C_coords, edge_index):\n    \"\"\"Compute geometric features for each edge in the protein graph.\"\"\"\n    R, origins = compute_local_frames(N_coords, CA_coords, C_coords)\n    src, dst = edge_index\n    features_list = []\n    for s, d in zip(src, dst):\n        R_rel, t_rel = compute_relative_orientation(R[s], origins[s], R[d], origins[d])\n        # Features: relative translation (3) + flattened relative rotation (9)\n        feat = {{b3}}\n        features_list.append(feat)\n    return torch.stack(features_list)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "cross product for z-axis",
+                    "acceptable": ["torch.cross(x_axis, v, dim=-1)", "torch.cross(x_axis, v)"],
+                    "hint": "The z-axis is the cross product of x_axis and the CA-N vector, giving a vector perpendicular to both."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "relative rotation between frames",
+                    "acceptable": ["R_i.T @ R_j", "R_i.transpose(-1, -2) @ R_j", "torch.matmul(R_i.T, R_j)"],
+                    "hint": "The relative rotation from frame i to frame j is R_i^T @ R_j."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "concatenate translation and rotation features",
+                    "acceptable": ["torch.cat([t_rel, R_rel.flatten()])", "torch.cat([t_rel, R_rel.reshape(-1)])"],
+                    "hint": "Concatenate the 3D relative translation with the flattened 3x3 rotation matrix (9 values)."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_tied_residue_mpnn",
+            "title": "Tied Residue Design for Repeat Proteins",
+            "difficulty": "medium",
+            "description": "Implement tied residue constraints for ProteinMPNN-style sequence design of repeat proteins, where structurally equivalent positions across repeat units are constrained to have the same amino acid identity.",
+            "info": "Repeat proteins consist of tandemly repeated structural units (e.g., leucine-rich repeats, ankyrin repeats, TPR motifs) where each repeat has similar structure. Designing repeat proteins requires tying amino acid identities across equivalent positions in different repeats to maintain symmetry. ProteinMPNN (Dauparas et al., Science 2022) supports tied positions through logit averaging, and this approach has been used to design stable repeat proteins with novel functions. Brunette et al. (Nature 2015) demonstrated that designed repeat proteins with perfectly repeated sequences achieve exceptional thermostability. The tied-residue approach generalizes to other symmetry scenarios, including homo-oligomers and designed protein cages. Averaging logits across tied positions ensures consensus sequence selection, while still allowing natural variation at non-tied positions. Reference: Dauparas et al., Science 378, 49-56 (2022); Brunette et al., Nature 528, 580-584 (2015).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef tied_residue_decode(model, backbone_feats, tied_groups, temperature=0.1):\n    \"\"\"Autoregressive decoding with tied residue constraints.\n    model: ProteinMPNN-style model\n    backbone_feats: (L, feat_dim) structural features\n    tied_groups: list of lists, each inner list contains indices that\n                 must have the same amino acid (e.g., repeat equivalent positions)\n    \"\"\"\n    L = backbone_feats.shape[0]\n    sequence = torch.full((L,), fill_value=-1, dtype=torch.long)\n    encoder_out = model.encode(backbone_feats)\n    # Build position-to-group mapping\n    pos_to_group = {}\n    for gid, group in enumerate(tied_groups):\n        for pos in group:\n            pos_to_group[pos] = gid\n    # Track which groups have been assigned\n    group_assigned = {}\n    decode_order = torch.randperm(L).tolist()\n    for pos in decode_order:\n        if pos in pos_to_group:\n            gid = pos_to_group[pos]\n            if gid in group_assigned:\n                # Already assigned: copy the amino acid\n                sequence[pos] = {{b1}}\n                continue\n        # Get logits for this position\n        logits = model.decode_step(encoder_out, sequence, pos)  # (20,)\n        if pos in pos_to_group:\n            # Average logits across all tied positions in this group\n            group = tied_groups[pos_to_group[pos]]\n            all_logits = []\n            for p in group:\n                all_logits.append(model.decode_step(encoder_out, sequence, p))\n            logits = {{b2}}\n        probs = F.softmax(logits / temperature, dim=-1)\n        sampled_aa = torch.multinomial(probs, 1).squeeze(-1)\n        sequence[pos] = sampled_aa\n        if pos in pos_to_group:\n            gid = pos_to_group[pos]\n            group_assigned[gid] = sampled_aa.item()\n            # Assign to all tied positions\n            for p in tied_groups[gid]:\n                {{b3}}\n    return sequence",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "copy previously assigned AA",
+                    "acceptable": ["group_assigned[gid]"],
+                    "hint": "Use the amino acid already assigned to this tied group."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "average logits across tied positions",
+                    "acceptable": ["torch.stack(all_logits).mean(dim=0)"],
+                    "hint": "Stack all logits from tied positions and average along the first dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "assign sampled AA to all tied positions",
+                    "acceptable": ["sequence[p] = sampled_aa"],
+                    "hint": "Set the amino acid at each tied position to the sampled amino acid."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_pair_representation",
+            "title": "Pair Representation Update for Structure Generation",
+            "difficulty": "hard",
+            "description": "Implement the pair representation update with outer product mean and triangular attention, as used in AlphaFold2-derived structure generation models.",
+            "info": "The pair representation in AlphaFold2 (Jumper et al., Nature 2021) captures pairwise relationships between all residue pairs and is updated using outer product mean from MSA features and triangular multiplicative updates. Structure generation models like FrameDiff (Yim et al., ICLR 2024) and RF2-based methods inherit this pair representation architecture. The outer product mean computes pair features by taking the outer product of single-representation rows, capturing co-evolutionary signals. Triangular attention enforces consistency: if residue i is close to j, and j to k, then the i-k pair should reflect this transitivity. The pair representation directly informs the IPA attention mechanism and is critical for long-range contact prediction. These updates are computationally expensive (O(L^2) memory) but essential for accurate structure modeling. Reference: Jumper et al., Nature 596, 583-589 (2021); Yim et al., ICLR 2024.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PairRepresentationUpdate(nn.Module):\n    \"\"\"Update pair representation with outer product mean and triangle attention.\"\"\"\n    def __init__(self, node_dim=256, pair_dim=128, hidden_dim=32):\n        super().__init__()\n        # Outer product mean projections\n        self.left_proj = nn.Linear(node_dim, hidden_dim)\n        self.right_proj = nn.Linear(node_dim, hidden_dim)\n        self.opm_output = nn.Linear(hidden_dim * hidden_dim, pair_dim)\n        # Triangular multiplicative update (outgoing)\n        self.tri_left = nn.Linear(pair_dim, hidden_dim)\n        self.tri_right = nn.Linear(pair_dim, hidden_dim)\n        self.tri_gate_left = nn.Linear(pair_dim, hidden_dim)\n        self.tri_gate_right = nn.Linear(pair_dim, hidden_dim)\n        self.tri_output = nn.Linear(hidden_dim, pair_dim)\n        self.layer_norm = nn.LayerNorm(pair_dim)\n\n    def outer_product_mean(self, node_feats):\n        \"\"\"Compute pair features via outer product of node features.\n        node_feats: (L, node_dim)\n        Returns: (L, L, pair_dim)\n        \"\"\"\n        L = node_feats.shape[0]\n        left = self.left_proj(node_feats)   # (L, hidden)\n        right = self.right_proj(node_feats) # (L, hidden)\n        # Outer product: (L, L, hidden*hidden)\n        opm = {{b1}}\n        return self.opm_output(opm)\n\n    def triangular_update(self, pair_feats):\n        \"\"\"Triangular multiplicative update (outgoing edges).\n        pair_feats: (L, L, pair_dim)\n        \"\"\"\n        left = self.tri_left(pair_feats) * torch.sigmoid(self.tri_gate_left(pair_feats))\n        right = self.tri_right(pair_feats) * torch.sigmoid(self.tri_gate_right(pair_feats))\n        # Triangular product: sum over shared index k\n        # For outgoing: pair_ij = sum_k left_ik * right_jk\n        tri_out = {{b2}}\n        return self.tri_output(tri_out)\n\n    def forward(self, node_feats, pair_feats):\n        # Outer product mean update\n        pair_feats = pair_feats + self.outer_product_mean(node_feats)\n        # Triangular multiplicative update\n        pair_feats = self.layer_norm(pair_feats)\n        pair_feats = {{b3}}\n        return pair_feats",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "outer product of left and right projections",
+                    "acceptable": ["torch.einsum('ih,jk->ijhk', left, right).reshape(L, L, -1)", "(left.unsqueeze(1).unsqueeze(-1) * right.unsqueeze(0).unsqueeze(-2)).reshape(L, L, -1)"],
+                    "hint": "Compute the outer product between left (L, h) and right (L, h) to get (L, L, h*h), representing all residue pair interactions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "triangular product summing over shared index",
+                    "acceptable": ["torch.einsum('ikh,jkh->ijh', left, right)", "torch.matmul(left.permute(2,0,1), right.permute(2,1,0)).permute(1,2,0)"],
+                    "hint": "Contract over the shared index k: pair_ij = sum_k left_ik * right_jk, using einsum."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "add triangular update residually",
+                    "acceptable": ["pair_feats + self.triangular_update(pair_feats)"],
+                    "hint": "Add the triangular update output to pair features as a residual connection."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_diffusion_guidance",
+            "title": "Potential-Guided Diffusion for Constrained Design",
+            "difficulty": "hard",
+            "description": "Implement potential-guided reverse diffusion that steers protein backbone generation toward desired properties by adding gradient-based guidance to the denoising process.",
+            "info": "Potential-guided diffusion (Dhariwal & Nichol, NeurIPS 2021) modifies the reverse diffusion process by adding gradients from external potential functions to the denoising score. In protein design, RFdiffusion (Watson et al., Nature 2023) uses potentials to guide generation toward desired properties: binder contacts, symmetry, secondary structure content, and radius of gyration. The guided score is: score_guided = score_unconditional + gamma * grad_x(log p(y|x_t)), where gamma is the guidance scale and p(y|x_t) is the potential evaluated on noisy structures. Multiple potentials can be combined additively for multi-objective design. Chroma (Ingraham et al., Nature 2023) generalizes this with programmatic conditioners. Key considerations include gradient clipping to prevent instability and annealing the guidance strength across timesteps. Reference: Watson et al., Nature 620, 1089-1100 (2023); Dhariwal & Nichol, NeurIPS 2021.",
+            "code": "import torch\n\nclass GuidedDiffusionSampler:\n    \"\"\"Reverse diffusion with potential-based guidance.\"\"\"\n    def __init__(self, denoiser, potentials, guidance_scales, noise_schedule):\n        self.denoiser = denoiser\n        self.potentials = potentials      # list of potential functions\n        self.scales = guidance_scales      # list of floats\n        self.schedule = noise_schedule\n\n    def compute_guidance_gradient(self, x_t, t):\n        \"\"\"Compute combined gradient from all guidance potentials.\"\"\"\n        x_t_grad = x_t.detach().requires_grad_(True)\n        total_potential = 0.0\n        for potential, scale in zip(self.potentials, self.scales):\n            total_potential = total_potential + scale * potential(x_t_grad, t)\n        total_potential.backward()\n        grad = {{b1}}\n        return grad\n\n    def guided_reverse_step(self, x_t, t, grad_clip=1.0):\n        \"\"\"One guided reverse diffusion step.\"\"\"\n        alpha_bar_t = self.schedule['alpha_bar'][t]\n        beta_t = self.schedule['betas'][t]\n        alpha_t = 1 - beta_t\n        # Get unguided denoiser prediction\n        with torch.no_grad():\n            eps_pred = self.denoiser(x_t, t)\n        # Compute guidance gradient\n        guidance_grad = self.compute_guidance_gradient(x_t, t)\n        # Clip gradient for stability\n        guidance_grad = torch.clamp(guidance_grad, -grad_clip, grad_clip)\n        # Modify predicted noise with guidance\n        guided_eps = {{b2}}\n        # Compute posterior mean\n        x_mean = (1 / torch.sqrt(alpha_t)) * (\n            x_t - (beta_t / torch.sqrt(1 - alpha_bar_t)) * guided_eps\n        )\n        # Add noise (except at t=0)\n        if t > 0:\n            noise = torch.randn_like(x_t)\n            x_prev = {{b3}}\n        else:\n            x_prev = x_mean\n        return x_prev",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "extract gradient from computation graph",
+                    "acceptable": ["x_t_grad.grad.clone()", "x_t_grad.grad.detach().clone()", "x_t_grad.grad"],
+                    "hint": "Access the gradient accumulated on x_t_grad via .grad attribute."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "subtract guidance from noise prediction",
+                    "acceptable": ["eps_pred - torch.sqrt(1 - alpha_bar_t) * guidance_grad", "eps_pred - (1 - alpha_bar_t).sqrt() * guidance_grad"],
+                    "hint": "Modify the noise prediction by subtracting the scaled guidance gradient: eps - sqrt(1-alpha_bar)*grad."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "posterior mean plus noise",
+                    "acceptable": ["x_mean + torch.sqrt(beta_t) * noise"],
+                    "hint": "Add sqrt(beta_t) scaled noise to the posterior mean for stochastic sampling."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_radius_gyration",
+            "title": "Radius of Gyration Potential for Compact Designs",
+            "difficulty": "easy",
+            "description": "Implement a radius of gyration potential used to guide protein diffusion models toward generating compact, globular structures.",
+            "info": "The radius of gyration (Rg) measures the spatial compactness of a protein structure, defined as the root-mean-square distance of all atoms from the center of mass. Natural globular proteins follow an empirical scaling law: Rg ~ 2.2 * N^0.38, where N is the number of residues (Dima & Thirumalai, J. Phys. Chem. B 2004). In diffusion-based protein design, an Rg potential can be used to guide generation toward compact structures and prevent the generation of extended or unfolded conformations. RFdiffusion (Watson et al., Nature 2023) uses radius of gyration as one of the guidance potentials during reverse diffusion. The Rg potential penalizes structures that are too extended (Rg > expected) or too compact (Rg < expected), steering generation toward the natural compactness. This is particularly important for larger proteins where diffusion models may produce loosely packed structures. Reference: Watson et al., Nature 620, 1089-1100 (2023); Dima & Thirumalai, J. Phys. Chem. B 108, 6564-6570 (2004).",
+            "code": "import torch\n\ndef radius_of_gyration(coords):\n    \"\"\"Compute radius of gyration for a set of coordinates.\n    coords: (N, 3) C-alpha coordinates\n    Returns: scalar Rg value\n    \"\"\"\n    center_of_mass = {{b1}}\n    deviations = coords - center_of_mass\n    rg = torch.sqrt((deviations ** 2).sum(dim=-1).mean())\n    return rg\n\ndef expected_rg(num_residues):\n    \"\"\"Expected Rg for a globular protein of given length.\"\"\"\n    return 2.2 * (num_residues ** 0.38)\n\ndef rg_potential(coords, target_rg=None):\n    \"\"\"Guidance potential to enforce compactness.\n    Returns a scalar potential (lower = closer to target Rg).\n    \"\"\"\n    N = coords.shape[0]\n    if target_rg is None:\n        target_rg = expected_rg(N)\n    actual_rg = radius_of_gyration(coords)\n    potential = {{b2}}\n    return potential\n\ndef rg_loss_batch(coords_batch, masks):\n    \"\"\"Batch radius of gyration loss.\n    coords_batch: (B, L, 3)\n    masks: (B, L) boolean for valid residues\n    \"\"\"\n    losses = []\n    for i in range(coords_batch.shape[0]):\n        valid_coords = coords_batch[i][masks[i]]\n        losses.append(rg_potential(valid_coords))\n    return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "center of mass of coordinates",
+                    "acceptable": ["coords.mean(dim=0)", "torch.mean(coords, dim=0)"],
+                    "hint": "Compute the mean of all coordinates along the residue dimension (dim=0)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "squared deviation from target Rg",
+                    "acceptable": ["(actual_rg - target_rg) ** 2"],
+                    "hint": "Penalize the squared difference between actual and target radius of gyration."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "average loss across batch",
+                    "acceptable": ["torch.stack(losses).mean()", "sum(losses) / len(losses)"],
+                    "hint": "Average the per-structure Rg losses across the batch."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_mpnn_tied_sampling",
+            "title": "Temperature-Stratified Sampling for Sequence Design",
+            "difficulty": "easy",
+            "description": "Implement temperature-stratified sampling for inverse folding, where different regions of the protein (core, surface, interface) use different sampling temperatures to balance conservation and diversity.",
+            "info": "Temperature-stratified sampling is a practical technique for protein sequence design where different structural regions are sampled at different temperatures. Core residues (buried, hydrophobic) benefit from low temperatures (T~0.1) for conservative, stable designs, while surface residues can use higher temperatures (T~0.3-0.5) for diversity without compromising stability. ProteinMPNN (Dauparas et al., Science 2022) supports per-position temperature specification. Interface residues in binder design often use intermediate temperatures to balance binding affinity with diversity. Solvent-accessible surface area (SASA) is commonly used to classify residues as core (SASA < 25%), boundary (25-50%), or surface (>50%). This approach was used in experimental campaigns where diversifying surface residues while conserving core residues increased the success rate of designed proteins. Reference: Dauparas et al., Science 378, 49-56 (2022).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef classify_residues_by_sasa(sasa_values, core_threshold=0.25, surface_threshold=0.50):\n    \"\"\"Classify residues into core, boundary, and surface based on SASA.\n    sasa_values: (L,) relative SASA values between 0 and 1\n    Returns: (L,) integer labels: 0=core, 1=boundary, 2=surface\n    \"\"\"\n    labels = torch.zeros_like(sasa_values, dtype=torch.long)\n    labels[sasa_values >= core_threshold] = 1\n    labels[sasa_values >= surface_threshold] = 2\n    return labels\n\ndef stratified_temperature_sample(logits, sasa_values,\n                                   core_temp=0.1, boundary_temp=0.2, surface_temp=0.5):\n    \"\"\"Sample amino acids with per-residue temperatures based on SASA.\n    logits: (L, 20) amino acid logits from inverse folding model\n    sasa_values: (L,) relative SASA\n    \"\"\"\n    L = logits.shape[0]\n    region_labels = classify_residues_by_sasa(sasa_values)\n    # Build per-residue temperature vector\n    temp_map = torch.tensor([core_temp, boundary_temp, surface_temp])\n    temperatures = {{b1}}\n    # Scale logits by per-residue temperature\n    scaled_logits = {{b2}}\n    # Sample from the temperature-scaled distribution\n    probs = F.softmax(scaled_logits, dim=-1)\n    sampled_seq = {{b3}}\n    return sampled_seq",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "map region labels to temperatures",
+                    "acceptable": ["temp_map[region_labels]"],
+                    "hint": "Index into the temperature map using the region labels to get per-residue temperatures."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "divide logits by temperatures",
+                    "acceptable": ["logits / temperatures.unsqueeze(-1)", "logits / temperatures.unsqueeze(1)", "logits / temperatures[:, None]"],
+                    "hint": "Divide the logits by the per-residue temperatures (unsqueezed for broadcasting over the 20 amino acid classes)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "sample from probability distribution",
+                    "acceptable": ["torch.multinomial(probs, num_samples=1).squeeze(-1)", "torch.multinomial(probs, 1).squeeze(-1)"],
+                    "hint": "Use torch.multinomial to sample one amino acid per position from the probability distribution."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_contact_map_loss",
+            "title": "Contact Map Prediction Loss for Structure Generation",
+            "difficulty": "medium",
+            "description": "Implement a contact map-based auxiliary loss for protein structure generation, enforcing that the predicted contact map from generated coordinates matches a target contact pattern.",
+            "info": "Contact maps represent pairwise residue contacts (typically C-beta distance < 8 Angstroms) and serve as a coarse structural descriptor. trRosetta (Yang et al., PNAS 2020) pioneered using predicted inter-residue distances and contacts to guide protein structure generation. In diffusion-based design, a contact map loss can enforce desired tertiary contacts during generation. The loss compares the differentiable contact map computed from generated coordinates with a target contact map using binary cross-entropy. This approach is particularly useful for enforcing long-range contacts that define the protein fold, such as beta-sheet hydrogen bonding patterns and helix packing interactions. Contact-guided generation was a key stepping stone from structure prediction to structure generation. Norn et al. (PNAS 2021) used trRosetta contact predictions as the optimization objective for de novo protein hallucination. Reference: Yang et al., PNAS 117, 1496-1503 (2020); Norn et al., PNAS 118, e2017228118 (2021).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef differentiable_contact_map(coords, threshold=8.0, sharpness=5.0):\n    \"\"\"Compute a differentiable (soft) contact map from coordinates.\n    coords: (L, 3) C-beta coordinates\n    Returns: (L, L) soft contact probabilities\n    \"\"\"\n    dist = torch.cdist(coords, coords)  # (L, L)\n    # Soft contacts using sigmoid\n    contact_map = {{b1}}\n    return contact_map\n\ndef contact_map_loss(generated_coords, target_contacts, contact_mask=None):\n    \"\"\"BCE loss between generated and target contact maps.\n    generated_coords: (L, 3) generated C-beta coordinates\n    target_contacts: (L, L) binary target contact map\n    contact_mask: (L, L) optional mask for which contacts to enforce\n    \"\"\"\n    pred_contacts = differentiable_contact_map(generated_coords)\n    # Binary cross entropy\n    bce = {{b2}}\n    if contact_mask is not None:\n        bce = bce * contact_mask\n        loss = bce.sum() / contact_mask.sum()\n    else:\n        # Exclude diagonal (self-contacts)\n        mask = 1.0 - torch.eye(pred_contacts.shape[0])\n        loss = {{b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "sigmoid contact probability",
+                    "acceptable": ["torch.sigmoid(sharpness * (threshold - dist))", "torch.sigmoid((threshold - dist) * sharpness)"],
+                    "hint": "Apply sigmoid to (threshold - distance) scaled by sharpness: contacts are likely when distance < threshold."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "binary cross entropy between contact maps",
+                    "acceptable": ["F.binary_cross_entropy(pred_contacts, target_contacts, reduction='none')", "-(target_contacts * torch.log(pred_contacts + 1e-8) + (1 - target_contacts) * torch.log(1 - pred_contacts + 1e-8))"],
+                    "hint": "Compute per-element binary cross entropy between predicted and target contact maps."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "masked mean loss excluding diagonal",
+                    "acceptable": ["(bce * mask).sum() / mask.sum()"],
+                    "hint": "Multiply BCE by the diagonal-exclusion mask and compute the mean over valid entries."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_sequence_perplexity",
+            "title": "Sequence Perplexity for Design Quality Assessment",
+            "difficulty": "easy",
+            "description": "Implement sequence perplexity computation for evaluating the quality of designed protein sequences using a protein language model.",
+            "info": "Sequence perplexity measures how well a designed protein sequence conforms to the distribution learned by a protein language model (pLM). Low perplexity indicates the sequence is protein-like and evolutionarily plausible. ESM-2 (Lin et al., Science 2023) provides pseudo-perplexity via masked language modeling: each position is masked and the model's predicted probability of the true amino acid is recorded. The geometric mean of inverse probabilities gives perplexity: PPL = exp(-1/L * sum(log p(aa_i))). Designed sequences with perplexity similar to natural proteins (PPL ~10-15 for ESM-2) are more likely to fold and function correctly. ProteinMPNN-designed sequences typically achieve low perplexity because the model captures natural sequence statistics. Very low perplexity may indicate the model is reproducing natural sequences rather than exploring novel designs. Reference: Lin et al., Science 379, 1123-1130 (2023); Dauparas et al., Science 378, 49-56 (2022).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef compute_pseudo_perplexity(plm_model, sequence_tokens, mask_token_id=32):\n    \"\"\"Compute pseudo-perplexity via masked language model.\n    plm_model: protein language model (e.g., ESM-2)\n    sequence_tokens: (L,) integer token indices\n    mask_token_id: token ID for the mask token\n    \"\"\"\n    L = sequence_tokens.shape[0]\n    log_probs_sum = 0.0\n    for i in range(L):\n        # Mask position i\n        masked_seq = sequence_tokens.clone()\n        masked_seq[i] = mask_token_id\n        # Get model predictions\n        with torch.no_grad():\n            logits = plm_model(masked_seq.unsqueeze(0))  # (1, L, vocab_size)\n        # Get log probability of true token at position i\n        log_probs = F.log_softmax(logits[0, i], dim=-1)\n        log_probs_sum += {{b1}}\n    # Perplexity = exp(-1/L * sum(log_probs))\n    avg_nll = {{b2}}\n    perplexity = {{b3}}\n    return perplexity",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "log prob of true token",
+                    "acceptable": ["log_probs[sequence_tokens[i]].item()", "log_probs[sequence_tokens[i]]"],
+                    "hint": "Index into the log probability vector with the true token at position i."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "average negative log likelihood",
+                    "acceptable": ["-log_probs_sum / L"],
+                    "hint": "Negate the sum of log probabilities and divide by sequence length L."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "exponentiate to get perplexity",
+                    "acceptable": ["torch.exp(torch.tensor(avg_nll))", "torch.tensor(avg_nll).exp()"],
+                    "hint": "Perplexity is the exponential of the average negative log-likelihood."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_new_ddim_sampling",
+            "title": "DDIM Sampling for Accelerated Protein Generation",
+            "difficulty": "medium",
+            "description": "Implement DDIM (Denoising Diffusion Implicit Models) sampling for faster protein backbone generation with fewer reverse diffusion steps.",
+            "info": "DDIM sampling (Song et al., ICLR 2021) enables deterministic or near-deterministic reverse diffusion with far fewer steps than standard DDPM, typically 50-100 steps instead of 1000. For protein generation, DDIM is used by RFdiffusion (Watson et al., Nature 2023) and FrameDiff (Yim et al., ICLR 2024) to accelerate inference. DDIM redefines the reverse process as x_{t-1} = sqrt(alpha_bar_{t-1}) * x0_pred + sqrt(1-alpha_bar_{t-1}-sigma^2) * eps_pred + sigma * noise, where sigma=0 gives deterministic sampling. The key insight is that this non-Markovian reverse process produces the same marginal distributions as DDPM but allows step skipping. Timestep subsequences (e.g., every 10th step) are selected, reducing the number of neural network evaluations. DDIM also enables interpolation in latent space between generated structures by controlling the noise trajectory. Reference: Song et al., 'Denoising Diffusion Implicit Models', ICLR 2021; Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\n\ndef ddim_sample_step(denoiser, x_t, t_curr, t_prev, alpha_bar, eta=0.0):\n    \"\"\"One DDIM sampling step for protein backbone generation.\n    denoiser: model predicting x0 from (x_t, t)\n    x_t: (N, 3) current noisy coordinates\n    t_curr, t_prev: current and previous timestep indices\n    alpha_bar: precomputed cumulative alpha schedule\n    eta: stochasticity parameter (0 = deterministic DDIM)\n    \"\"\"\n    alpha_bar_t = alpha_bar[t_curr]\n    alpha_bar_prev = alpha_bar[t_prev] if t_prev >= 0 else torch.tensor(1.0)\n    # Predict clean structure\n    x0_pred = denoiser(x_t, torch.tensor([t_curr]))\n    # Compute predicted noise from x_t and x0_pred\n    eps_pred = {{b1}}\n    # DDIM variance\n    sigma = eta * torch.sqrt((1 - alpha_bar_prev) / (1 - alpha_bar_t)) * \\\n            torch.sqrt(1 - alpha_bar_t / alpha_bar_prev)\n    # Direction pointing to x_t\n    dir_xt = {{b2}}\n    # Compute x_{t-1}\n    noise = torch.randn_like(x_t) if eta > 0 and t_prev >= 0 else torch.zeros_like(x_t)\n    x_prev = {{b3}}\n    return x_prev\n\ndef ddim_full_sample(denoiser, num_residues, alpha_bar, num_steps=50, eta=0.0):\n    \"\"\"Full DDIM sampling with step skipping.\"\"\"\n    T = len(alpha_bar)\n    # Select timestep subsequence\n    timesteps = torch.linspace(T - 1, 0, num_steps + 1).long()\n    x = torch.randn(num_residues, 3)\n    for i in range(num_steps):\n        x = ddim_sample_step(denoiser, x, timesteps[i], timesteps[i + 1], alpha_bar, eta)\n    return x",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "recover noise from x_t and x0_pred",
+                    "acceptable": ["(x_t - torch.sqrt(alpha_bar_t) * x0_pred) / torch.sqrt(1 - alpha_bar_t)"],
+                    "hint": "From x_t = sqrt(alpha_bar) * x0 + sqrt(1-alpha_bar) * eps, solve for eps."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "direction term in DDIM formula",
+                    "acceptable": ["torch.sqrt(1 - alpha_bar_prev - sigma ** 2) * eps_pred"],
+                    "hint": "The direction term is sqrt(1 - alpha_bar_{t-1} - sigma^2) * predicted_noise."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "DDIM update formula",
+                    "acceptable": ["torch.sqrt(alpha_bar_prev) * x0_pred + dir_xt + sigma * noise"],
+                    "hint": "DDIM: x_{t-1} = sqrt(alpha_bar_{t-1}) * x0_pred + direction + sigma * noise."
+                }
+            ]
         }
     ]
 }

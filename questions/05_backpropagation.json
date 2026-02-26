@@ -75,6 +75,680 @@
                     "hint": "dx = dz @ W^T."
                 }
             ]
+        },
+        {
+            "id": "backprop_new_computational_graph",
+            "title": "Building a Computational Graph Node",
+            "difficulty": "medium",
+            "description": "Implement a simple computational graph node that stores its value and tracks parent nodes. The multiply operation should create a new node whose backward pass distributes gradients using the product rule.",
+            "info": "Computational graphs are the backbone of automatic differentiation frameworks like PyTorch and TensorFlow. Each node stores a value and references to its parent nodes, along with a local gradient function. During the forward pass, the graph is built dynamically; during the backward pass, gradients flow from the loss node back to every parameter by repeatedly applying the chain rule at each node. This architecture allows frameworks to differentiate arbitrary compositions of operations without the user manually deriving gradients.",
+            "code": "import numpy as np\n\nclass Node:\n    def __init__(self, value, parents=None, grad_fn=None):\n        self.value = value\n        self.parents = parents or []\n        self.grad_fn = grad_fn\n        self.grad = 0.0\n\ndef multiply(a, b):\n    \"\"\"Create a node representing a * b.\"\"\"\n    out = Node(a.value * b.value, parents=[a, b])\n    def _backward(upstream):\n        a.grad += {{b1}}\n        b.grad += {{b2}}\n    out.grad_fn = _backward\n    return out",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "upstream * ???",
+                    "acceptable": [
+                        "upstream * b.value"
+                    ],
+                    "hint": "d(a*b)/da = b, so gradient for a is upstream * b.value."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "upstream * ???",
+                    "acceptable": [
+                        "upstream * a.value"
+                    ],
+                    "hint": "d(a*b)/db = a, so gradient for b is upstream * a.value."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_autograd_basic",
+            "title": "PyTorch Autograd - Basic Gradient Computation",
+            "difficulty": "easy",
+            "description": "Use PyTorch autograd to compute the gradient of y = x^3 + 2x^2 at x = 3. The analytical gradient is 3x^2 + 4x.",
+            "info": "PyTorch's autograd engine records operations on tensors with requires_grad=True into a dynamic computational graph. Calling .backward() on a scalar output traverses this graph in reverse topological order, accumulating gradients into the .grad attribute of each leaf tensor. This mechanism allows users to define arbitrarily complex functions and obtain exact gradients automatically. The dynamic graph approach (define-by-run) means the graph is rebuilt each forward pass, enabling control flow like loops and conditionals inside the model.",
+            "code": "import torch\n\nx = torch.tensor(3.0, requires_grad=True)\ny = x**3 + 2*x**2\n{{b1}}\nprint(x.grad)  # Should be 39.0 (3*9 + 4*3)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "y.???",
+                    "acceptable": [
+                        "y.backward()",
+                        "y.backward(retain_graph=True)"
+                    ],
+                    "hint": "Call the backward method on the scalar output to trigger autograd."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_grad_accumulation",
+            "title": "Gradient Accumulation Over Mini-Batches",
+            "difficulty": "medium",
+            "description": "Implement gradient accumulation over multiple mini-batches to simulate a larger effective batch size. Accumulate gradients for 'accum_steps' steps before performing an optimizer step.",
+            "info": "Gradient accumulation is a memory-saving technique that simulates large batch training on hardware with limited GPU memory. Instead of processing one large batch, the training loop processes several small mini-batches and sums their gradients before updating parameters. The key detail is dividing each mini-batch loss by the accumulation steps so the total gradient magnitude matches that of a single large batch. This technique is essential for training large models like transformers where a single large batch may not fit in GPU memory.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(10, 2)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)\naccum_steps = 4\n\nfor i, (x_batch, y_batch) in enumerate(dataloader):\n    loss = nn.functional.cross_entropy(model(x_batch), y_batch)\n    loss = {{b1}}\n    loss.backward()\n    if (i + 1) % accum_steps == 0:\n        {{b2}}\n        {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "loss / ???",
+                    "acceptable": [
+                        "loss / accum_steps"
+                    ],
+                    "hint": "Normalize the loss by the number of accumulation steps."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.step()"
+                    ],
+                    "hint": "After accumulating enough gradients, perform the parameter update."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.zero_grad()"
+                    ],
+                    "hint": "Reset gradients to zero after the update so they don't keep accumulating."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_gradient_checkpointing",
+            "title": "Gradient Checkpointing with torch.utils.checkpoint",
+            "difficulty": "hard",
+            "description": "Apply gradient checkpointing to a sequential model to trade compute for memory. Checkpointed segments do not store intermediate activations; instead they are recomputed during the backward pass.",
+            "info": "Gradient checkpointing (also called activation checkpointing) drastically reduces memory usage during training by discarding intermediate activations in the forward pass and recomputing them on-the-fly during the backward pass. This trades roughly 30% more compute time for a significant reduction in memory, enabling training of much deeper or wider models. In PyTorch, torch.utils.checkpoint.checkpoint wraps a function so its internals are not stored in the autograd graph. This technique was pivotal for training models like GPT-3 and other large transformers that would otherwise exceed GPU memory.",
+            "code": "import torch\nimport torch.nn as nn\nfrom torch.utils.checkpoint import checkpoint\n\nclass CheckpointedBlock(nn.Module):\n    def __init__(self, dim):\n        super().__init__()\n        self.net = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, dim))\n\n    def forward(self, x):\n        return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "checkpoint(???, ???, use_reentrant=False)",
+                    "acceptable": [
+                        "checkpoint(self.net, x, use_reentrant=False)",
+                        "checkpoint(self.net, x)"
+                    ],
+                    "hint": "Pass the function (self.net) and input (x) to checkpoint()."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_jacobian",
+            "title": "Computing the Jacobian Matrix with PyTorch",
+            "difficulty": "hard",
+            "description": "Compute the full Jacobian matrix of a vector-valued function f: R^n -> R^m using torch.autograd.functional.jacobian. The Jacobian J[i,j] = df_i/dx_j.",
+            "info": "The Jacobian matrix generalizes the gradient to vector-valued functions, containing all first-order partial derivatives organized as a matrix where row i, column j holds df_i/dx_j. Computing the full Jacobian requires m backward passes (one per output dimension) or n forward-mode passes (one per input dimension), making it expensive for high-dimensional functions. PyTorch provides torch.autograd.functional.jacobian as a convenience that automates this process. Jacobians are critical in physics-informed neural networks, normalizing flows (where the log-determinant of the Jacobian appears in the loss), and for analyzing the sensitivity of neural network outputs to inputs.",
+            "code": "import torch\nfrom torch.autograd.functional import jacobian\n\ndef f(x):\n    return torch.stack([x[0]**2 + x[1], x[0] * x[1]**3])\n\nx = torch.tensor([2.0, 3.0])\nJ = {{b1}}\nprint(J)  # Should be [[4.0, 1.0], [27.0, 54.0]]",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "jacobian(???, ???)",
+                    "acceptable": [
+                        "jacobian(f, x)"
+                    ],
+                    "hint": "Pass the function and the input point to torch.autograd.functional.jacobian."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_hvp",
+            "title": "Hessian-Vector Product",
+            "difficulty": "hard",
+            "description": "Compute the Hessian-vector product Hv for a scalar function f(x) without forming the full Hessian. This uses the identity Hv = d/dx(grad_f . v), computed via two backward passes.",
+            "info": "The Hessian-vector product (Hvp) computes the product of the Hessian matrix with a vector without ever forming the full Hessian, which would require O(n^2) memory. The trick is to first compute g = grad(f, x), then compute grad(g . v, x), which gives Hv using only two backward passes and O(n) memory. This technique is fundamental to second-order optimization methods like conjugate gradient and truncated Newton methods. It is also used in computing the curvature of the loss landscape and in influence functions for understanding which training examples most affect a prediction.",
+            "code": "import torch\n\ndef hvp(f, x, v):\n    \"\"\"Compute Hessian-vector product Hv.\"\"\"\n    x = x.detach().requires_grad_(True)\n    loss = f(x)\n    grad_f = torch.autograd.grad(loss, x, create_graph={{b1}})[0]\n    hvp_result = torch.autograd.grad({{b2}}, x)[0]\n    return hvp_result",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "True"
+                    ],
+                    "hint": "create_graph=True is needed so we can differentiate through the gradient itself."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "grad_f @ ???",
+                    "acceptable": [
+                        "grad_f @ v",
+                        "torch.dot(grad_f, v)",
+                        "(grad_f * v).sum()"
+                    ],
+                    "hint": "Differentiate the dot product of the gradient with v to get Hv."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_second_order",
+            "title": "Second-Order Gradients in PyTorch",
+            "difficulty": "medium",
+            "description": "Compute the second derivative d^2y/dx^2 of y = sin(x) at a point using PyTorch autograd. The first derivative is cos(x), the second is -sin(x).",
+            "info": "Second-order gradients require differentiating through the gradient computation itself, which PyTorch supports via the create_graph=True argument to .backward() or torch.autograd.grad(). This tells PyTorch to build a computational graph of the gradient computation, enabling further differentiation. Second-order gradients are used in meta-learning algorithms like MAML, where the outer loop must differentiate through the inner loop's gradient updates. They are also used in computing the Hessian diagonal for adaptive learning rate methods and in regularization techniques like gradient penalty in GANs.",
+            "code": "import torch\n\nx = torch.tensor(1.0, requires_grad=True)\ny = torch.sin(x)\n\n# First derivative\ndy_dx = torch.autograd.grad(y, x, {{b1}})[0]\n# Second derivative\nd2y_dx2 = torch.autograd.grad({{b2}})[0]\nprint(d2y_dx2)  # Should be -sin(1.0)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "create_graph=???",
+                    "acceptable": [
+                        "create_graph=True"
+                    ],
+                    "hint": "Set create_graph=True to allow computing higher-order derivatives."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???, x",
+                    "acceptable": [
+                        "dy_dx, x"
+                    ],
+                    "hint": "Differentiate the first derivative (dy_dx) with respect to x."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_backward_hook",
+            "title": "Registering a Backward Hook for Gradient Inspection",
+            "difficulty": "medium",
+            "description": "Register a backward hook on a layer to inspect and optionally modify gradients as they flow through the network during backpropagation.",
+            "info": "Backward hooks in PyTorch allow users to inspect or modify gradients at specific points in the computational graph during the backward pass. A hook registered via register_full_backward_hook receives the module, the gradient of the loss with respect to the module's output, and the gradient with respect to the module's input. This is invaluable for debugging vanishing or exploding gradients, implementing gradient-based visualization techniques like Grad-CAM, or applying custom gradient modifications. Hooks are also used in gradient penalty computation and in architectures that need to detach or scale gradients at specific layers.",
+            "code": "import torch\nimport torch.nn as nn\n\ngradient_stats = {}\n\ndef hook_fn(module, grad_input, grad_output):\n    gradient_stats['mean'] = grad_output[0].mean().item()\n    gradient_stats['std'] = grad_output[0].std().item()\n\nmodel = nn.Sequential(nn.Linear(10, 5), nn.ReLU(), nn.Linear(5, 1))\nhandle = model[0].{{b1}}\n\nx = torch.randn(4, 10)\nloss = model(x).sum()\nloss.backward()\nprint(gradient_stats)\nhandle.{{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "register_???(hook_fn)",
+                    "acceptable": [
+                        "register_full_backward_hook(hook_fn)",
+                        "register_backward_hook(hook_fn)"
+                    ],
+                    "hint": "Use register_full_backward_hook (or the older register_backward_hook) to attach the hook."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???()",
+                    "acceptable": [
+                        "remove()"
+                    ],
+                    "hint": "Call .remove() on the handle to detach the hook when done."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_custom_autograd",
+            "title": "Custom Autograd Function",
+            "difficulty": "hard",
+            "description": "Implement a custom autograd function for a clipped ReLU (clips output to a maximum value). The forward pass clamps between 0 and max_val. The backward pass passes gradient only where the input was within [0, max_val].",
+            "info": "PyTorch's torch.autograd.Function class lets users define custom forward and backward computations, which is essential when the built-in autograd cannot handle a particular operation efficiently or correctly. The forward method receives a context object (ctx) that can save tensors for the backward pass using ctx.save_for_backward. The backward method retrieves these tensors and computes the gradient with respect to each input. Custom autograd functions are used for implementing custom activation functions, interfacing with non-PyTorch code, and applying the straight-through estimator for non-differentiable operations like quantization.",
+            "code": "import torch\n\nclass ClippedReLU(torch.autograd.Function):\n    @staticmethod\n    def forward(ctx, x, max_val):\n        {{b1}}\n        return x.clamp(0, max_val)\n\n    @staticmethod\n    def backward(ctx, grad_output):\n        x, max_val = ctx.saved_tensors\n        mask = {{b2}}\n        return grad_output * mask, None",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "ctx.save_for_backward(x, ???)",
+                    "acceptable": [
+                        "ctx.save_for_backward(x, torch.tensor(max_val))",
+                        "ctx.save_for_backward(x, max_val)"
+                    ],
+                    "hint": "Save x and max_val for use in the backward pass."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(x >= 0) & (x <= ???)",
+                    "acceptable": [
+                        "(x >= 0) & (x <= max_val)",
+                        "((x >= 0) & (x <= max_val)).float()",
+                        "(x >= 0) & (x <= max_val.item())"
+                    ],
+                    "hint": "Gradient flows only where the input was in the non-clipped region [0, max_val]."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_grad_clip_norm",
+            "title": "Gradient Clipping by Global Norm",
+            "difficulty": "easy",
+            "description": "Apply gradient clipping by global norm to prevent exploding gradients. This scales all parameter gradients uniformly so their combined L2 norm does not exceed max_norm.",
+            "info": "Gradient clipping by norm is a standard technique to prevent exploding gradients, especially in recurrent neural networks and transformers. The global norm is computed as the L2 norm of all parameter gradients concatenated into a single vector. If this norm exceeds the threshold, all gradients are scaled down by the same factor (max_norm / total_norm), preserving their relative directions. PyTorch provides torch.nn.utils.clip_grad_norm_ as a convenient in-place implementation. A typical max_norm value of 1.0 is used in transformer training, though the optimal value is model-dependent.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(100, 10)\noptimizer = torch.optim.Adam(model.parameters())\n\nx = torch.randn(32, 100)\nloss = model(x).sum()\nloss.backward()\n\n# Clip gradients\n{{b1}}\noptimizer.step()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.nn.utils.???(model.parameters(), max_norm=1.0)",
+                    "acceptable": [
+                        "torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)",
+                        "torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)"
+                    ],
+                    "hint": "Use clip_grad_norm_ (with underscore for in-place) from torch.nn.utils."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_grad_clip_value",
+            "title": "Gradient Clipping by Value",
+            "difficulty": "easy",
+            "description": "Apply gradient clipping by value to clamp each gradient element independently to the range [-clip_value, clip_value].",
+            "info": "Gradient clipping by value is a simpler alternative to norm-based clipping that independently clamps each gradient element to a fixed range. Unlike norm clipping, which preserves gradient direction, value clipping can change the direction of the gradient vector since each element is clamped independently. This approach is less commonly used than norm clipping in modern practice because it can distort the gradient direction, but it provides a hard upper bound on any individual gradient element. It is sometimes preferred when specific parameter groups have vastly different gradient scales and independent control is needed.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(100, 10)\nloss = model(torch.randn(32, 100)).sum()\nloss.backward()\n\n{{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.nn.utils.???(model.parameters(), ???)",
+                    "acceptable": [
+                        "torch.nn.utils.clip_grad_value_(model.parameters(), 0.5)",
+                        "torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=0.5)",
+                        "torch.nn.utils.clip_grad_value_(model.parameters(), 1.0)"
+                    ],
+                    "hint": "Use clip_grad_value_ (with underscore for in-place) to clamp gradients elementwise."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_vanishing_demo",
+            "title": "Demonstrating Vanishing Gradients with Sigmoid",
+            "difficulty": "medium",
+            "description": "Build a deep network with sigmoid activations and measure how gradient magnitude decays layer by layer, demonstrating the vanishing gradient problem.",
+            "info": "The vanishing gradient problem occurs when gradients shrink exponentially as they propagate through many layers during backpropagation, causing early layers to learn extremely slowly or not at all. With sigmoid activations, the maximum derivative is 0.25, so after passing through n layers the gradient is scaled by at most 0.25^n. For a 10-layer network, this means gradients reaching the first layer are attenuated by a factor of roughly 10^-6. This problem motivated the development of ReLU activations, skip connections (ResNets), and normalization techniques, all of which help maintain gradient flow across deep architectures.",
+            "code": "import torch\nimport torch.nn as nn\n\nlayers = []\nfor i in range(10):\n    layers.extend([nn.Linear(64, 64), nn.Sigmoid()])\nmodel = nn.Sequential(*layers)\n\ngrad_norms = []\ndef save_grad_norm(name):\n    def hook(module, grad_input, grad_output):\n        grad_norms.append((name, {{b1}}))\n    return hook\n\nfor i, layer in enumerate(model):\n    if isinstance(layer, nn.Linear):\n        layer.register_full_backward_hook(save_grad_norm(f'linear_{i}'))\n\nx = torch.randn(32, 64)\nloss = model(x).sum()\nloss.backward()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "grad_output[0].???.item()",
+                    "acceptable": [
+                        "grad_output[0].norm().item()",
+                        "grad_output[0].norm(2).item()"
+                    ],
+                    "hint": "Compute the L2 norm of the gradient tensor to measure its magnitude."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_gradient_flow",
+            "title": "Gradient Flow Analysis - Average Gradient per Layer",
+            "difficulty": "medium",
+            "description": "After a backward pass, iterate over named parameters and compute the average absolute gradient for each layer to diagnose gradient flow issues.",
+            "info": "Gradient flow analysis is a practical debugging technique where you plot the average absolute gradient of each layer's parameters after a backward pass. Healthy gradient flow shows relatively consistent gradient magnitudes across layers, while problematic networks show gradients that decay (vanishing) or grow (exploding) from the output layer toward the input. This technique can reveal dead layers where gradients are near zero, layers with exploding gradients, or architectural bottlenecks. It is especially useful when training deep networks for the first time and is often one of the first diagnostic steps when a model fails to converge.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef plot_grad_flow(model):\n    avg_grads = []\n    layer_names = []\n    for name, param in model.named_parameters():\n        if param.requires_grad and {{b1}}:\n            avg_grads.append({{b2}})\n            layer_names.append(name)\n    return layer_names, avg_grads",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "param.??? is not None",
+                    "acceptable": [
+                        "param.grad is not None"
+                    ],
+                    "hint": "Check that the parameter actually has a gradient computed."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "param.grad.???.mean().item()",
+                    "acceptable": [
+                        "param.grad.abs().mean().item()",
+                        "param.grad.data.abs().mean().item()"
+                    ],
+                    "hint": "Compute the mean of the absolute values of the gradient tensor."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_numerical_grad_check",
+            "title": "Numerical Gradient Checking with Finite Differences",
+            "difficulty": "medium",
+            "description": "Implement numerical gradient checking using central finite differences to verify an analytical gradient. The central difference formula is [f(x+h) - f(x-h)] / (2h).",
+            "info": "Numerical gradient checking is a debugging technique that verifies analytical gradients by comparing them against finite difference approximations. The central difference method [f(x+h) - f(x-h)] / (2h) is preferred over the forward difference [f(x+h) - f(x)] / h because it has O(h^2) error instead of O(h). A typical epsilon of 1e-5 to 1e-7 is used, and the relative error between the numerical and analytical gradients should be less than 1e-5 for a correct implementation. This technique was essential before autograd frameworks existed and remains valuable for verifying custom backward passes.",
+            "code": "import numpy as np\n\ndef numerical_gradient(f, x, eps=1e-5):\n    grad = np.zeros_like(x)\n    for i in range(len(x)):\n        x_plus = x.copy()\n        x_minus = x.copy()\n        x_plus[i] += eps\n        x_minus[i] -= eps\n        grad[i] = {{b1}}\n    return grad\n\ndef check_gradient(f, grad_f, x, eps=1e-5):\n    numerical = numerical_gradient(f, x, eps)\n    analytical = grad_f(x)\n    rel_error = {{b2}}\n    return rel_error",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(f(x_plus) - f(x_minus)) / ???",
+                    "acceptable": [
+                        "(f(x_plus) - f(x_minus)) / (2 * eps)",
+                        "(f(x_plus) - f(x_minus)) / (2*eps)"
+                    ],
+                    "hint": "Central difference: [f(x+h) - f(x-h)] / (2h)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.linalg.norm(??? - ???) / (np.linalg.norm(???) + np.linalg.norm(???) + 1e-8)",
+                    "acceptable": [
+                        "np.linalg.norm(numerical - analytical) / (np.linalg.norm(numerical) + np.linalg.norm(analytical) + 1e-8)",
+                        "np.linalg.norm(analytical - numerical) / (np.linalg.norm(analytical) + np.linalg.norm(numerical) + 1e-8)"
+                    ],
+                    "hint": "Compute the relative error: ||num - ana|| / (||num|| + ||ana|| + small_constant)."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_finite_diff_torch",
+            "title": "Finite Difference Verification in PyTorch",
+            "difficulty": "easy",
+            "description": "Use PyTorch's built-in gradcheck utility to automatically verify that a custom function's backward pass matches finite differences.",
+            "info": "PyTorch provides torch.autograd.gradcheck as a convenient tool that automatically computes finite-difference approximations and compares them against the analytical gradients produced by the autograd engine. It perturbs each input element by a small epsilon (default 1e-6), computes the numerical Jacobian, and checks that it matches the autograd Jacobian within a tolerance. This function is the standard way to test custom autograd.Function implementations. It supports both real and complex inputs and can check double-backward (second derivatives) via the gradgradcheck variant.",
+            "code": "import torch\nfrom torch.autograd import gradcheck\n\ndef my_relu(x):\n    return x.clamp(min=0)\n\nx = torch.randn(5, dtype=torch.float64, requires_grad=True)\nresult = {{b1}}\nprint('Gradcheck passed!' if result else 'Gradcheck FAILED!')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "gradcheck(???, ???)",
+                    "acceptable": [
+                        "gradcheck(my_relu, x)",
+                        "gradcheck(my_relu, (x,))",
+                        "gradcheck(my_relu, x, eps=1e-6)"
+                    ],
+                    "hint": "Pass the function and input tensor(s) to gradcheck."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_softmax_ce_backward",
+            "title": "Backprop Through Softmax + Cross-Entropy",
+            "difficulty": "hard",
+            "description": "Implement the backward pass for the combined softmax + cross-entropy loss. The elegant result is that the gradient of the loss w.r.t. the logits z is simply (softmax(z) - y_onehot) / N.",
+            "info": "The combined softmax plus cross-entropy gradient is one of the most elegant results in backpropagation. Individually, the softmax Jacobian and cross-entropy gradient are complex, but when composed, the gradient of the loss with respect to the logits simplifies to (p - y) / N, where p is the softmax output and y is the one-hot target. This simplification is numerically more stable than computing the two gradients separately, which is why frameworks like PyTorch combine them into a single cross_entropy function that operates on raw logits. The result also has an intuitive interpretation: the gradient pushes logits toward the target class and away from incorrect classes, proportional to the prediction error.",
+            "code": "import numpy as np\n\ndef softmax(z):\n    e = np.exp(z - z.max(axis=1, keepdims=True))\n    return e / e.sum(axis=1, keepdims=True)\n\ndef softmax_cross_entropy_backward(logits, y_true):\n    \"\"\"y_true: integer class labels, shape (N,)\"\"\"\n    N = logits.shape[0]\n    probs = softmax(logits)\n    grad = probs.copy()\n    grad[np.arange(N), y_true] -= {{b1}}\n    grad = grad / {{b2}}\n    return grad",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "1",
+                        "1.0"
+                    ],
+                    "hint": "Subtract 1 from the probability at the correct class position (p_correct - 1)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "N"
+                    ],
+                    "hint": "Normalize by the batch size N to get the mean gradient."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_batchnorm_backward",
+            "title": "Backprop Through Batch Normalization",
+            "difficulty": "hard",
+            "description": "Implement the backward pass of batch normalization. Given upstream gradient dout and cached values from the forward pass, compute the gradient with respect to the input x.",
+            "info": "The batch normalization backward pass is notoriously tricky because the normalization couples all samples in a batch, meaning each sample's gradient depends on the statistics of the entire batch. The gradient must flow through three paths: directly through the normalization, through the mean, and through the variance. The full derivation involves applying the chain rule to x_hat = (x - mu) / sqrt(var + eps) while remembering that mu and var are themselves functions of x. An efficient implementation avoids explicit loops and uses vectorized operations, and the final formula involves terms proportional to 1/N that capture the batch coupling.",
+            "code": "import numpy as np\n\ndef batchnorm_backward(dout, x, gamma, x_hat, var, eps=1e-5):\n    N, D = x.shape\n    std_inv = 1.0 / np.sqrt(var + eps)\n    dx_hat = dout * gamma\n    dvar = np.sum(dx_hat * (x - x.mean(axis=0)) * -0.5 * std_inv**3, axis=0)\n    dmu = np.sum(dx_hat * -std_inv, axis=0)\n    dx = {{b1}}\n    return dx",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "dx_hat * std_inv + dvar * 2 * (x - x.mean(axis=0)) / N + ??? / N",
+                    "acceptable": [
+                        "dx_hat * std_inv + dvar * 2 * (x - x.mean(axis=0)) / N + dmu / N",
+                        "(dx_hat * std_inv) + (dvar * 2 * (x - x.mean(axis=0)) / N) + (dmu / N)"
+                    ],
+                    "hint": "The dx gradient has three terms: one from x_hat normalization, one from variance, and dmu/N from the mean."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_conv_backward",
+            "title": "Backprop Through a 2D Convolution Layer",
+            "difficulty": "hard",
+            "description": "Use PyTorch to verify that the gradient with respect to a convolution kernel matches the cross-correlation between the input and the upstream gradient.",
+            "info": "Backpropagation through convolution layers involves two key gradient computations: the gradient with respect to the kernel (used to update weights) and the gradient with respect to the input (used to propagate to earlier layers). The kernel gradient is the cross-correlation of the input with the upstream gradient, while the input gradient is computed using a 'full' convolution of the upstream gradient with the flipped kernel. In implementation, the input gradient corresponds to a transposed convolution (sometimes called deconvolution). These operations are highly optimized in deep learning frameworks using im2col transformations or direct FFT-based convolution.",
+            "code": "import torch\nimport torch.nn as nn\n\nconv = nn.Conv2d(3, 16, kernel_size=3, padding=1, bias=False)\nx = torch.randn(1, 3, 32, 32, requires_grad=True)\nout = conv(x)\nloss = out.sum()\nloss.backward()\n\n# Gradient w.r.t. input exists\nassert {{b1}}\n# Gradient w.r.t. kernel exists\nassert {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x.??? is not None",
+                    "acceptable": [
+                        "x.grad is not None"
+                    ],
+                    "hint": "Check that the input tensor has a gradient after backward()."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "conv.weight.??? is not None",
+                    "acceptable": [
+                        "conv.weight.grad is not None"
+                    ],
+                    "hint": "Check that the convolution kernel has a gradient."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_attention_backward",
+            "title": "Backprop Through Scaled Dot-Product Attention",
+            "difficulty": "hard",
+            "description": "Implement the forward pass of scaled dot-product attention with PyTorch autograd tracking, then verify gradients flow to Q, K, and V.",
+            "info": "Scaled dot-product attention computes Attention(Q,K,V) = softmax(QK^T / sqrt(d_k)) V, and its backward pass must propagate gradients through the softmax, the matrix multiplications, and the scaling. The gradient with respect to V flows through a simple matrix multiplication with the attention weights, but the gradients for Q and K are more complex because they must pass through the softmax Jacobian. In practice, memory-efficient attention implementations like FlashAttention fuse the forward and backward kernels to avoid materializing the full N x N attention matrix. Understanding this gradient flow is essential for debugging attention-based architectures.",
+            "code": "import torch\nimport torch.nn.functional as F\nimport math\n\ndef scaled_dot_product_attention(Q, K, V):\n    d_k = Q.size(-1)\n    scores = Q @ {{b1}} / math.sqrt(d_k)\n    attn_weights = F.softmax(scores, dim=-1)\n    return attn_weights @ V\n\nQ = torch.randn(2, 8, 16, requires_grad=True)\nK = torch.randn(2, 8, 16, requires_grad=True)\nV = torch.randn(2, 8, 16, requires_grad=True)\nout = scaled_dot_product_attention(Q, K, V)\nout.sum().backward()\nassert Q.grad is not None and K.grad is not None and V.grad is not None",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "K.???(-2, -1)",
+                    "acceptable": [
+                        "K.transpose(-2, -1)"
+                    ],
+                    "hint": "Transpose the last two dimensions of K for the dot product QK^T."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_loss_landscape",
+            "title": "Loss Landscape Visualization Along Random Directions",
+            "difficulty": "medium",
+            "description": "Evaluate the loss along a random direction in parameter space to visualize a 1D slice of the loss landscape. This helps understand the curvature and smoothness around the current parameters.",
+            "info": "Loss landscape visualization plots the loss function as parameters are perturbed along random directions from a reference point, revealing the geometry of the optimization problem. A 1D slice evaluates L(theta + alpha * d) for a range of scalar alpha values and a random direction d, showing whether the landscape is smooth, has sharp minima, or contains plateaus. The technique was popularized by Li et al. (2018) who showed that skip connections in ResNets dramatically smooth the loss landscape. These visualizations help explain why certain architectures train more easily and why learning rate choices matter, as sharp minima require smaller steps.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\ndef eval_loss_along_direction(model, loss_fn, data, targets, direction, alphas):\n    \"\"\"Evaluate loss at theta + alpha * direction for each alpha.\"\"\"\n    original_params = [p.data.clone() for p in model.parameters()]\n    losses = []\n    for alpha in alphas:\n        for p, p0, d in zip(model.parameters(), original_params, direction):\n            p.data = {{b1}}\n        with torch.no_grad():\n            loss = loss_fn(model(data), targets).item()\n        losses.append(loss)\n    # Restore original parameters\n    for p, p0 in zip(model.parameters(), original_params):\n        {{b2}}\n    return losses",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "p0 + ??? * d",
+                    "acceptable": [
+                        "p0 + alpha * d"
+                    ],
+                    "hint": "Perturb original parameters p0 by alpha times the direction d."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "p.data = ???",
+                    "acceptable": [
+                        "p.data = p0",
+                        "p.data.copy_(p0)"
+                    ],
+                    "hint": "Restore each parameter to its original value p0."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_grad_stats_monitor",
+            "title": "Gradient Statistics Monitoring During Training",
+            "difficulty": "easy",
+            "description": "Implement a function that computes and logs key gradient statistics (mean, std, max, min) for all model parameters after each backward pass.",
+            "info": "Monitoring gradient statistics during training is one of the most practical debugging techniques for deep learning. Tracking the mean, standard deviation, maximum, and minimum of gradients for each layer over time can reveal vanishing gradients (decreasing norms), exploding gradients (increasing norms), dead neurons (zero gradients), or training instabilities (high variance). Many training frameworks like Weights & Biases and TensorBoard provide built-in gradient histograms. A common rule of thumb is that gradient magnitudes should be roughly on the order of 1e-3 to 1e-1, and the ratio of gradient norm to parameter norm should be around 1e-3.",
+            "code": "import torch\n\ndef log_gradient_stats(model):\n    stats = {}\n    for name, param in model.named_parameters():\n        if param.grad is not None:\n            g = param.grad\n            stats[name] = {\n                'mean': {{b1}},\n                'std': g.std().item(),\n                'max': g.max().item(),\n                'min': g.min().item()\n            }\n    return stats",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "g.???.item()",
+                    "acceptable": [
+                        "g.mean().item()",
+                        "g.data.mean().item()"
+                    ],
+                    "hint": "Compute the mean of the gradient tensor and convert to a Python scalar."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_mixed_precision",
+            "title": "Mixed Precision Training with GradScaler",
+            "difficulty": "medium",
+            "description": "Implement a mixed precision training step using torch.cuda.amp. The GradScaler scales the loss to prevent underflow in float16 gradients, then unscales before the optimizer step.",
+            "info": "Mixed precision training uses float16 for the forward and backward passes to reduce memory and increase throughput, while keeping a float32 master copy of weights for the optimizer update. The key challenge is that float16 has a limited dynamic range (minimum ~6e-8), so small gradients can underflow to zero. The GradScaler solves this by multiplying the loss by a large scale factor before backward(), which proportionally scales all gradients into the representable range. Before the optimizer step, gradients are unscaled back to their true values. The scaler dynamically adjusts its scale factor based on whether inf/nan gradients are detected.",
+            "code": "import torch\nimport torch.nn as nn\nfrom torch.cuda.amp import autocast, GradScaler\n\nmodel = nn.Linear(100, 10).cuda()\noptimizer = torch.optim.Adam(model.parameters())\nscaler = GradScaler()\n\nx = torch.randn(32, 100).cuda()\ny = torch.randint(0, 10, (32,)).cuda()\n\nwith {{b1}}:\n    loss = nn.functional.cross_entropy(model(x), y)\n\nscaler.scale(loss).backward()\n{{b2}}\nscaler.update()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???():",
+                    "acceptable": [
+                        "autocast()",
+                        "autocast(dtype=torch.float16)"
+                    ],
+                    "hint": "Use the autocast context manager for mixed precision forward pass."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "scaler.???(optimizer)",
+                    "acceptable": [
+                        "scaler.step(optimizer)"
+                    ],
+                    "hint": "scaler.step unscales gradients and then calls optimizer.step() if no inf/nan."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_detach_stop_grad",
+            "title": "Stopping Gradient Flow with detach()",
+            "difficulty": "easy",
+            "description": "Use .detach() to stop gradient flow at a specific point in the computational graph. This is commonly used in target networks (e.g., DQN) and contrastive learning.",
+            "info": "The .detach() method in PyTorch creates a new tensor that shares the same data but is disconnected from the computational graph, effectively stopping gradient propagation at that point. This is essential for implementing algorithms where certain targets should not receive gradients, such as the target network in DQN, the momentum encoder in MoCo, or the stop-gradient branch in BYOL and SimSiam. Without detach, gradients would flow through both branches, collapsing the learned representations. It is also used in actor-critic methods to prevent the critic's loss from affecting the actor's parameters and vice versa.",
+            "code": "import torch\nimport torch.nn as nn\n\nencoder = nn.Linear(64, 32)\npredictor = nn.Linear(32, 32)\n\nx1 = torch.randn(16, 64)\nx2 = torch.randn(16, 64)\n\n# Online branch: receives gradients\nz1 = predictor(encoder(x1))\n# Target branch: NO gradients\nwith torch.no_grad():\n    z2 = encoder(x2)\n# Alternative using detach:\nz2_alt = encoder(x2).{{b1}}\n\nloss = ((z1 - z2_alt) ** 2).mean()\nloss.backward()\nassert encoder.weight.grad is not None",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???()",
+                    "acceptable": [
+                        "detach()"
+                    ],
+                    "hint": "Call .detach() to disconnect the tensor from the computation graph."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_retain_graph",
+            "title": "Retaining the Computation Graph for Multiple Backward Passes",
+            "difficulty": "medium",
+            "description": "When you need to call backward() multiple times on the same graph (e.g., for computing multiple loss components separately), you must retain the graph.",
+            "info": "By default, PyTorch frees the computational graph after .backward() to save memory, which means calling backward a second time would raise an error. Setting retain_graph=True preserves the graph for subsequent backward calls. This is needed when computing gradients from multiple losses that share intermediate computations, in meta-learning where inner and outer loops both differentiate through the same parameters, or when computing second-order derivatives. However, retaining the graph increases memory usage, so it should be used judiciously. The last backward call can set retain_graph=False (the default) to free the graph.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(10, 5)\nx = torch.randn(4, 10)\nout = model(x)\n\nloss1 = out[:, :3].sum()\nloss2 = out[:, 3:].sum()\n\n# First backward - must retain graph\nloss1.backward({{b1}})\n# Second backward - can release graph\nloss2.backward()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "retain_graph=???",
+                    "acceptable": [
+                        "retain_graph=True"
+                    ],
+                    "hint": "Set retain_graph=True so the graph is not freed after the first backward."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_no_grad_context",
+            "title": "Disabling Gradient Computation for Inference",
+            "difficulty": "easy",
+            "description": "Use torch.no_grad() to disable gradient tracking during inference. This reduces memory usage and speeds up computation since autograd does not need to record operations.",
+            "info": "The torch.no_grad() context manager disables gradient computation, which is essential during inference to reduce memory consumption and improve performance. Inside this context, all operations on tensors (even those with requires_grad=True) produce tensors with requires_grad=False and no computation graph is built. This typically reduces memory usage by 50% or more since intermediate activations do not need to be stored. It is standard practice to wrap evaluation and inference code in torch.no_grad(), and most training loops include a validation phase wrapped in this context. The decorator @torch.no_grad() can also be applied to entire functions.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(100, 10)\nx = torch.randn(32, 100)\n\n# During inference, disable gradient computation\n{{b1}}\n    output = model(x)\n    print(output.requires_grad)  # False",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "with torch.???:",
+                    "acceptable": [
+                        "with torch.no_grad():",
+                        "with torch.inference_mode():"
+                    ],
+                    "hint": "Use torch.no_grad() or torch.inference_mode() as a context manager."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_tanh_derivative",
+            "title": "Tanh Derivative",
+            "difficulty": "easy",
+            "description": "Implement the derivative of the tanh activation function. Recall: tanh'(x) = 1 - tanh(x)^2.",
+            "info": "The tanh derivative has the elegant form 1 - tanh(x)^2, meaning it can be computed directly from the output without re-evaluating the exponential. Unlike sigmoid, tanh is zero-centered, which helps with gradient dynamics since the gradient is not always positive or always negative. However, tanh still suffers from the vanishing gradient problem: its derivative is at most 1.0 (at x=0) and approaches 0 for large |x|, causing gradients to shrink in deep networks. Tanh remains widely used in LSTMs and GRUs, where its bounded range [-1, 1] is important for controlling the cell state, and in the output layer of generators in GANs.",
+            "code": "import numpy as np\n\ndef tanh_derivative(x):\n    t = np.tanh(x)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 - t???",
+                    "acceptable": [
+                        "1 - t**2",
+                        "1 - t * t",
+                        "1 - np.square(t)"
+                    ],
+                    "hint": "tanh'(x) = 1 - tanh(x)^2."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_leaky_relu_grad",
+            "title": "Leaky ReLU Derivative",
+            "difficulty": "easy",
+            "description": "Implement the derivative of the Leaky ReLU function with a given negative slope alpha. Unlike standard ReLU, Leaky ReLU has a small non-zero gradient for negative inputs.",
+            "info": "Leaky ReLU was introduced to address the dying ReLU problem, where neurons with negative inputs receive zero gradients and permanently stop learning. By allowing a small, non-zero gradient (typically alpha=0.01) for negative inputs, Leaky ReLU ensures that every neuron can potentially recover during training. The derivative is 1 for positive inputs and alpha for negative inputs, providing a simple piecewise linear gradient. Variants include Parametric ReLU (PReLU), where alpha is a learnable parameter, and Randomized ReLU (RReLU), where alpha is randomly sampled during training. These variants consistently show mild improvements over standard ReLU in certain architectures.",
+            "code": "import numpy as np\n\ndef leaky_relu_derivative(x, alpha=0.01):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.where(x > 0, ???, ???)",
+                    "acceptable": [
+                        "np.where(x > 0, 1, alpha)",
+                        "np.where(x > 0, 1.0, alpha)",
+                        "np.where(x > 0, 1, 0.01)"
+                    ],
+                    "hint": "Return 1 where x > 0, and alpha where x <= 0."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_mse_backward",
+            "title": "Backprop Through MSE Loss",
+            "difficulty": "easy",
+            "description": "Compute the gradient of the mean squared error loss L = (1/N) * sum((y_pred - y_true)^2) with respect to y_pred.",
+            "info": "The MSE loss gradient is one of the simplest and most commonly encountered gradients in deep learning. For L = (1/N) * sum((y_pred - y_true)^2), the gradient with respect to y_pred is (2/N) * (y_pred - y_true). This gradient has the intuitive property that it points in the direction of the prediction error and its magnitude is proportional to the error, meaning larger errors produce larger gradient updates. The factor of 2/N is sometimes absorbed into the learning rate in practice. MSE is the standard loss for regression tasks and is equivalent to maximum likelihood estimation under the assumption of Gaussian noise.",
+            "code": "import numpy as np\n\ndef mse_backward(y_pred, y_true):\n    N = y_pred.shape[0]\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(2 / ???) * (??? - ???)",
+                    "acceptable": [
+                        "(2 / N) * (y_pred - y_true)",
+                        "2 * (y_pred - y_true) / N"
+                    ],
+                    "hint": "d/dy_pred [(1/N) * sum((y_pred - y_true)^2)] = (2/N) * (y_pred - y_true)."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_grad_zero",
+            "title": "Zeroing Gradients Before Each Training Step",
+            "difficulty": "easy",
+            "description": "Explain why and how to zero gradients before each training step. By default, PyTorch accumulates gradients in the .grad attribute, so failing to zero them causes incorrect updates.",
+            "info": "PyTorch accumulates gradients by default (adding new gradients to existing .grad values) rather than overwriting them. This design choice supports gradient accumulation across mini-batches, but it means gradients must be explicitly zeroed before each standard training step to prevent stale gradients from corrupting updates. The standard method is optimizer.zero_grad(), which sets .grad to None or fills it with zeros for all parameters managed by the optimizer. Since PyTorch 1.7, the set_to_none=True argument (now the default) sets .grad = None instead of filling with zeros, which is slightly faster and uses less memory.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(10, 2)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)\nloss_fn = nn.MSELoss()\n\nfor x, y in dataloader:\n    {{b1}}\n    pred = model(x)\n    loss = loss_fn(pred, y)\n    loss.backward()\n    optimizer.step()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.zero_grad()",
+                        "optimizer.zero_grad(set_to_none=True)"
+                    ],
+                    "hint": "Zero out gradients before computing new ones to prevent accumulation."
+                }
+            ]
+        },
+        {
+            "id": "backprop_new_skip_connection_grad",
+            "title": "Gradient Flow Through Skip Connections",
+            "difficulty": "medium",
+            "description": "Implement a residual block and show how the skip connection provides an identity gradient path that alleviates vanishing gradients.",
+            "info": "Skip connections (residual connections) are the key innovation of ResNets that enabled training of networks with hundreds or even thousands of layers. By computing y = F(x) + x, the gradient becomes dy/dx = dF/dx + I, where I is the identity matrix. This means that even if the gradient through F(x) vanishes, the identity path still propagates a gradient of 1, ensuring that earlier layers always receive useful gradient signal. This insight transformed deep learning by showing that depth itself is not the enemy; rather, it is the loss of gradient information through many nonlinear transformations. Skip connections are now ubiquitous in transformers, U-Nets, and other modern architectures.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass ResidualBlock(nn.Module):\n    def __init__(self, dim):\n        super().__init__()\n        self.fc1 = nn.Linear(dim, dim)\n        self.relu = nn.ReLU()\n        self.fc2 = nn.Linear(dim, dim)\n\n    def forward(self, x):\n        residual = x\n        out = self.fc2(self.relu(self.fc1(x)))\n        return out + {{b1}}\n\n# Stack 50 blocks - still trainable thanks to skip connections\nblocks = nn.Sequential(*[ResidualBlock(64) for _ in range(50)])\nx = torch.randn(8, 64, requires_grad=True)\nloss = blocks(x).sum()\nloss.backward()\nprint(f'Input gradient norm: {x.grad.norm().item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "residual",
+                        "x"
+                    ],
+                    "hint": "Add the skip connection (the original input) to the transformed output."
+                }
+            ]
         }
     ]
 }

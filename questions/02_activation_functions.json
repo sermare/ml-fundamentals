@@ -108,6 +108,653 @@
                     "hint": "Like ReLU, but negative values are scaled by alpha instead of zeroed."
                 }
             ]
+        },
+        {
+            "id": "act_new_gelu",
+            "title": "GELU Activation",
+            "difficulty": "medium",
+            "description": "Implement the GELU (Gaussian Error Linear Unit) activation using its approximate tanh-based formula.",
+            "info": "GELU (Gaussian Error Linear Unit) was introduced by Hendrycks and Gimpel (2016) and has become the default activation in transformer architectures like BERT and GPT. Unlike ReLU which hard-gates values at zero, GELU applies a smooth, probabilistic gating: GELU(x) = x * P(X <= x) where X ~ N(0,1). The tanh approximation is GELU(x) = 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3))). This smooth gating allows small negative values to pass through with reduced magnitude rather than being completely zeroed out.",
+            "code": "import numpy as np\n\ndef gelu(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * x * (1 + np.tanh(???))",
+                    "acceptable": [
+                        "0.5 * x * (1 + np.tanh(np.sqrt(2 / np.pi) * (x + 0.044715 * x**3)))",
+                        "0.5 * x * (1 + np.tanh(np.sqrt(2.0 / np.pi) * (x + 0.044715 * x ** 3)))",
+                        "0.5 * x * (1.0 + np.tanh(np.sqrt(2.0 / np.pi) * (x + 0.044715 * np.power(x, 3))))"
+                    ],
+                    "hint": "GELU approx = 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))."
+                }
+            ]
+        },
+        {
+            "id": "act_new_silu",
+            "title": "SiLU / Swish Activation",
+            "difficulty": "easy",
+            "description": "Implement the SiLU (Sigmoid Linear Unit) activation, also known as Swish.",
+            "info": "SiLU, also called Swish, was discovered through automated search by Ramachandran et al. (2017) at Google Brain. It is defined as f(x) = x * sigmoid(x), which makes it a self-gated activation function where the input is multiplied by its own sigmoid. SiLU is smooth and non-monotonic, meaning it can output values slightly below zero for negative inputs before returning to zero. It has become the default activation in many modern architectures including EfficientNet and various diffusion models.",
+            "code": "import numpy as np\n\ndef silu(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x * ???",
+                    "acceptable": [
+                        "x * (1 / (1 + np.exp(-x)))",
+                        "x / (1 + np.exp(-x))",
+                        "x * (1.0 / (1.0 + np.exp(-x)))"
+                    ],
+                    "hint": "SiLU(x) = x * sigmoid(x). Recall sigmoid(x) = 1/(1+exp(-x))."
+                }
+            ]
+        },
+        {
+            "id": "act_new_mish",
+            "title": "Mish Activation",
+            "difficulty": "medium",
+            "description": "Implement the Mish activation function using NumPy.",
+            "info": "Mish was proposed by Diganta Misra (2019) and is defined as f(x) = x * tanh(softplus(x)) = x * tanh(ln(1 + e^x)). Like SiLU/Swish, Mish is smooth and non-monotonic, but it tends to produce slightly different gradient landscapes. Mish became popular through its adoption in YOLOv4 and other computer vision architectures. Empirically, Mish can outperform both ReLU and Swish on certain tasks, though the differences are often small and architecture-dependent.",
+            "code": "import numpy as np\n\ndef mish(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x * np.tanh(???)",
+                    "acceptable": [
+                        "x * np.tanh(np.log(1 + np.exp(x)))",
+                        "x * np.tanh(np.log1p(np.exp(x)))"
+                    ],
+                    "hint": "Mish(x) = x * tanh(softplus(x)), where softplus(x) = ln(1 + e^x)."
+                }
+            ]
+        },
+        {
+            "id": "act_new_elu",
+            "title": "ELU Activation",
+            "difficulty": "easy",
+            "description": "Implement the Exponential Linear Unit (ELU) with a configurable alpha parameter.",
+            "info": "ELU (Exponential Linear Unit), proposed by Clevert et al. (2015), uses an exponential curve for negative inputs: f(x) = x if x > 0, and f(x) = alpha*(exp(x) - 1) if x <= 0. Unlike Leaky ReLU which uses a linear slope for negatives, ELU saturates to -alpha for large negative values, which helps push mean activations closer to zero. This zero-centering property can speed up learning by reducing the bias shift effect. ELU is continuously differentiable everywhere, unlike ReLU which has a kink at zero.",
+            "code": "import numpy as np\n\ndef elu(x, alpha=1.0):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.where(???, x, ???)",
+                    "acceptable": [
+                        "np.where(x > 0, x, alpha * (np.exp(x) - 1))",
+                        "np.where(x >= 0, x, alpha * (np.exp(x) - 1))",
+                        "np.where(x <= 0, alpha * (np.exp(x) - 1), x)"
+                    ],
+                    "hint": "ELU = x for x > 0, and alpha*(exp(x)-1) for x <= 0."
+                }
+            ]
+        },
+        {
+            "id": "act_new_selu",
+            "title": "SELU Activation",
+            "difficulty": "medium",
+            "description": "Implement SELU (Scaled Exponential Linear Unit) with the specific lambda and alpha constants that enable self-normalization.",
+            "info": "SELU was introduced by Klambauer et al. (2017) with the remarkable property that it can make neural networks self-normalizing, meaning activations automatically converge to zero mean and unit variance during training. It is defined as SELU(x) = lambda * (x if x > 0, alpha*(exp(x)-1) if x <= 0), with carefully derived constants lambda ~= 1.0507 and alpha ~= 1.6733. This self-normalizing property holds under specific conditions including the use of LeCun normal initialization. SELU eliminates the need for batch normalization in fully-connected networks when these conditions are met.",
+            "code": "import numpy as np\n\ndef selu(x):\n    alpha = 1.6732632423543772\n    scale = 1.0507009873554805\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "scale * np.where(???, ???, ???)",
+                    "acceptable": [
+                        "scale * np.where(x > 0, x, alpha * (np.exp(x) - 1))",
+                        "scale * np.where(x >= 0, x, alpha * (np.exp(x) - 1))",
+                        "scale * np.where(x <= 0, alpha * (np.exp(x) - 1), x)"
+                    ],
+                    "hint": "SELU = scale * ELU(x, alpha). It's a scaled version of ELU with special constants."
+                }
+            ]
+        },
+        {
+            "id": "act_new_softplus",
+            "title": "Softplus Activation",
+            "difficulty": "easy",
+            "description": "Implement the Softplus activation function, a smooth approximation to ReLU.",
+            "info": "Softplus is defined as f(x) = ln(1 + e^x) and serves as a smooth approximation to the ReLU function. As x becomes large and positive, softplus approaches x; as x becomes large and negative, it approaches 0, just like ReLU but without the sharp corner at zero. Softplus is always positive and its derivative is the sigmoid function, creating an elegant mathematical relationship. It is commonly used in variational autoencoders to parameterize positive quantities like variances, and in probabilistic models where smoothness is required.",
+            "code": "import numpy as np\n\ndef softplus(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.log(???)",
+                    "acceptable": [
+                        "np.log(1 + np.exp(x))",
+                        "np.log1p(np.exp(x))"
+                    ],
+                    "hint": "Softplus(x) = ln(1 + e^x). NumPy has np.log1p for log(1+x)."
+                }
+            ]
+        },
+        {
+            "id": "act_new_softsign",
+            "title": "Softsign Activation",
+            "difficulty": "easy",
+            "description": "Implement the Softsign activation function using NumPy.",
+            "info": "Softsign is defined as f(x) = x / (1 + |x|) and maps inputs to the range (-1, 1), similar to tanh but with a different shape. Unlike tanh, which saturates exponentially, softsign approaches its asymptotes polynomially, meaning it saturates more slowly. This slower saturation can be beneficial because gradients do not vanish as quickly for large input values. Softsign was explored as an alternative to tanh in early deep learning work by Bergstra et al., though it never achieved widespread adoption compared to ReLU-family activations.",
+            "code": "import numpy as np\n\ndef softsign(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x / (???)",
+                    "acceptable": [
+                        "x / (1 + np.abs(x))",
+                        "x / (1.0 + np.abs(x))",
+                        "x / (1 + np.absolute(x))"
+                    ],
+                    "hint": "Softsign(x) = x / (1 + |x|). Use np.abs() for absolute value."
+                }
+            ]
+        },
+        {
+            "id": "act_new_hard_sigmoid",
+            "title": "Hard Sigmoid",
+            "difficulty": "easy",
+            "description": "Implement the hard sigmoid function, a piecewise linear approximation of sigmoid.",
+            "info": "Hard sigmoid is a computationally cheap, piecewise linear approximation of the sigmoid function. It is defined as f(x) = clip((x + 3) / 6, 0, 1), which means it equals 0 for x <= -3, equals 1 for x >= 3, and linearly interpolates between them. Hard sigmoid avoids the expensive exp() computation required by true sigmoid, making it attractive for mobile and embedded deployments. It is used in MobileNetV3 and other efficient architectures as part of the hard swish activation.",
+            "code": "import numpy as np\n\ndef hard_sigmoid(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.clip(???)",
+                    "acceptable": [
+                        "np.clip((x + 3) / 6, 0, 1)",
+                        "np.clip((x + 3.0) / 6.0, 0.0, 1.0)",
+                        "np.clip(x / 6 + 0.5, 0, 1)",
+                        "np.clip(x / 6.0 + 0.5, 0.0, 1.0)"
+                    ],
+                    "hint": "Hard sigmoid = clip((x+3)/6, 0, 1). Use np.clip for clamping."
+                }
+            ]
+        },
+        {
+            "id": "act_new_hard_swish",
+            "title": "Hard Swish",
+            "difficulty": "medium",
+            "description": "Implement the hard swish activation, used in MobileNetV3. It uses hard sigmoid as the gating function.",
+            "info": "Hard swish was introduced in MobileNetV3 (Howard et al., 2019) as a computationally efficient alternative to the Swish/SiLU activation. It is defined as f(x) = x * hard_sigmoid(x) = x * clip((x+3)/6, 0, 1), replacing the expensive sigmoid computation with a piecewise linear approximation. Hard swish provides nearly identical accuracy to regular swish while being significantly faster on mobile hardware. The function is exactly zero for x <= -3 and exactly x for x >= 3, with a smooth cubic segment in between.",
+            "code": "import numpy as np\n\ndef hard_swish(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x * np.clip(???)",
+                    "acceptable": [
+                        "x * np.clip((x + 3) / 6, 0, 1)",
+                        "x * np.clip((x + 3.0) / 6.0, 0.0, 1.0)"
+                    ],
+                    "hint": "Hard swish = x * hard_sigmoid(x) = x * clip((x+3)/6, 0, 1)."
+                }
+            ]
+        },
+        {
+            "id": "act_new_prelu_torch",
+            "title": "PReLU in PyTorch",
+            "difficulty": "medium",
+            "description": "Create a simple neural network in PyTorch that uses PReLU activation between two linear layers. The learnable alpha should be initialized to 0.25.",
+            "info": "Parametric ReLU (PReLU) was introduced by He et al. (2015) in the same paper that proposed Kaiming initialization. Unlike Leaky ReLU where alpha is a fixed hyperparameter, PReLU treats alpha as a learnable parameter optimized during training via backpropagation. PyTorch's nn.PReLU module can learn a single alpha shared across all channels, or a per-channel alpha when num_parameters matches the channel dimension. PReLU adds negligible computational cost but can improve accuracy, especially in deeper networks where the optimal negative slope may vary by layer.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PReLUNet(nn.Module):\n    def __init__(self, in_features, hidden, out_features):\n        super().__init__()\n        self.fc1 = nn.Linear(in_features, hidden)\n        self.act = {{b1}}\n        self.fc2 = nn.Linear(hidden, out_features)\n\n    def forward(self, x):\n        return self.fc2(self.act(self.fc1(x)))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.PReLU(???)",
+                    "acceptable": [
+                        "nn.PReLU(init=0.25)",
+                        "nn.PReLU(num_parameters=1, init=0.25)"
+                    ],
+                    "hint": "nn.PReLU takes an optional init parameter for the initial alpha value."
+                }
+            ]
+        },
+        {
+            "id": "act_new_celu",
+            "title": "CELU Activation",
+            "difficulty": "medium",
+            "description": "Implement the Continuously Differentiable ELU (CELU) with a configurable alpha parameter.",
+            "info": "CELU (Continuously Differentiable Exponential Linear Unit) was proposed by Barron (2017) as a modification of ELU that is continuously differentiable everywhere, including at x=0. It is defined as CELU(x) = max(0,x) + min(0, alpha*(exp(x/alpha) - 1)). The key difference from standard ELU is the division by alpha inside the exponential, which ensures the derivative is continuous at the origin regardless of the alpha value. When alpha=1, CELU is identical to ELU. The continuous differentiability can improve optimization stability in certain training regimes.",
+            "code": "import numpy as np\n\ndef celu(x, alpha=1.0):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.maximum(0, x) + np.minimum(0, ???)",
+                    "acceptable": [
+                        "np.maximum(0, x) + np.minimum(0, alpha * (np.exp(x / alpha) - 1))",
+                        "np.maximum(0.0, x) + np.minimum(0.0, alpha * (np.exp(x / alpha) - 1))"
+                    ],
+                    "hint": "CELU = max(0,x) + min(0, alpha*(exp(x/alpha) - 1))."
+                }
+            ]
+        },
+        {
+            "id": "act_new_log_softmax",
+            "title": "Log-Softmax",
+            "difficulty": "medium",
+            "description": "Implement the numerically stable log-softmax function. Compute it directly rather than taking log(softmax(x)).",
+            "info": "Log-softmax computes log(softmax(x)) in a numerically stable way and is essential for training with NLLLoss in PyTorch. Computing log(softmax(x)) naively by first taking softmax then log can cause numerical issues: softmax may underflow to zero, making the log undefined. The stable formula is log_softmax(x) = x - max(x) - log(sum(exp(x - max(x)))). Log-softmax is more numerically stable and computationally efficient than separate log and softmax operations. In PyTorch, nn.LogSoftmax combined with nn.NLLLoss is equivalent to nn.CrossEntropyLoss.",
+            "code": "import numpy as np\n\ndef log_softmax(x):\n    x_max = np.max(x, axis=-1, keepdims=True)\n    shifted = x - x_max\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "shifted - np.log(???)",
+                    "acceptable": [
+                        "shifted - np.log(np.sum(np.exp(shifted), axis=-1, keepdims=True))",
+                        "shifted - np.log(np.exp(shifted).sum(axis=-1, keepdims=True))"
+                    ],
+                    "hint": "log_softmax(x) = (x - max) - log(sum(exp(x - max)))."
+                }
+            ]
+        },
+        {
+            "id": "act_new_glu",
+            "title": "Gated Linear Unit (GLU)",
+            "difficulty": "hard",
+            "description": "Implement the Gated Linear Unit. Split the input tensor in half along the last dimension: the first half is the value and the second half goes through sigmoid to form the gate.",
+            "info": "The Gated Linear Unit (GLU) was introduced by Dauphin et al. (2017) for language modeling and has become a key building block in modern transformer variants like PaLM and LLaMA. GLU splits its input into two halves along a specified dimension: GLU(x) = a * sigmoid(b), where [a, b] = split(x). The sigmoid-gated half acts as a learned gate controlling information flow from the value half. Variants include SwiGLU (using SiLU instead of sigmoid) and GeGLU (using GELU), which have shown strong performance in large language models.",
+            "code": "import numpy as np\n\ndef glu(x):\n    # Split x into two halves along last dimension\n    d = x.shape[-1] // 2\n    a = x[..., :d]\n    b = x[..., d:]\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "a * ???",
+                    "acceptable": [
+                        "a * (1 / (1 + np.exp(-b)))",
+                        "a / (1 + np.exp(-b))"
+                    ],
+                    "hint": "GLU(x) = a * sigmoid(b). Apply sigmoid to the gate half and multiply."
+                }
+            ]
+        },
+        {
+            "id": "act_new_relu_derivative",
+            "title": "ReLU Derivative",
+            "difficulty": "easy",
+            "description": "Implement the derivative of the ReLU function. The derivative is 1 for positive inputs and 0 for non-positive inputs.",
+            "info": "The derivative of ReLU is a step function: it equals 1 when x > 0 and 0 when x <= 0. Technically, ReLU is not differentiable at x = 0, but in practice we define the derivative as 0 at that point (a subgradient). This simple binary gradient is what makes ReLU computationally efficient during backpropagation. However, the zero gradient for negative inputs is also the cause of the 'dying ReLU' problem, where neurons that consistently receive negative inputs stop learning entirely.",
+            "code": "import numpy as np\n\ndef relu_derivative(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(x ??? 0).astype(???)",
+                    "acceptable": [
+                        "(x > 0).astype(float)",
+                        "(x > 0).astype(np.float64)",
+                        "(x > 0).astype(np.float32)",
+                        "np.where(x > 0, 1.0, 0.0)",
+                        "np.where(x > 0, 1, 0)"
+                    ],
+                    "hint": "ReLU'(x) = 1 if x > 0, else 0. Cast the boolean to float."
+                }
+            ]
+        },
+        {
+            "id": "act_new_sigmoid_derivative",
+            "title": "Sigmoid Derivative",
+            "difficulty": "easy",
+            "description": "Implement the derivative of the sigmoid function, given that sigma(x) has already been computed. Use the elegant identity sigma'(x) = sigma(x) * (1 - sigma(x)).",
+            "info": "One of sigmoid's most elegant properties is that its derivative can be expressed entirely in terms of its own output: sigma'(x) = sigma(x) * (1 - sigma(x)). This means during backpropagation, you only need the forward pass output to compute the gradient, without re-evaluating any exponentials. The maximum value of the derivative is 0.25, occurring at x=0, which illustrates the vanishing gradient problem: gradients are always shrunk by at least a factor of 4 per layer. For deep networks, this multiplicative shrinkage across layers makes sigmoid impractical for hidden layers.",
+            "code": "import numpy as np\n\ndef sigmoid(x):\n    return 1 / (1 + np.exp(-x))\n\ndef sigmoid_derivative(x):\n    s = sigmoid(x)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "s * ???",
+                    "acceptable": [
+                        "s * (1 - s)",
+                        "s * (1.0 - s)"
+                    ],
+                    "hint": "The sigmoid derivative is sigma(x) * (1 - sigma(x))."
+                }
+            ]
+        },
+        {
+            "id": "act_new_dead_neuron",
+            "title": "Dead ReLU Neuron Detection",
+            "difficulty": "medium",
+            "description": "Write a function that detects dead neurons in a ReLU network. A neuron is 'dead' if it outputs zero for every sample in a batch. Return the fraction of dead neurons.",
+            "info": "Dead neurons are a common pathology in ReLU networks where certain neurons always output zero regardless of input, effectively removing them from the network. This happens when weights are updated such that the pre-activation is always negative, and since ReLU's gradient is zero for negative inputs, the neuron can never recover. High learning rates, poor initialization, or lack of batch normalization can increase the prevalence of dead neurons. Monitoring the dead neuron fraction during training is a useful diagnostic: rates above 20-40% may indicate training problems requiring learning rate reduction or a switch to Leaky ReLU.",
+            "code": "import numpy as np\n\ndef dead_neuron_fraction(activations):\n    \"\"\"activations: array of shape (batch_size, num_neurons) after ReLU.\"\"\"\n    # A neuron is dead if ALL its activations across the batch are zero\n    neuron_is_dead = {{b1}}\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.all(activations ??? 0, axis=???)",
+                    "acceptable": [
+                        "np.all(activations == 0, axis=0)",
+                        "np.all(activations <= 0, axis=0)"
+                    ],
+                    "hint": "Check if all values along the batch axis (axis=0) are zero for each neuron."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.???(neuron_is_dead)",
+                    "acceptable": [
+                        "np.mean(neuron_is_dead)",
+                        "neuron_is_dead.mean()",
+                        "np.sum(neuron_is_dead) / neuron_is_dead.shape[0]",
+                        "neuron_is_dead.sum() / neuron_is_dead.shape[0]"
+                    ],
+                    "hint": "Compute the fraction (mean) of True values to get the dead neuron ratio."
+                }
+            ]
+        },
+        {
+            "id": "act_new_activation_stats",
+            "title": "Activation Statistics Monitor",
+            "difficulty": "medium",
+            "description": "Write a PyTorch forward hook that records the mean, standard deviation, and fraction of zeros for activations passing through a layer. Store the stats in the provided dictionary.",
+            "info": "Monitoring activation statistics during training is a powerful diagnostic tool for understanding network health. The mean and standard deviation reveal whether activations are exploding or vanishing, while the fraction of zeros indicates dead neurons in ReLU networks. Forward hooks in PyTorch allow non-invasive monitoring by attaching callback functions to any module. Well-behaved activations typically have mean close to zero and moderate standard deviation; deviations from this suggest issues with initialization, learning rate, or architecture choices.",
+            "code": "import torch\nimport torch.nn as nn\n\nstats = {}\n\ndef activation_hook(module, input, output):\n    stats['mean'] = {{b1}}\n    stats['std'] = output.std().item()\n    stats['zero_frac'] = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "output.???().item()",
+                    "acceptable": [
+                        "output.mean().item()",
+                        "output.float().mean().item()"
+                    ],
+                    "hint": "Compute the mean of the output tensor and convert to a Python scalar with .item()."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(output == 0).???.item()",
+                    "acceptable": [
+                        "(output == 0).float().mean().item()",
+                        "(output == 0).sum().item() / output.numel()",
+                        "torch.sum(output == 0).item() / output.numel()"
+                    ],
+                    "hint": "Count zeros: cast the boolean tensor to float and take the mean."
+                }
+            ]
+        },
+        {
+            "id": "act_new_gradient_flow",
+            "title": "Gradient Flow Through Activations",
+            "difficulty": "hard",
+            "description": "Use PyTorch autograd to compute and compare the gradients of ReLU, sigmoid, and tanh at a range of input values. Return the gradient arrays for analysis.",
+            "info": "Understanding gradient flow through activation functions is essential for diagnosing training issues in deep networks. Sigmoid and tanh both suffer from vanishing gradients for large |x| values, where the derivative approaches zero, while ReLU has a constant gradient of 1 for positive inputs but exactly zero for negatives. In a deep network, gradients are multiplied across layers during backpropagation, so even a slight per-layer shrinkage compounds exponentially. This analysis motivates the preference for ReLU and its variants in deep architectures, as well as the development of normalization techniques.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef compute_activation_gradients(x_values):\n    x = torch.tensor(x_values, dtype=torch.float32, requires_grad=True)\n    \n    # ReLU gradient\n    y_relu = F.relu(x)\n    y_relu.sum().backward()\n    relu_grad = {{b1}}\n    x.grad.zero_()\n    \n    # Sigmoid gradient\n    y_sig = torch.sigmoid(x)\n    y_sig.sum().backward()\n    sig_grad = x.grad.clone().numpy()\n    x.grad.zero_()\n    \n    # Tanh gradient\n    y_tanh = torch.tanh(x)\n    y_tanh.sum().backward()\n    tanh_grad = x.grad.clone().numpy()\n    \n    return relu_grad, sig_grad, tanh_grad",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x.grad.???.numpy()",
+                    "acceptable": [
+                        "x.grad.clone().numpy()",
+                        "x.grad.detach().numpy()",
+                        "x.grad.data.clone().numpy()",
+                        "x.grad.detach().clone().numpy()"
+                    ],
+                    "hint": "Clone the gradient tensor before zeroing it, then convert to numpy."
+                }
+            ]
+        },
+        {
+            "id": "act_new_compare_activations",
+            "title": "Activation Function Comparison",
+            "difficulty": "medium",
+            "description": "Compute the output of ReLU, GELU, and SiLU/Swish for a range of inputs and return them for comparison. Use PyTorch functional API.",
+            "info": "Comparing activation functions side by side reveals their behavioral differences, especially for negative inputs. ReLU hard-clips negatives to zero, while GELU and SiLU/Swish allow small negative values to pass through with reduced magnitude, creating a smooth transition region. GELU approximates multiplying x by the probability that x exceeds a standard normal sample, while SiLU gates x by its own sigmoid. These smoother activations have become standard in transformers (GELU for BERT/GPT, SiLU for vision models) because they improve gradient flow in deep architectures.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef compare_activations(x_np):\n    x = torch.tensor(x_np, dtype=torch.float32)\n    relu_out = F.relu(x).numpy()\n    gelu_out = {{b1}}\n    silu_out = {{b2}}\n    return relu_out, gelu_out, silu_out",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "F.gelu(x).???",
+                    "acceptable": [
+                        "F.gelu(x).numpy()",
+                        "F.gelu(x).detach().numpy()"
+                    ],
+                    "hint": "Apply F.gelu and convert to numpy."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.silu(x).???",
+                    "acceptable": [
+                        "F.silu(x).numpy()",
+                        "F.silu(x).detach().numpy()"
+                    ],
+                    "hint": "Apply F.silu and convert to numpy."
+                }
+            ]
+        },
+        {
+            "id": "act_new_swiglu",
+            "title": "SwiGLU Activation",
+            "difficulty": "hard",
+            "description": "Implement SwiGLU, the variant of GLU that uses SiLU/Swish as the gating function instead of sigmoid. This is used in LLaMA and PaLM.",
+            "info": "SwiGLU was proposed by Shazeer (2020) and combines the Gated Linear Unit architecture with the SiLU/Swish activation. Instead of GLU's sigmoid gate, SwiGLU uses SiLU: SwiGLU(x) = a * SiLU(b) where [a, b] = split(x). SwiGLU has become the dominant feed-forward activation in modern large language models including PaLM, LLaMA, and Mistral. The combination of the gating mechanism with the smooth, non-monotonic SiLU activation empirically outperforms both standard ReLU feed-forward layers and vanilla GLU on language modeling benchmarks.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef swiglu(x):\n    d = x.shape[-1] // 2\n    a = x[..., :d]\n    b = x[..., d:]\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "a * F.???(b)",
+                    "acceptable": [
+                        "a * F.silu(b)",
+                        "a * (b * torch.sigmoid(b))"
+                    ],
+                    "hint": "SwiGLU uses SiLU instead of sigmoid as the gate: a * SiLU(b)."
+                }
+            ]
+        },
+        {
+            "id": "act_new_geglu",
+            "title": "GeGLU Activation",
+            "difficulty": "hard",
+            "description": "Implement GeGLU, the GLU variant using GELU as the gating function. This is another popular choice for transformer FFN blocks.",
+            "info": "GeGLU combines the Gated Linear Unit structure with the GELU activation function, defined as GeGLU(x) = a * GELU(b) where [a, b] = split(x). Proposed alongside SwiGLU by Shazeer (2020), GeGLU offers a different trade-off in the gating mechanism by using the probabilistic smoothness of GELU. In practice, SwiGLU and GeGLU perform similarly and both significantly outperform standard ReLU or GELU feed-forward layers in transformers. The choice between them is often determined by framework defaults and minor benchmark differences.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef geglu(x):\n    d = x.shape[-1] // 2\n    a = x[..., :d]\n    b = x[..., d:]\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "a * F.???(b)",
+                    "acceptable": [
+                        "a * F.gelu(b)"
+                    ],
+                    "hint": "GeGLU uses GELU as the gate function: a * GELU(b)."
+                }
+            ]
+        },
+        {
+            "id": "act_new_sparsemax",
+            "title": "Sparsemax Forward Pass",
+            "difficulty": "hard",
+            "description": "Implement sparsemax for a 1D input vector. Sparsemax projects onto the probability simplex, producing sparse outputs unlike softmax.",
+            "info": "Sparsemax, proposed by Martins and Astudillo (2016), is an alternative to softmax that can output exact zeros, producing sparse probability distributions. While softmax always assigns non-zero probability to every class, sparsemax projects the input onto the probability simplex by clipping small values to exactly zero. The algorithm sorts inputs in descending order, finds a threshold tau such that the positive entries of (z - tau) sum to one, and clips negative values to zero. Sparsemax is useful in attention mechanisms and structured prediction where interpretable, sparse distributions are desired.",
+            "code": "import numpy as np\n\ndef sparsemax(z):\n    z_sorted = np.sort(z)[::-1]\n    k = np.arange(1, len(z) + 1)\n    cumsum = np.cumsum(z_sorted)\n    support = 1 + k * z_sorted > cumsum\n    k_star = {{b1}}\n    tau = (cumsum[k_star - 1] - 1) / k_star\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???(support)",
+                    "acceptable": [
+                        "np.sum(support)",
+                        "support.sum()",
+                        "np.count_nonzero(support)"
+                    ],
+                    "hint": "k* is the number of elements in the support (where the condition is True)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.maximum(z - tau, ???)",
+                    "acceptable": [
+                        "np.maximum(z - tau, 0)",
+                        "np.maximum(z - tau, 0.0)"
+                    ],
+                    "hint": "Clip to the simplex: max(z - threshold, 0)."
+                }
+            ]
+        },
+        {
+            "id": "act_new_torch_gelu_module",
+            "title": "PyTorch GELU in a Network",
+            "difficulty": "easy",
+            "description": "Build a simple feedforward network in PyTorch with two hidden layers, each followed by GELU activation.",
+            "info": "GELU has become the standard activation function in transformer-based models and is readily available in PyTorch as nn.GELU(). When building networks, using nn.GELU() as a module (rather than the functional F.gelu) allows it to be included in nn.Sequential containers and makes the model architecture self-documenting when printed. The approximate keyword argument controls whether to use the exact GELU (via the error function) or the faster tanh approximation. For most applications, the default exact computation is preferred.",
+            "code": "import torch.nn as nn\n\ndef make_gelu_network(in_dim, hidden_dim, out_dim):\n    return nn.Sequential(\n        nn.Linear(in_dim, hidden_dim),\n        {{b1}},\n        nn.Linear(hidden_dim, hidden_dim),\n        {{b1}},\n        nn.Linear(hidden_dim, out_dim)\n    )",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???()",
+                    "acceptable": [
+                        "nn.GELU()",
+                        "nn.GELU(approximate='none')",
+                        "nn.GELU(approximate='tanh')"
+                    ],
+                    "hint": "PyTorch provides GELU as nn.GELU()."
+                }
+            ]
+        },
+        {
+            "id": "act_new_entmax",
+            "title": "Entmax 1.5 (Alpha-Entmax)",
+            "difficulty": "hard",
+            "description": "Implement a simplified version of entmax with alpha=1.5, which interpolates between softmax (alpha=1) and sparsemax (alpha=2). Use the bisection method to find the threshold.",
+            "info": "Entmax, proposed by Peters et al. (2019), generalizes both softmax and sparsemax through a continuous alpha parameter. When alpha=1, entmax reduces to softmax; when alpha=2, it becomes sparsemax. The intermediate value alpha=1.5 provides a balance: sparser than softmax but smoother than sparsemax. Entmax uses the Tsallis entropy framework and produces sparser distributions as alpha increases. It is particularly useful in attention mechanisms where different heads may benefit from different sparsity levels, and alpha can even be learned during training (adaptive entmax).",
+            "code": "import numpy as np\n\ndef entmax15(z, num_iters=50):\n    \"\"\"Entmax with alpha=1.5 using bisection.\"\"\"\n    z = np.array(z, dtype=np.float64)\n    lo, hi = np.min(z) - 2, np.max(z)\n    for _ in range(num_iters):\n        mid = (lo + hi) / 2\n        p = {{b1}}\n        if p.sum() > 1:\n            lo = mid\n        else:\n            hi = mid\n    tau = (lo + hi) / 2\n    return np.maximum(z - tau, 0) ** 2",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.maximum(z - mid, 0) ** ???",
+                    "acceptable": [
+                        "np.maximum(z - mid, 0) ** 2",
+                        "np.maximum(z - mid, 0.0) ** 2"
+                    ],
+                    "hint": "For alpha=1.5, the mapping is p = max(z - tau, 0)^(1/(alpha-1)) = max(z - tau, 0)^2."
+                }
+            ]
+        },
+        {
+            "id": "act_new_when_to_use",
+            "title": "Choosing the Right Activation",
+            "difficulty": "easy",
+            "description": "Fill in the recommended activation function for each use case in this configuration dictionary.",
+            "info": "Choosing the right activation function depends on the architecture and task. For transformer feed-forward layers, GELU or SwiGLU are standard choices used in BERT, GPT, and LLaMA. For convolutional networks, ReLU and its variants (Leaky ReLU, PReLU) remain effective and computationally cheap. For output layers, sigmoid is used for binary classification, softmax for multi-class, and no activation (linear) for regression. Mobile architectures prefer hard swish for its computational efficiency with minimal accuracy loss.",
+            "code": "# What activation to use where?\nrecommendations = {\n    'transformer_ffn': {{b1}},\n    'cnn_hidden': {{b2}},\n    'binary_output': 'sigmoid',\n    'multiclass_output': 'softmax',\n}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "'???'",
+                    "acceptable": [
+                        "'gelu'",
+                        "'GELU'",
+                        "'swiglu'",
+                        "'SwiGLU'"
+                    ],
+                    "hint": "Transformers (BERT, GPT) typically use GELU or SwiGLU in their FFN blocks."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "'???'",
+                    "acceptable": [
+                        "'relu'",
+                        "'ReLU'",
+                        "'leaky_relu'"
+                    ],
+                    "hint": "CNNs most commonly use ReLU or its variants."
+                }
+            ]
+        },
+        {
+            "id": "act_new_tanh_derivative",
+            "title": "Tanh Derivative",
+            "difficulty": "easy",
+            "description": "Implement the derivative of tanh using the identity tanh'(x) = 1 - tanh(x)^2.",
+            "info": "The derivative of tanh has an elegant closed-form expression: tanh'(x) = 1 - tanh(x)^2, meaning it can be computed directly from the forward pass output without re-evaluating exponentials. The maximum derivative value is 1 (at x=0) and it approaches 0 for large |x|, which is a key factor in the vanishing gradient problem. Compared to sigmoid whose max derivative is only 0.25, tanh has a stronger gradient signal near zero, which partly explains why it was preferred over sigmoid for hidden layers before ReLU became dominant. This property also makes tanh useful in RNNs where gradient preservation across time steps is critical.",
+            "code": "import numpy as np\n\ndef tanh_derivative(x):\n    t = np.tanh(x)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 - ???",
+                    "acceptable": [
+                        "1 - t ** 2",
+                        "1 - t**2",
+                        "1 - np.square(t)",
+                        "1.0 - t ** 2"
+                    ],
+                    "hint": "tanh'(x) = 1 - tanh(x)^2."
+                }
+            ]
+        },
+        {
+            "id": "act_new_softplus_stable",
+            "title": "Numerically Stable Softplus",
+            "difficulty": "medium",
+            "description": "Implement a numerically stable version of softplus that avoids overflow for large positive inputs. For large x, softplus(x) ~ x.",
+            "info": "The naive softplus implementation ln(1 + exp(x)) overflows for large positive x because exp(x) becomes astronomically large. A numerically stable version uses the identity: for large x, softplus(x) is approximately x, while for moderate and small x, the standard formula works fine. A common threshold is x > 20, above which softplus(x) = x to floating point precision. PyTorch uses this threshold internally in F.softplus with a configurable beta and threshold parameter. This pattern of handling numerical edge cases is a recurring theme in activation function implementations.",
+            "code": "import numpy as np\n\ndef softplus_stable(x, threshold=20.0):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.where(x > threshold, ???, ???)",
+                    "acceptable": [
+                        "np.where(x > threshold, x, np.log1p(np.exp(x)))",
+                        "np.where(x > threshold, x, np.log(1 + np.exp(x)))"
+                    ],
+                    "hint": "For x > threshold, return x directly. Otherwise use log(1+exp(x))."
+                }
+            ]
+        },
+        {
+            "id": "act_new_register_hook",
+            "title": "Register Activation Hooks on All Layers",
+            "difficulty": "hard",
+            "description": "Write a function that registers a forward hook on every activation layer in a PyTorch model to collect activation statistics. Store per-layer mean and std in a dictionary keyed by layer name.",
+            "info": "Registering hooks on activation layers is a standard debugging technique for deep networks. By iterating over named_modules(), you can selectively attach hooks to specific layer types (e.g., ReLU, GELU). The hook receives the module, its input, and its output, allowing non-invasive inspection of intermediate values. This technique is used in tools like TensorBoard's histogram visualization, gradient debugging, and neural network interpretability research. Collecting these statistics over training iterations reveals trends like activation collapse or explosion.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef register_activation_hooks(model, stats_dict):\n    handles = []\n    for name, module in model.named_modules():\n        if isinstance(module, (nn.ReLU, nn.GELU, nn.SiLU)):\n            def hook_fn(mod, inp, out, layer_name=name):\n                stats_dict[layer_name] = {\n                    'mean': out.mean().item(),\n                    'std': {{b1}}\n                }\n            handle = {{b2}}\n            handles.append(handle)\n    return handles",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "out.???().item()",
+                    "acceptable": [
+                        "out.std().item()",
+                        "out.float().std().item()"
+                    ],
+                    "hint": "Compute the standard deviation of the output tensor."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "module.register_forward_???(hook_fn)",
+                    "acceptable": [
+                        "module.register_forward_hook(hook_fn)"
+                    ],
+                    "hint": "Use register_forward_hook to attach the hook to the module."
+                }
+            ]
+        },
+        {
+            "id": "act_new_gelu_exact",
+            "title": "GELU Exact (Error Function)",
+            "difficulty": "medium",
+            "description": "Implement the exact GELU using the Gaussian CDF, which can be expressed with the error function: GELU(x) = x * 0.5 * (1 + erf(x / sqrt(2))).",
+            "info": "The exact GELU is defined using the cumulative distribution function of the standard normal distribution: GELU(x) = x * Phi(x), where Phi is the CDF. This can be written using the error function as GELU(x) = 0.5 * x * (1 + erf(x / sqrt(2))). The erf-based formulation is mathematically exact, unlike the tanh approximation used in practice. SciPy and PyTorch both provide erf implementations, and NumPy exposes it through scipy.special.erf. The exact version is marginally slower but avoids the small approximation error of the tanh formula.",
+            "code": "from scipy.special import erf\nimport numpy as np\n\ndef gelu_exact(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * x * (1 + erf(???))",
+                    "acceptable": [
+                        "0.5 * x * (1 + erf(x / np.sqrt(2)))",
+                        "0.5 * x * (1.0 + erf(x / np.sqrt(2.0)))",
+                        "x * 0.5 * (1 + erf(x / np.sqrt(2)))",
+                        "0.5 * x * (1 + erf(x * np.sqrt(0.5)))"
+                    ],
+                    "hint": "GELU_exact(x) = 0.5 * x * (1 + erf(x / sqrt(2)))."
+                }
+            ]
+        },
+        {
+            "id": "act_new_silu_derivative",
+            "title": "SiLU/Swish Derivative",
+            "difficulty": "medium",
+            "description": "Implement the derivative of the SiLU/Swish activation function. The derivative is: swish'(x) = sigmoid(x) + x * sigmoid(x) * (1 - sigmoid(x)) = sigmoid(x) * (1 + x * (1 - sigmoid(x))).",
+            "info": "The derivative of SiLU/Swish is more complex than ReLU's simple step function. It can be written as swish'(x) = sigmoid(x) + x * sigmoid(x) * (1 - sigmoid(x)), or equivalently sigmoid(x) * (1 + x - x * sigmoid(x)). Unlike ReLU which has zero gradient for all negatives, SiLU's gradient is non-zero almost everywhere, which means neurons are less likely to become permanently inactive. The derivative can exceed 1 for some positive x values, which helps prevent vanishing gradients. This smooth gradient landscape is one reason SiLU has been successful in deep architectures.",
+            "code": "import numpy as np\n\ndef silu_derivative(x):\n    sig = 1 / (1 + np.exp(-x))\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "sig * (1 + x * ???)",
+                    "acceptable": [
+                        "sig * (1 + x * (1 - sig))",
+                        "sig * (1.0 + x * (1.0 - sig))",
+                        "sig + x * sig * (1 - sig)"
+                    ],
+                    "hint": "SiLU'(x) = sigmoid(x) * (1 + x * (1 - sigmoid(x)))."
+                }
+            ]
         }
     ]
 }

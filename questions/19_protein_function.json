@@ -12,19 +12,27 @@
                 {
                     "id": "b1",
                     "placeholder": "nn.???() # output activation for multi-label",
-                    "acceptable": ["nn.Sigmoid()"],
+                    "acceptable": [
+                        "nn.Sigmoid()"
+                    ],
                     "hint": "Multi-label classification uses sigmoid (not softmax) to independently predict each label."
                 },
                 {
                     "id": "b2",
                     "placeholder": "nn.???() # multi-label loss",
-                    "acceptable": ["nn.BCELoss()", "nn.BCEWithLogitsLoss()"],
+                    "acceptable": [
+                        "nn.BCELoss()",
+                        "nn.BCEWithLogitsLoss()"
+                    ],
                     "hint": "Binary Cross-Entropy loss is used for multi-label classification where each label is independent."
                 },
                 {
                     "id": "b3",
                     "placeholder": "labels.???() # target dtype",
-                    "acceptable": ["labels.float()", "labels.to(torch.float)"],
+                    "acceptable": [
+                        "labels.float()",
+                        "labels.to(torch.float)"
+                    ],
                     "hint": "BCE loss requires float targets, not integer labels."
                 }
             ]
@@ -40,19 +48,25 @@
                 {
                     "id": "b1",
                     "placeholder": "??? # threshold variable",
-                    "acceptable": ["t"],
+                    "acceptable": [
+                        "t"
+                    ],
                     "hint": "Compare scores against the current threshold t from the loop."
                 },
                 {
                     "id": "b2",
                     "placeholder": "np.sum(???) # total predicted positives",
-                    "acceptable": ["np.sum(y_pred[i])"],
+                    "acceptable": [
+                        "np.sum(y_pred[i])"
+                    ],
                     "hint": "Sum the predicted positive labels for protein i."
                 },
                 {
                     "id": "b3",
                     "placeholder": "2 * ??? * ??? / (??? + ???) # F1 formula",
-                    "acceptable": ["2 * avg_prec * avg_rec / (avg_prec + avg_rec)"],
+                    "acceptable": [
+                        "2 * avg_prec * avg_rec / (avg_prec + avg_rec)"
+                    ],
                     "hint": "F1 = 2 * precision * recall / (precision + recall)."
                 }
             ]
@@ -68,19 +82,26 @@
                 {
                     "id": "b1",
                     "placeholder": "??? # output dimension",
-                    "acceptable": ["num_ec_classes", "7"],
+                    "acceptable": [
+                        "num_ec_classes",
+                        "7"
+                    ],
                     "hint": "The output dimension should match the number of EC classes."
                 },
                 {
                     "id": "b2",
                     "placeholder": "nn.???() # multi-class loss",
-                    "acceptable": ["nn.CrossEntropyLoss()"],
+                    "acceptable": [
+                        "nn.CrossEntropyLoss()"
+                    ],
                     "hint": "For single-label multi-class classification, use CrossEntropyLoss."
                 },
                 {
                     "id": "b3",
                     "placeholder": "???() # compute gradients",
-                    "acceptable": ["backward()"],
+                    "acceptable": [
+                        "backward()"
+                    ],
                     "hint": "Call backward() on the loss to compute gradients."
                 }
             ]
@@ -96,19 +117,25 @@
                 {
                     "id": "b1",
                     "placeholder": "h_a ??? h_b # element-wise interaction",
-                    "acceptable": ["h_a * h_b"],
+                    "acceptable": [
+                        "h_a * h_b"
+                    ],
                     "hint": "Element-wise (Hadamard) product captures pairwise feature interactions between the two protein representations."
                 },
                 {
                     "id": "b2",
                     "placeholder": "nn.???() # binary classification loss",
-                    "acceptable": ["nn.BCEWithLogitsLoss()"],
+                    "acceptable": [
+                        "nn.BCEWithLogitsLoss()"
+                    ],
                     "hint": "BCEWithLogitsLoss combines sigmoid activation with binary cross-entropy for numerical stability."
                 },
                 {
                     "id": "b3",
                     "placeholder": "??? # target tensor",
-                    "acceptable": ["labels"],
+                    "acceptable": [
+                        "labels"
+                    ],
                     "hint": "Pass the labels tensor directly as the target."
                 }
             ]
@@ -124,19 +151,28 @@
                 {
                     "id": "b1",
                     "placeholder": "x.???  # reshape for Conv1d",
-                    "acceptable": ["x.transpose(1, 2)", "x.permute(0, 2, 1)"],
+                    "acceptable": [
+                        "x.transpose(1, 2)",
+                        "x.permute(0, 2, 1)"
+                    ],
                     "hint": "Conv1d expects (batch, channels, length), so transpose the last two dimensions."
                 },
                 {
                     "id": "b2",
                     "placeholder": "torch.tensor([???]) # upweight positive class",
-                    "acceptable": ["torch.tensor([10.0])", "torch.tensor([5.0])", "torch.tensor([9.0])"],
+                    "acceptable": [
+                        "torch.tensor([10.0])",
+                        "torch.tensor([5.0])",
+                        "torch.tensor([9.0])"
+                    ],
                     "hint": "Use a positive weight > 1 (e.g., 10.0) to account for the rarity of binding residues."
                 },
                 {
                     "id": "b3",
                     "placeholder": "??? # target labels",
-                    "acceptable": ["binding_labels"],
+                    "acceptable": [
+                        "binding_labels"
+                    ],
                     "hint": "Pass the binding_labels tensor as the target for the loss function."
                 }
             ]
@@ -152,19 +188,25 @@
                 {
                     "id": "b1",
                     "placeholder": "stats.???() # rank correlation function",
-                    "acceptable": ["spearmanr"],
+                    "acceptable": [
+                        "spearmanr"
+                    ],
                     "hint": "Use scipy.stats.spearmanr to compute Spearman rank correlation."
                 },
                 {
                     "id": "b2",
                     "placeholder": "??? # significance threshold",
-                    "acceptable": ["0.05"],
+                    "acceptable": [
+                        "0.05"
+                    ],
                     "hint": "The standard significance threshold (alpha) is 0.05."
                 },
                 {
                     "id": "b3",
                     "placeholder": "stats.???() # linear correlation function",
-                    "acceptable": ["pearsonr"],
+                    "acceptable": [
+                        "pearsonr"
+                    ],
                     "hint": "Use scipy.stats.pearsonr to compute Pearson linear correlation."
                 }
             ]
@@ -180,19 +222,26 @@
                 {
                     "id": "b1",
                     "placeholder": "???(y_true, y_scores) # ROC AUC",
-                    "acceptable": ["roc_auc_score"],
+                    "acceptable": [
+                        "roc_auc_score"
+                    ],
                     "hint": "Use roc_auc_score from sklearn.metrics to compute AUROC."
                 },
                 {
                     "id": "b2",
                     "placeholder": "???(y_true, y_scores) # precision-recall AUC",
-                    "acceptable": ["average_precision_score"],
+                    "acceptable": [
+                        "average_precision_score"
+                    ],
                     "hint": "Use average_precision_score from sklearn.metrics to compute AUPRC."
                 },
                 {
                     "id": "b3",
                     "placeholder": "np.???(y_true) # baseline = prevalence",
-                    "acceptable": ["np.mean(y_true)", "y_true.mean()"],
+                    "acceptable": [
+                        "np.mean(y_true)",
+                        "y_true.mean()"
+                    ],
                     "hint": "The random baseline for AUPRC equals the prevalence (mean) of positives."
                 }
             ]
@@ -208,19 +257,26 @@
                 {
                     "id": "b1",
                     "placeholder": "??? # output size for regression",
-                    "acceptable": ["1"],
+                    "acceptable": [
+                        "1"
+                    ],
                     "hint": "Regression to a single scalar fitness value requires output dimension 1."
                 },
                 {
                     "id": "b2",
                     "placeholder": "nn.???() # regression loss",
-                    "acceptable": ["nn.MSELoss()", "nn.HuberLoss()"],
+                    "acceptable": [
+                        "nn.MSELoss()",
+                        "nn.HuberLoss()"
+                    ],
                     "hint": "Mean Squared Error (MSE) loss is standard for regression tasks."
                 },
                 {
                     "id": "b3",
                     "placeholder": "??? # target fitness values",
-                    "acceptable": ["fitness"],
+                    "acceptable": [
+                        "fitness"
+                    ],
                     "hint": "Pass the fitness tensor as the regression target."
                 }
             ]
@@ -236,19 +292,25 @@
                 {
                     "id": "b1",
                     "placeholder": "??? # index for mutant",
-                    "acceptable": ["mutant_idx"],
+                    "acceptable": [
+                        "mutant_idx"
+                    ],
                     "hint": "Index into the log-probability vector using the mutant amino acid index."
                 },
                 {
                     "id": "b2",
                     "placeholder": "??? # index for wildtype",
-                    "acceptable": ["wildtype_idx"],
+                    "acceptable": [
+                        "wildtype_idx"
+                    ],
                     "hint": "Index into the log-probability vector using the wildtype amino acid index."
                 },
                 {
                     "id": "b3",
                     "placeholder": "F.???(logits, dim=-1) # convert to log-probs",
-                    "acceptable": ["F.log_softmax"],
+                    "acceptable": [
+                        "F.log_softmax"
+                    ],
                     "hint": "Use F.log_softmax to convert raw logits to log-probabilities."
                 }
             ]
@@ -264,19 +326,26 @@
                 {
                     "id": "b1",
                     "placeholder": "torch.???([ , ], dim=-1) # concatenate features",
-                    "acceptable": ["torch.cat([protein_emb, mutation_feat], dim=-1)", "torch.cat([protein_emb, mutation_feat], dim=1)"],
+                    "acceptable": [
+                        "torch.cat([protein_emb, mutation_feat], dim=-1)",
+                        "torch.cat([protein_emb, mutation_feat], dim=1)"
+                    ],
                     "hint": "Use torch.cat to concatenate protein embedding and mutation features along the feature dimension."
                 },
                 {
                     "id": "b2",
                     "placeholder": "???() # reset gradients",
-                    "acceptable": ["zero_grad()"],
+                    "acceptable": [
+                        "zero_grad()"
+                    ],
                     "hint": "Call zero_grad() on the optimizer to clear accumulated gradients before backprop."
                 },
                 {
                     "id": "b3",
                     "placeholder": "???() # update weights",
-                    "acceptable": ["step()"],
+                    "acceptable": [
+                        "step()"
+                    ],
                     "hint": "Call step() on the optimizer to update model parameters using computed gradients."
                 }
             ]
@@ -292,19 +361,27 @@
                 {
                     "id": "b1",
                     "placeholder": "torch.???(child_prob - parent_prob, ???) # ReLU-style penalty",
-                    "acceptable": ["torch.clamp(child_prob - parent_prob, min=0)", "torch.relu(child_prob - parent_prob)", "F.relu(child_prob - parent_prob)"],
+                    "acceptable": [
+                        "torch.clamp(child_prob - parent_prob, min=0)",
+                        "torch.relu(child_prob - parent_prob)",
+                        "F.relu(child_prob - parent_prob)"
+                    ],
                     "hint": "Use torch.clamp with min=0 (or torch.relu) so only violations (child > parent) are penalized."
                 },
                 {
                     "id": "b2",
                     "placeholder": "len(???) # normalize by number of constraints",
-                    "acceptable": ["len(parent_child_pairs)"],
+                    "acceptable": [
+                        "len(parent_child_pairs)"
+                    ],
                     "hint": "Normalize the penalty by the number of parent-child pairs."
                 },
                 {
                     "id": "b3",
                     "placeholder": "??? # return combined loss",
-                    "acceptable": ["total_loss"],
+                    "acceptable": [
+                        "total_loss"
+                    ],
                     "hint": "Return the total_loss which combines BCE loss and the hierarchy penalty."
                 }
             ]
@@ -320,19 +397,27 @@
                 {
                     "id": "b1",
                     "placeholder": "???(1, 2) # remove pooled dimension",
-                    "acceptable": ["squeeze(1, 2)", "squeeze(-1)"],
+                    "acceptable": [
+                        "squeeze(1, 2)",
+                        "squeeze(-1)"
+                    ],
                     "hint": "Use squeeze to remove the length dimension after adaptive pooling reduces it to 1."
                 },
                 {
                     "id": "b2",
                     "placeholder": "torch.???(logits, dim=-1) # get predicted class",
-                    "acceptable": ["argmax"],
+                    "acceptable": [
+                        "argmax"
+                    ],
                     "hint": "Use torch.argmax to get the index of the highest logit for each sample."
                 },
                 {
                     "id": "b3",
                     "placeholder": ".???().item() # compute mean",
-                    "acceptable": ["float().mean()", "sum().item() / len(fold_labels)"],
+                    "acceptable": [
+                        "float().mean()",
+                        "sum().item() / len(fold_labels)"
+                    ],
                     "hint": "Convert the boolean tensor to float and compute the mean for accuracy."
                 }
             ]
@@ -348,19 +433,26 @@
                 {
                     "id": "b1",
                     "placeholder": "???(pred, true) # Spearman correlation",
-                    "acceptable": ["spearmanr"],
+                    "acceptable": [
+                        "spearmanr"
+                    ],
                     "hint": "Use the imported spearmanr function from scipy.stats."
                 },
                 {
                     "id": "b2",
                     "placeholder": "np.???(all_spearman) # aggregate metric",
-                    "acceptable": ["np.mean(all_spearman)"],
+                    "acceptable": [
+                        "np.mean(all_spearman)"
+                    ],
                     "hint": "Compute the unweighted mean of Spearman correlations across assays."
                 },
                 {
                     "id": "b3",
                     "placeholder": "'???' # key for number of variants",
-                    "acceptable": ["'n_variants'", "\"n_variants\""],
+                    "acceptable": [
+                        "'n_variants'",
+                        "\"n_variants\""
+                    ],
                     "hint": "Access the 'n_variants' key from the results dictionary."
                 }
             ]
@@ -376,19 +468,28 @@
                 {
                     "id": "b1",
                     "placeholder": "~??? # boolean negation for train",
-                    "acceptable": ["~test_mask"],
+                    "acceptable": [
+                        "~test_mask"
+                    ],
                     "hint": "The train mask is the boolean negation (~) of the test mask."
                 },
                 {
                     "id": "b2",
                     "placeholder": "??? # comparison operator",
-                    "acceptable": ["<="],
+                    "acceptable": [
+                        "<="
+                    ],
                     "hint": "Training includes variants with mutation count less than or equal to max_train_depth."
                 },
                 {
                     "id": "b3",
                     "placeholder": "??? # range or list of held-out positions",
-                    "acceptable": ["list(range(100, 121))", "np.arange(100, 121)", "list(range(100, 120))", "np.arange(100, 120)"],
+                    "acceptable": [
+                        "list(range(100, 121))",
+                        "np.arange(100, 121)",
+                        "list(range(100, 120))",
+                        "np.arange(100, 120)"
+                    ],
                     "hint": "Create a list or array of positions 100 through 120 to hold out."
                 }
             ]
@@ -404,19 +505,27 @@
                 {
                     "id": "b1",
                     "placeholder": "np.sum(y_true[:, ???]) # count positives for term i",
-                    "acceptable": ["np.sum(y_true[:, i])", "y_true[:, i].sum()"],
+                    "acceptable": [
+                        "np.sum(y_true[:, i])",
+                        "y_true[:, i].sum()"
+                    ],
                     "hint": "Sum the binary labels for term i across all proteins."
                 },
                 {
                     "id": "b2",
                     "placeholder": "np.???(term_aurocs) # macro average",
-                    "acceptable": ["np.mean(term_aurocs)"],
+                    "acceptable": [
+                        "np.mean(term_aurocs)"
+                    ],
                     "hint": "Macro-averaged AUROC is the simple mean of per-term AUROCs."
                 },
                 {
                     "id": "b3",
                     "placeholder": "len(???) # number of evaluated terms",
-                    "acceptable": ["len(term_aucs)", "len(term_aurocs)"],
+                    "acceptable": [
+                        "len(term_aucs)",
+                        "len(term_aurocs)"
+                    ],
                     "hint": "Count how many terms had sufficient positive/negative examples to compute AUROC."
                 }
             ]
@@ -432,19 +541,28 @@
                 {
                     "id": "b1",
                     "placeholder": "??? @ node_features # graph convolution",
-                    "acceptable": ["adj_matrix @ node_features", "torch.mm(adj_matrix, node_features)", "torch.matmul(adj_matrix, node_features)"],
+                    "acceptable": [
+                        "adj_matrix @ node_features",
+                        "torch.mm(adj_matrix, node_features)",
+                        "torch.matmul(adj_matrix, node_features)"
+                    ],
                     "hint": "Multiply the adjacency matrix by node features to aggregate neighbor information."
                 },
                 {
                     "id": "b2",
                     "placeholder": "sum(dim=???) # dot product score",
-                    "acceptable": ["sum(dim=-1)", "sum(dim=1)"],
+                    "acceptable": [
+                        "sum(dim=-1)",
+                        "sum(dim=1)"
+                    ],
                     "hint": "Sum the element-wise product along the feature dimension to compute dot product scores."
                 },
                 {
                     "id": "b3",
                     "placeholder": "torch.???(n_nodes) # self-loop matrix",
-                    "acceptable": ["torch.eye(n_nodes)"],
+                    "acceptable": [
+                        "torch.eye(n_nodes)"
+                    ],
                     "hint": "Add an identity matrix (torch.eye) to include self-loops in the adjacency matrix."
                 }
             ]
@@ -460,19 +578,25 @@
                 {
                     "id": "b1",
                     "placeholder": "??? - ??? # embedding change from mutation",
-                    "acceptable": ["mut_emb - wt_emb"],
+                    "acceptable": [
+                        "mut_emb - wt_emb"
+                    ],
                     "hint": "Compute the difference: mutant embedding minus wildtype embedding."
                 },
                 {
                     "id": "b2",
                     "placeholder": "???() # switch to evaluation mode",
-                    "acceptable": ["eval()"],
+                    "acceptable": [
+                        "eval()"
+                    ],
                     "hint": "Call eval() to switch the model to evaluation mode (disables dropout)."
                 },
                 {
                     "id": "b3",
                     "placeholder": "torch.???(): # disable gradient computation",
-                    "acceptable": ["no_grad()"],
+                    "acceptable": [
+                        "no_grad()"
+                    ],
                     "hint": "Use torch.no_grad() context to disable gradient tracking during evaluation."
                 }
             ]
@@ -488,19 +612,25 @@
                 {
                     "id": "b1",
                     "placeholder": "??? # boolean mask for false negatives",
-                    "acceptable": ["fn_terms"],
+                    "acceptable": [
+                        "fn_terms"
+                    ],
                     "hint": "Use the fn_terms boolean mask to select IC values of missed true annotations."
                 },
                 {
                     "id": "b2",
                     "placeholder": "avg_mi**??? # squared misinformation",
-                    "acceptable": ["avg_mi**2"],
+                    "acceptable": [
+                        "avg_mi**2"
+                    ],
                     "hint": "Smin = sqrt(ru^2 + mi^2), so square the average misinformation term."
                 },
                 {
                     "id": "b3",
                     "placeholder": "???(best_smin, smin) # keep minimum",
-                    "acceptable": ["min(best_smin, smin)"],
+                    "acceptable": [
+                        "min(best_smin, smin)"
+                    ],
                     "hint": "Take the minimum semantic distance across all thresholds."
                 }
             ]
@@ -516,19 +646,25 @@
                 {
                     "id": "b1",
                     "placeholder": "??? # dilation rate parameter",
-                    "acceptable": ["dilation"],
+                    "acceptable": [
+                        "dilation"
+                    ],
                     "hint": "Pass the dilation parameter to the Conv1d layer to set its dilation rate."
                 },
                 {
                     "id": "b2",
                     "placeholder": "??? # global pool output size",
-                    "acceptable": ["1"],
+                    "acceptable": [
+                        "1"
+                    ],
                     "hint": "Global average pooling reduces the sequence dimension to 1."
                 },
                 {
                     "id": "b3",
                     "placeholder": "self.???(h) # final classification",
-                    "acceptable": ["self.classifier(h)"],
+                    "acceptable": [
+                        "self.classifier(h)"
+                    ],
                     "hint": "Pass the pooled features through the classifier layer to get per-term logits."
                 }
             ]
@@ -544,20 +680,1086 @@
                 {
                     "id": "b1",
                     "placeholder": "??? # number of folds",
-                    "acceptable": ["5"],
+                    "acceptable": [
+                        "5"
+                    ],
                     "hint": "5-fold cross-validation is the most common choice."
                 },
                 {
                     "id": "b2",
                     "placeholder": "model.???() # train the model",
-                    "acceptable": ["fit"],
+                    "acceptable": [
+                        "fit"
+                    ],
                     "hint": "Use the fit() method to train the scikit-learn model on training data."
                 },
                 {
                     "id": "b3",
                     "placeholder": "np.???(fold_correlations) # standard deviation",
-                    "acceptable": ["std"],
+                    "acceptable": [
+                        "std"
+                    ],
                     "hint": "Use np.std to compute the standard deviation across folds."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_dta_regression",
+            "title": "Drug-Target Affinity Prediction with Dual-Input Network",
+            "difficulty": "medium",
+            "description": "Build a dual-input neural network that takes protein embeddings and molecular fingerprints to predict drug-target binding affinity (Kd values).",
+            "info": "Drug-target affinity (DTA) prediction estimates the binding strength between a small molecule and a target protein, typically measured as Kd, Ki, or IC50. DeepDTA (Ozturk et al., Bioinformatics 2018) pioneered using CNNs on both protein sequences and SMILES strings for affinity regression. The Davis and KIBA datasets are standard benchmarks containing kinase inhibitor binding measurements. Concordance index (CI) and mean squared error (MSE) are common evaluation metrics for DTA. Representing proteins via pretrained embeddings (e.g., ESM-2) and drugs via Morgan fingerprints has become a strong baseline. Reference: Ozturk et al., 'DeepDTA: deep drug-target binding affinity prediction', Bioinformatics 2018; He et al., 'SimBoost: a read-across approach for predicting drug-target binding affinities', J Cheminformatics 2017.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\nclass DTAModel(nn.Module):\n    def __init__(self, prot_dim=1280, drug_dim=2048, hidden=256):\n        super().__init__()\n        self.prot_encoder = nn.Sequential(\n            nn.Linear(prot_dim, hidden), nn.ReLU(), nn.Dropout(0.2))\n        self.drug_encoder = nn.Sequential(\n            nn.Linear(drug_dim, hidden), nn.ReLU(), nn.Dropout(0.2))\n        self.regressor = nn.Sequential(\n            nn.Linear(hidden * 2, hidden), nn.ReLU(),\n            nn.Linear(hidden, 1))\n\n    def forward(self, prot_emb, drug_fp):\n        p = self.prot_encoder(prot_emb)\n        d = self.drug_encoder(drug_fp)\n        combined = torch.cat([p, d], dim={{b1}})\n        return self.regressor(combined).squeeze(-1)\n\nmodel = DTAModel()\nprot = torch.randn(32, 1280)\ndrug = torch.randn(32, 2048)\naffinity = torch.randn(32)\n\ncriterion = nn.{{b2}}()\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\npred = model(prot, drug)\nloss = criterion(pred, affinity)\nloss.{{b3}}()\noptimizer.step()\nprint(f'Loss: {loss.item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "dim=??? # concatenation dimension",
+                    "acceptable": [
+                        "1",
+                        "-1"
+                    ],
+                    "hint": "Concatenate protein and drug features along the feature dimension (dim=1 or dim=-1)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # regression loss",
+                    "acceptable": [
+                        "MSELoss"
+                    ],
+                    "hint": "Mean squared error loss is standard for affinity regression."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "loss.???() # compute gradients",
+                    "acceptable": [
+                        "backward"
+                    ],
+                    "hint": "Call backward() to compute gradients for all parameters."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_virtual_screening",
+            "title": "Virtual Screening with Binary Classification",
+            "difficulty": "easy",
+            "description": "Implement a binary classifier for virtual screening that predicts whether a compound is active or inactive against a protein target.",
+            "info": "Virtual screening uses computational methods to identify promising drug candidates from large compound libraries. Machine learning approaches frame this as binary classification: active vs. inactive against a target. The DUD-E benchmark (Mysinger et al., J Med Chem 2012) provides decoy sets for evaluating virtual screening methods. Enrichment factor and AUROC are key metrics, measuring how well actives are ranked above inactives. Morgan fingerprints (ECFP) from RDKit are widely used molecular representations for virtual screening classifiers. Random forests and gradient boosting remain competitive baselines. Reference: Mysinger et al., 'Directory of Useful Decoys, Enhanced (DUD-E)', J Med Chem 2012; Lyu et al., 'Ultra-large library docking for discovering new chemotypes', Nature 2019.",
+            "code": "import numpy as np\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.metrics import roc_auc_score, precision_recall_curve, auc\n\nnp.random.seed(42)\nn_compounds = 1000\nX = np.random.randn(n_compounds, 1024)  # Morgan fingerprints\ny = np.zeros(n_compounds)\ny[:50] = 1  # 50 actives, 950 inactives (imbalanced)\n\nfrom sklearn.model_selection import train_test_split\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, stratify=y, random_state=42)\n\nclf = RandomForestClassifier(n_estimators=100, class_weight='{{b1}}',\n                              random_state=42)\nclf.fit(X_train, y_train)\ny_scores = clf.predict_proba(X_test)[:, {{b2}}]\n\nauroc = roc_auc_score(y_test, y_scores)\nprec, rec, _ = precision_recall_curve(y_test, y_scores)\nauprc = {{b3}}(rec, prec)\nprint(f'AUROC: {auroc:.4f}, AUPRC: {auprc:.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "'???' # handle class imbalance",
+                    "acceptable": [
+                        "balanced"
+                    ],
+                    "hint": "Use 'balanced' class weights to handle the imbalanced active/inactive ratio."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "[:, ???] # probability of positive class",
+                    "acceptable": [
+                        "1"
+                    ],
+                    "hint": "Index 1 gives the predicted probability of the positive (active) class."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "???(rec, prec) # area under PR curve",
+                    "acceptable": [
+                        "auc"
+                    ],
+                    "hint": "Use sklearn's auc() function on recall and precision arrays."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_mol_property",
+            "title": "Molecular Property Prediction with Graph Neural Networks",
+            "difficulty": "hard",
+            "description": "Build a message-passing neural network (MPNN) for predicting molecular properties like logP from molecular graphs.",
+            "info": "Molecular property prediction is a core task in drug discovery, predicting physicochemical properties like lipophilicity (logP), aqueous solubility, and toxicity from molecular structure. Message-passing neural networks (MPNNs) operate on molecular graphs where atoms are nodes and bonds are edges. Gilmer et al. (ICML 2017) formalized the MPNN framework and demonstrated state-of-the-art performance on quantum chemistry benchmarks. The MoleculeNet benchmark (Wu et al., Chem Sci 2018) provides standardized datasets and splits for comparing molecular property prediction methods. Chemprop (Yang et al., J Chem Inf Model 2019) uses directed MPNN (D-MPNN) and remains a strong baseline. Reference: Gilmer et al., 'Neural message passing for quantum chemistry', ICML 2017; Wu et al., 'MoleculeNet: a benchmark for molecular machine learning', Chem Sci 2018.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass AtomMPNN(nn.Module):\n    def __init__(self, atom_dim=32, hidden=64, n_steps=3):\n        super().__init__()\n        self.n_steps = n_steps\n        self.message_fn = nn.Linear(hidden, hidden)\n        self.update_fn = nn.GRUCell(hidden, hidden)\n        self.atom_embed = nn.Linear(atom_dim, hidden)\n        self.readout = nn.Sequential(\n            nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 1))\n\n    def forward(self, atom_feats, adj):\n        h = self.atom_embed(atom_feats)  # (n_atoms, hidden)\n        for _ in range(self.n_steps):\n            messages = {{b1}} @ self.message_fn(h)\n            h = self.update_fn(messages, h)\n        # Global mean pooling over atoms\n        mol_repr = h.{{b2}}(dim=0, keepdim=True)\n        return self.readout(mol_repr).squeeze()\n\n# Simulate a molecule with 10 atoms\nn_atoms = 10\natom_feats = torch.randn(n_atoms, 32)\nadj = torch.zeros(n_atoms, n_atoms)\nfor i in range(n_atoms - 1):\n    adj[i, i+1] = adj[i+1, i] = 1.0\nadj = adj / adj.sum(dim=1, keepdim=True).clamp(min=1)\n\nmodel = AtomMPNN()\npred_logp = model(atom_feats, adj)\nprint(f'Predicted logP: {pred_logp.{{b3}}():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? @ self.message_fn(h) # aggregate neighbor messages",
+                    "acceptable": [
+                        "adj"
+                    ],
+                    "hint": "Multiply the adjacency matrix by transformed node features to aggregate neighbor messages."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "h.???(dim=0, keepdim=True) # global pooling",
+                    "acceptable": [
+                        "mean"
+                    ],
+                    "hint": "Use mean pooling over all atoms to get a fixed-size molecular representation."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "pred_logp.???() # get scalar value",
+                    "acceptable": [
+                        "item"
+                    ],
+                    "hint": "Use .item() to extract a Python scalar from a zero-dimensional tensor."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_admet_multitask",
+            "title": "Multi-Task ADMET Property Prediction",
+            "difficulty": "medium",
+            "description": "Implement a multi-task neural network that simultaneously predicts multiple ADMET properties (absorption, distribution, metabolism, excretion, toxicity) from molecular features.",
+            "info": "ADMET prediction estimates pharmacokinetic and safety properties of drug candidates, crucial for filtering compounds early in drug discovery. Multi-task learning jointly predicts multiple ADMET endpoints, exploiting shared molecular features across tasks. The Therapeutics Data Commons (TDC) benchmark (Huang et al., NeurIPS 2021 Datasets) provides standardized ADMET datasets with scaffold splits. ADMET properties include Caco-2 permeability, CYP450 inhibition, hERG toxicity, and clearance. Multi-task models with hard parameter sharing typically outperform single-task models due to regularization from related tasks. Scaffold-based splitting ensures chemically dissimilar train/test sets for realistic evaluation. Reference: Huang et al., 'Therapeutics Data Commons: Machine Learning Datasets and Tasks for Drug Discovery', NeurIPS 2021 Datasets; Xiong et al., 'ADMETlab 2.0: an integrated online platform for ADMET prediction', Nucleic Acids Res 2021.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass MultiTaskADMET(nn.Module):\n    def __init__(self, input_dim=2048, hidden=256, n_tasks=5):\n        super().__init__()\n        self.shared = nn.Sequential(\n            nn.Linear(input_dim, hidden), nn.ReLU(),\n            nn.BatchNorm1d(hidden), nn.Dropout(0.3),\n            nn.Linear(hidden, hidden), nn.ReLU())\n        # Task-specific heads\n        self.heads = nn.ModuleList([\n            nn.Linear(hidden, 1) for _ in range({{b1}})])\n\n    def forward(self, x):\n        shared_repr = self.shared(x)\n        outputs = [head(shared_repr) for head in self.heads]\n        return torch.cat(outputs, dim={{b2}})\n\nmodel = MultiTaskADMET()\nX = torch.randn(16, 2048)\ny = torch.randn(16, 5)\nmask = torch.randint(0, 2, (16, 5)).float()  # missing label mask\n\npred = model(X)\n# Masked MSE loss: only compute loss for available labels\nloss = (((pred - y) ** 2) * mask).sum() / mask.{{b3}}().clamp(min=1)\nprint(f'Masked loss: {loss.item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "range(???) # number of task heads",
+                    "acceptable": [
+                        "n_tasks"
+                    ],
+                    "hint": "Create one output head per ADMET task."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "dim=??? # stack task outputs",
+                    "acceptable": [
+                        "1",
+                        "-1"
+                    ],
+                    "hint": "Concatenate task outputs along the feature dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "mask.???() # count valid entries",
+                    "acceptable": [
+                        "sum"
+                    ],
+                    "hint": "Sum the mask to count how many labels are available for normalization."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_cpi_attention",
+            "title": "Compound-Protein Interaction with Cross-Attention",
+            "difficulty": "hard",
+            "description": "Implement a cross-attention mechanism for compound-protein interaction (CPI) prediction where drug tokens attend to protein residues.",
+            "info": "Compound-protein interaction (CPI) prediction determines whether a small molecule binds to a target protein. Cross-attention mechanisms allow drug atom representations to attend to relevant protein residues, learning interaction-specific features. DrugBAN (Bai et al., ICML 2022) uses bilinear attention to model pairwise interactions between drug substructures and protein subsequences. The BioSNAP dataset and BindingDB provide large-scale CPI benchmarks. Attention-based models offer interpretability by highlighting which drug-protein atom-residue pairs contribute most to the interaction prediction. This approach outperforms simple concatenation of drug and protein embeddings. Reference: Bai et al., 'Interpretable bilinear attention network with domain adaptation improves drug-target prediction', ICML 2022; Tsubaki et al., 'Compound-protein interaction prediction with end-to-end learning of neural networks for graphs and sequences', Bioinformatics 2019.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass CrossAttentionCPI(nn.Module):\n    def __init__(self, drug_dim=128, prot_dim=128, hidden=64):\n        super().__init__()\n        self.W_q = nn.Linear(drug_dim, hidden)\n        self.W_k = nn.Linear(prot_dim, hidden)\n        self.W_v = nn.Linear(prot_dim, hidden)\n        self.classifier = nn.Linear(hidden, 1)\n\n    def forward(self, drug_tokens, prot_tokens):\n        # drug_tokens: (batch, n_atoms, drug_dim)\n        # prot_tokens: (batch, n_residues, prot_dim)\n        Q = self.W_q(drug_tokens)\n        K = self.W_k(prot_tokens)\n        V = self.W_v(prot_tokens)\n        scale = Q.size(-1) ** {{b1}}\n        attn = torch.bmm(Q, K.transpose(1, 2)) / scale\n        attn_weights = F.softmax(attn, dim={{b2}})\n        context = torch.bmm(attn_weights, V)  # (batch, n_atoms, hidden)\n        pooled = context.mean(dim=1)\n        return self.classifier(pooled).squeeze(-1), attn_weights\n\nmodel = CrossAttentionCPI()\ndrug = torch.randn(8, 20, 128)  # 20 atoms\nprot = torch.randn(8, 100, 128)  # 100 residues\nscores, attn = model(drug, prot)\nloss = nn.BCEWithLogitsLoss()(scores, torch.{{b3}}(8))\nprint(f'Scores shape: {scores.shape}, Attn shape: {attn.shape}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "Q.size(-1) ** ??? # scaling factor",
+                    "acceptable": [
+                        "0.5"
+                    ],
+                    "hint": "Scaled dot-product attention divides by the square root of key dimension, i.e., d^0.5."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "dim=??? # softmax over keys",
+                    "acceptable": [
+                        "-1",
+                        "2"
+                    ],
+                    "hint": "Apply softmax over the last dimension (key/residue dimension) to normalize attention weights."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.???(8) # random binary labels",
+                    "acceptable": [
+                        "randint(0, 2, (8,)).float()",
+                        "rand(8).round()"
+                    ],
+                    "hint": "Generate random binary labels for the batch using randint or rand().round()."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_solubility",
+            "title": "Protein Solubility Prediction from Sequence Features",
+            "difficulty": "easy",
+            "description": "Train a gradient boosting classifier to predict protein solubility from amino acid composition and physicochemical features.",
+            "info": "Protein solubility prediction is critical for recombinant protein production and biotherapeutic development. Sequence-derived features such as amino acid composition, charge distribution, and hydrophobicity are strong predictors of solubility. The SOLpro method (Magnan et al., Bioinformatics 2009) was among the first ML approaches, using SVMs on sequence features. The eSOL dataset (Niwa et al., PNAS 2009) provides experimental E. coli cell-free solubility measurements for thousands of proteins. Gradient boosting classifiers (e.g., XGBoost) perform well on tabular solubility features. DeepSol (Khurana et al., Bioinformatics 2018) later showed CNNs on raw sequences can match or exceed feature-based methods. Reference: Magnan et al., 'SOLpro: accurate sequence-based prediction of protein solubility', Bioinformatics 2009; Khurana et al., 'DeepSol: a deep learning framework for sequence-based protein solubility prediction', Bioinformatics 2018.",
+            "code": "import numpy as np\nfrom sklearn.ensemble import GradientBoostingClassifier\nfrom sklearn.metrics import accuracy_score, matthews_corrcoef\nfrom sklearn.model_selection import train_test_split\n\nnp.random.seed(42)\nn_proteins = 800\n# Features: AA composition (20), charge, hydrophobicity, MW, pI, ...\nX = np.random.randn(n_proteins, 25)\ny = np.random.randint(0, 2, n_proteins)  # soluble=1, insoluble=0\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size={{b1}}, random_state=42)\n\nclf = GradientBoostingClassifier(n_estimators=200, max_depth=4,\n                                  learning_rate=0.1, random_state=42)\nclf.fit(X_train, y_train)\ny_pred = clf.{{b2}}(X_test)\n\nacc = accuracy_score(y_test, y_pred)\nmcc = {{b3}}(y_test, y_pred)\nprint(f'Accuracy: {acc:.4f}, MCC: {mcc:.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "test_size=??? # fraction for testing",
+                    "acceptable": [
+                        "0.2",
+                        "0.25"
+                    ],
+                    "hint": "Reserve 20-25% of data for testing."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "clf.???(X_test) # get predictions",
+                    "acceptable": [
+                        "predict"
+                    ],
+                    "hint": "Use predict() to get class labels from the trained classifier."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "???(y_test, y_pred) # Matthew's correlation",
+                    "acceptable": [
+                        "matthews_corrcoef"
+                    ],
+                    "hint": "Matthews correlation coefficient (MCC) is a balanced metric for binary classification."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_aggregation",
+            "title": "Protein Aggregation Propensity Prediction",
+            "difficulty": "medium",
+            "description": "Build a 1D-CNN model to predict aggregation-prone regions in protein sequences from residue-level features.",
+            "info": "Protein aggregation is a major concern in biotherapeutic development and is linked to neurodegenerative diseases like Alzheimer's. Aggregation-prone regions (APRs) are short hydrophobic stretches that can form beta-sheet structures. TANGO (Fernandez-Escamilla et al., Nature Biotech 2004) pioneered computational APR prediction using statistical mechanics models. Aggrescan (Conchillo-Sole et al., BMC Bioinformatics 2007) uses an amino acid aggregation propensity scale derived from experimental data. Deep learning approaches frame APR prediction as residue-level binary classification with 1D convolutions over sequence windows. The AmyLoad database provides experimentally validated amyloidogenic peptide sequences for training and evaluation. Reference: Fernandez-Escamilla et al., 'Prediction of sequence-dependent and mutational effects on the aggregation of peptides and proteins', Nature Biotech 2004; Conchillo-Sole et al., 'AGGRESCAN: a server for the prediction of aggregation-prone regions in protein sequences', BMC Bioinformatics 2007.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass AggregationPredictor(nn.Module):\n    def __init__(self, input_dim=20, hidden=64):\n        super().__init__()\n        self.conv1 = nn.Conv1d(input_dim, hidden, kernel_size={{b1}}, padding=3)\n        self.conv2 = nn.Conv1d(hidden, hidden, kernel_size=5, padding=2)\n        self.fc = nn.Linear(hidden, 1)\n        self.relu = nn.ReLU()\n\n    def forward(self, x):\n        # x: (batch, seq_len, input_dim) one-hot encoded\n        x = x.transpose(1, 2)  # (batch, input_dim, seq_len)\n        h = self.relu(self.conv1(x))\n        h = self.relu(self.conv2(h))\n        h = h.{{b2}}(1, 2)  # back to (batch, seq_len, hidden)\n        return self.fc(h).squeeze(-1)  # per-residue scores\n\nmodel = AggregationPredictor()\nseq_onehot = torch.randn(4, 150, 20)  # batch of 4, length 150\nlabels = torch.randint(0, 2, (4, 150)).float()\n\npred = model(seq_onehot)\nloss = nn.BCEWithLogitsLoss()(pred, labels)\nloss.backward()\nprint(f'Output shape: {pred.shape}, Loss: {loss.{{b3}}():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "kernel_size=??? # wide convolution window",
+                    "acceptable": [
+                        "7"
+                    ],
+                    "hint": "A kernel size of 7 captures local sequence patterns spanning several residues."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "h.???(1, 2) # swap dimensions back",
+                    "acceptable": [
+                        "transpose"
+                    ],
+                    "hint": "Transpose dimensions 1 and 2 to convert from (batch, channels, seq) to (batch, seq, channels)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "loss.???() # extract scalar",
+                    "acceptable": [
+                        "item"
+                    ],
+                    "hint": "Use .item() to get the loss value as a Python float."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_immunogenicity",
+            "title": "Peptide Immunogenicity Prediction",
+            "difficulty": "medium",
+            "description": "Train a neural network to predict whether a peptide will elicit a T-cell immune response based on peptide sequence encoding and MHC context.",
+            "info": "Immunogenicity prediction estimates whether a peptide-MHC complex will activate T cells, a critical step beyond MHC binding prediction. The IEDB database (Vita et al., Nucleic Acids Res 2019) provides curated T-cell assay data for training immunogenicity models. Unlike MHC binding prediction, immunogenicity depends on T-cell receptor recognition, antigen processing, and peptide stability in the MHC groove. DeepImmuno (Li et al., Brief Bioinform 2021) uses deep learning on peptide sequences combined with HLA type information. Amino acid encoding schemes like BLOSUM62 features or learned embeddings capture residue similarity patterns relevant to immunogenicity. Models typically use binary classification with AUROC and AUPRC as key metrics. Reference: Vita et al., 'The Immune Epitope Database (IEDB)', Nucleic Acids Res 2019; Li et al., 'DeepImmuno: deep learning-empowered prediction and generation of immunogenic peptides', Brief Bioinform 2021.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\nclass ImmunogenicityModel(nn.Module):\n    def __init__(self, aa_vocab=21, embed_dim=32, max_len=15, hla_dim=34):\n        super().__init__()\n        self.aa_embed = nn.Embedding(aa_vocab, embed_dim)\n        self.peptide_encoder = nn.LSTM(embed_dim, 64, batch_first=True,\n                                        bidirectional=True)\n        self.classifier = nn.Sequential(\n            nn.Linear(128 + hla_dim, 64), nn.ReLU(),\n            nn.Dropout(0.3), nn.Linear(64, 1))\n\n    def forward(self, peptide_seq, hla_feat):\n        emb = self.aa_embed(peptide_seq)\n        output, (h_n, _) = self.peptide_encoder(emb)\n        # Concatenate forward and backward final hidden states\n        pep_repr = torch.cat([h_n[0], h_n[{{b1}}]], dim=-1)\n        combined = torch.cat([pep_repr, hla_feat], dim=-1)\n        return self.classifier(combined).squeeze(-1)\n\nmodel = ImmunogenicityModel()\npeptides = torch.randint(0, 21, (16, 9))  # 9-mer peptides\nhla = torch.randn(16, 34)  # HLA pseudo-sequence features\nlabels = torch.randint(0, 2, (16,)).{{b2}}()\n\nlogits = model(peptides, hla)\nloss = nn.{{b3}}()(logits, labels)\nloss.backward()\nprint(f'Logits range: [{logits.min():.2f}, {logits.max():.2f}]')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "h_n[???] # backward hidden state index",
+                    "acceptable": [
+                        "1"
+                    ],
+                    "hint": "In a bidirectional LSTM, h_n[0] is forward and h_n[1] is backward final hidden state."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": ").???() # convert to float",
+                    "acceptable": [
+                        "float"
+                    ],
+                    "hint": "Convert integer labels to float for binary cross-entropy loss."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "nn.???() # binary classification loss",
+                    "acceptable": [
+                        "BCEWithLogitsLoss"
+                    ],
+                    "hint": "BCEWithLogitsLoss combines sigmoid and binary cross-entropy for numerical stability."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_mhc_binding",
+            "title": "MHC-I Binding Prediction with Peptide Encoding",
+            "difficulty": "medium",
+            "description": "Build a model to predict MHC class I binding affinity for peptides using BLOSUM62-based amino acid encoding.",
+            "info": "MHC class I binding prediction is fundamental to neoantigen discovery and vaccine design. NetMHCpan (Jurtz et al., J Immunol 2017) is the gold standard, using artificial neural networks trained on binding affinity data from IEDB. Peptides are typically 8-11 amino acids long, and binding affinity is measured as IC50 in nM, often log-transformed. BLOSUM62 encoding represents each amino acid as a 20-dimensional vector capturing evolutionary substitution frequencies. The standard threshold for binding is IC50 < 500 nM (strong binder < 50 nM). Training data combines binding affinity (BA) and eluted ligand (EL) data for improved performance. Reference: Jurtz et al., 'NetMHCpan-4.0: Improved Peptide-MHC Class I Interaction Predictions', J Immunol 2017; O'Donnell et al., 'MHCflurry 2.0: Improved Pan-Allele Prediction of MHC Class I-Presented Peptides', Cell Systems 2020.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\n# Simplified BLOSUM62-like encoding (20 AA x 20 features)\nblosum_matrix = np.random.randn(21, 20).astype(np.float32)  # placeholder\n\ndef encode_peptide(seq_indices, max_len=11):\n    \"\"\"Encode peptide using BLOSUM features, pad to max_len.\"\"\"\n    encoded = blosum_matrix[seq_indices]\n    padded = np.zeros((max_len, 20), dtype=np.float32)\n    padded[:len(seq_indices)] = encoded[:max_len]\n    return padded\n\nclass MHCBindingPredictor(nn.Module):\n    def __init__(self, max_len=11, feat_dim=20, hidden=64):\n        super().__init__()\n        self.flatten_dim = max_len * feat_dim\n        self.net = nn.Sequential(\n            nn.Linear(self.flatten_dim, hidden), nn.ReLU(),\n            nn.Dropout(0.2),\n            nn.Linear(hidden, hidden), nn.ReLU(),\n            nn.Linear(hidden, 1))\n\n    def forward(self, x):\n        # x: (batch, max_len, feat_dim)\n        x = x.{{b1}}(x.size(0), -1)  # flatten\n        return self.net(x).squeeze(-1)\n\nmodel = MHCBindingPredictor()\npeptides = torch.randn(32, 11, 20)  # BLOSUM-encoded\nic50_log = torch.randn(32)  # log-transformed IC50\n\npred = model(peptides)\nloss = nn.MSELoss()(pred, ic50_log)\nloss.backward()\n# Convert prediction to IC50 nM\nic50_pred = torch.{{b2}}(pred * -1)  # inverse log transform\nbinder_mask = ic50_pred {{b3}} 500  # binding threshold\nprint(f'Predicted binders: {binder_mask.sum().item()}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x.???(x.size(0), -1) # reshape to 2D",
+                    "acceptable": [
+                        "view",
+                        "reshape"
+                    ],
+                    "hint": "Use view() or reshape() to flatten the peptide encoding for the linear layer."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(pred * -1) # inverse log transform",
+                    "acceptable": [
+                        "exp"
+                    ],
+                    "hint": "Use torch.exp() to convert log-transformed values back to the original IC50 scale."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "ic50_pred ??? 500 # binding threshold",
+                    "acceptable": [
+                        "<",
+                        "<="
+                    ],
+                    "hint": "A peptide is considered a binder if IC50 < 500 nM."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_tcr_epitope",
+            "title": "TCR-Epitope Binding Prediction with Dual Encoders",
+            "difficulty": "hard",
+            "description": "Implement a dual-encoder model predicting T-cell receptor (TCR) and epitope binding using CDR3 sequence embeddings.",
+            "info": "TCR-epitope interaction prediction aims to determine whether a T-cell receptor recognizes a specific peptide-MHC complex. The CDR3 region of the TCR beta chain is the primary determinant of epitope specificity. ERGO-II (Springer et al., Front Immunol 2021) and NetTCR (Montemurro et al., eLife 2022) use deep learning on CDR3 and epitope sequences for binding prediction. The VDJdb and McPAS-TCR databases provide paired TCR-epitope binding data. A major challenge is the extreme diversity of TCR sequences and limited positive training data. Negative sampling strategies (e.g., shuffled pairs) significantly impact model performance and must be carefully designed. Reference: Springer et al., 'Prediction of specific TCR-peptide binding from large dictionaries of TCR-peptide pairs', Front Immunol 2021; Montemurro et al., 'NetTCR-2.0 enables accurate prediction of TCR-peptide binding', eLife 2022.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass TCREpitopeDualEncoder(nn.Module):\n    def __init__(self, vocab=21, embed=32, hidden=64):\n        super().__init__()\n        self.aa_embed = nn.Embedding(vocab, embed)\n        self.tcr_encoder = nn.GRU(embed, hidden, batch_first=True)\n        self.epi_encoder = nn.GRU(embed, hidden, batch_first=True)\n        self.classifier = nn.Sequential(\n            nn.Linear(hidden * 2, 64), nn.ReLU(), nn.Linear(64, 1))\n\n    def forward(self, tcr_seq, epi_seq):\n        tcr_emb = self.aa_embed(tcr_seq)\n        epi_emb = self.aa_embed(epi_seq)\n        _, tcr_h = self.tcr_encoder(tcr_emb)  # (1, batch, hidden)\n        _, epi_h = self.epi_encoder(epi_emb)\n        tcr_repr = tcr_h.{{b1}}(0)  # remove layer dim\n        epi_repr = epi_h.squeeze(0)\n        combined = torch.cat([tcr_repr, epi_repr], dim=-1)\n        return self.classifier(combined).squeeze(-1)\n\nmodel = TCREpitopeDualEncoder()\ntcr = torch.randint(0, 21, (16, 15))  # CDR3 sequences, max len 15\nepi = torch.randint(0, 21, (16, 9))   # epitope 9-mers\nlabels = torch.randint(0, 2, (16,)).float()\n\nlogits = model(tcr, epi)\nloss = nn.BCEWithLogitsLoss()(logits, labels)\nloss.backward()\nprob = torch.{{b2}}(logits)\nprint(f'Binding probabilities: {prob[:5].detach().numpy().round({{b3}})}') ",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "tcr_h.???(0) # remove leading dimension",
+                    "acceptable": [
+                        "squeeze"
+                    ],
+                    "hint": "Use squeeze(0) to remove the num_layers dimension from the GRU hidden state."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(logits) # convert logits to probabilities",
+                    "acceptable": [
+                        "sigmoid"
+                    ],
+                    "hint": "Apply sigmoid to convert raw logits to probabilities in [0, 1]."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": ".round(???) # decimal places",
+                    "acceptable": [
+                        "3",
+                        "2"
+                    ],
+                    "hint": "Round to 2-3 decimal places for readable output."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_expression_pred",
+            "title": "Protein Expression Level Prediction from Codon Usage",
+            "difficulty": "easy",
+            "description": "Train a regression model to predict recombinant protein expression levels in E. coli from codon usage statistics and mRNA features.",
+            "info": "Protein expression level prediction estimates how much recombinant protein can be produced in a given host organism. Codon usage bias is a primary determinant of expression, as rare codons can stall ribosomes and reduce yield. The Codon Adaptation Index (CAI) (Sharp & Li, Nucleic Acids Res 1987) measures codon optimality relative to highly expressed genes. Machine learning models use features like CAI, GC content, mRNA folding energy near the start codon, and rare codon clusters. The ECOD dataset of experimentally measured E. coli expression levels provides training data for supervised approaches. Random forests on codon usage features provide a robust baseline before attempting deep learning. Reference: Sharp & Li, 'The codon Adaptation Index--a measure of directional synonymous codon usage bias', Nucleic Acids Res 1987; Kudla et al., 'Coding-sequence determinants of gene expression in Escherichia coli', Science 2009.",
+            "code": "import numpy as np\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import r2_score\nfrom scipy.stats import spearmanr\n\nnp.random.seed(42)\nn_genes = 600\n# Features: 61 codon frequencies + CAI + GC% + mRNA fold energy\nX = np.random.randn(n_genes, 64)\ny = np.random.exponential(1.0, n_genes)  # expression levels\n\nfrom sklearn.model_selection import train_test_split\nX_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2,\n                                            random_state=42)\n\nrf = RandomForestRegressor(n_estimators={{b1}}, max_depth=10,\n                            random_state=42)\nrf.fit(X_tr, y_tr)\ny_pred = rf.predict(X_te)\n\nr2 = r2_score(y_te, y_pred)\nrho, _ = spearmanr(y_te, y_pred)\nimportances = rf.{{b2}}\ntop_feat = np.{{b3}}(importances)[-5:][::-1]\nprint(f'R2: {r2:.4f}, Spearman: {rho:.4f}')\nprint(f'Top 5 feature indices: {top_feat}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "n_estimators=??? # number of trees",
+                    "acceptable": [
+                        "100",
+                        "200"
+                    ],
+                    "hint": "Use 100-200 trees for a robust random forest."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "rf.??? # get feature importance array",
+                    "acceptable": [
+                        "feature_importances_"
+                    ],
+                    "hint": "Access feature_importances_ attribute for Gini importance of each feature."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.???(importances) # sort by importance",
+                    "acceptable": [
+                        "argsort"
+                    ],
+                    "hint": "Use np.argsort to get indices that would sort the importances array."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_codon_opt",
+            "title": "Codon Optimization Scoring with Sequence Models",
+            "difficulty": "medium",
+            "description": "Implement a scoring function for codon-optimized sequences using a neural network that evaluates codon choices in the context of surrounding codons.",
+            "info": "Codon optimization replaces synonymous codons to maximize protein expression in a target host. Beyond single-codon frequency matching (CAI), context-dependent models consider codon pair bias and local mRNA structure effects. Codon pair bias (Coleman et al., Science 2008) measures the over- or under-representation of adjacent codon pairs relative to expectation. Neural network approaches can learn complex codon context preferences from highly expressed gene sequences. The model scores each codon position conditioned on its neighbors, similar to language modeling. Lattice et al. (Nature Biotech 2022) demonstrated that ML-optimized codon sequences significantly outperform rule-based optimization for mRNA therapeutics. Reference: Coleman et al., 'Virus attenuation by genome-scale changes in codon pair bias', Science 2008; Hanson & Coller, 'Codon optimality, bias and usage in translation and mRNA decay', Nat Rev Mol Cell Biol 2018.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass CodonContextScorer(nn.Module):\n    def __init__(self, n_codons=64, embed_dim=32, hidden=64):\n        super().__init__()\n        self.codon_embed = nn.Embedding(n_codons, embed_dim)\n        self.lstm = nn.LSTM(embed_dim, hidden, batch_first=True,\n                            bidirectional=True)\n        # Predict score for each codon position\n        self.scorer = nn.Linear(hidden * 2, 1)\n\n    def forward(self, codon_seq):\n        # codon_seq: (batch, n_codons_in_seq) codon indices\n        emb = self.codon_embed(codon_seq)\n        output, _ = self.lstm(emb)  # (batch, seq, hidden*2)\n        scores = self.scorer(output).squeeze(-1)\n        return scores\n\n    def sequence_score(self, codon_seq):\n        scores = self.forward(codon_seq)\n        return scores.{{b1}}(dim=-1)  # total sequence score\n\nmodel = CodonContextScorer()\n# Gene of 100 codons, batch of 4 variants\noriginal = torch.randint(0, 64, (4, 100))\noptimized = torch.randint(0, 64, (4, 100))\n\norig_scores = model.sequence_score(original)\nopt_scores = model.sequence_score(optimized)\nimprovement = opt_scores - orig_scores\nprint(f'Score improvement: {improvement.{{b2}}().detach().numpy():.4f}')\n\n# Training: maximize scores for highly expressed genes\nhigh_expr_codons = torch.randint(0, 64, (8, 100))\nscores = model.sequence_score(high_expr_codons)\nloss = -scores.{{b3}}()  # maximize by minimizing negative\nloss.backward()\nprint(f'Training loss: {loss.item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "scores.???(dim=-1) # aggregate over positions",
+                    "acceptable": [
+                        "sum",
+                        "mean"
+                    ],
+                    "hint": "Sum or average per-position scores to get a total sequence score."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "improvement.???() # average improvement",
+                    "acceptable": [
+                        "mean"
+                    ],
+                    "hint": "Take the mean improvement across the batch."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "scores.???() # average for loss",
+                    "acceptable": [
+                        "mean"
+                    ],
+                    "hint": "Average scores across the batch before negating for the loss."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_mrna_stability",
+            "title": "mRNA Stability Prediction from Sequence and Structure Features",
+            "difficulty": "medium",
+            "description": "Build a model predicting mRNA half-life from sequence composition, UTR features, and predicted secondary structure elements.",
+            "info": "mRNA stability determines protein expression duration and is critical for mRNA therapeutics and gene regulation studies. The 5' UTR, 3' UTR, poly(A) tail length, and codon optimality all influence mRNA half-life. Agarwal & Kelley (Cell Reports 2022) used deep learning on mRNA sequences to predict stability with models trained on genome-wide mRNA decay measurements. Saluki (Agarwal & Kelley, Genome Biology 2023) further showed that transformer-based models capturing RNA secondary structure improve mRNA half-life prediction. Features like AU-rich elements in the 3' UTR, GC content, and minimum free energy of local RNA structure are informative. Training data comes from BRIC-seq or TimeLapse-seq experiments measuring transcriptome-wide mRNA decay rates. Reference: Agarwal & Kelley, 'The genetic and biochemical determinants of mRNA degradation rates in mammals', Genome Biology 2023; Wayment-Steele et al., 'RNA structure determination and design using DL', Nature Methods 2024.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\nclass mRNAStabilityModel(nn.Module):\n    def __init__(self, seq_feat=50, struct_feat=20, hidden=128):\n        super().__init__()\n        total_input = seq_feat + struct_feat\n        self.net = nn.Sequential(\n            nn.Linear(total_input, hidden),\n            nn.{{b1}}(),\n            nn.BatchNorm1d(hidden),\n            nn.Dropout(0.3),\n            nn.Linear(hidden, 64),\n            nn.ReLU(),\n            nn.Linear(64, 1)\n        )\n\n    def forward(self, seq_features, struct_features):\n        x = torch.cat([seq_features, struct_features], dim=-1)\n        return self.net(x).squeeze(-1)\n\nmodel = mRNAStabilityModel()\nseq_feat = torch.randn(32, 50)    # codon freq, GC%, UTR features\nstruct_feat = torch.randn(32, 20)  # MFE, stem-loop counts, etc.\nhalf_life = torch.randn(32)        # log half-life\n\npred = model(seq_feat, struct_feat)\nloss = nn.{{b2}}()(pred, half_life)\n\noptimizer = torch.optim.Adam(model.parameters())\noptimizer.zero_grad()\nloss.backward()\noptimizer.{{b3}}()\nprint(f'Predicted half-lives: {pred[:3].detach().numpy().round(2)}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???() # activation function",
+                    "acceptable": [
+                        "ReLU",
+                        "GELU",
+                        "LeakyReLU"
+                    ],
+                    "hint": "Use ReLU or GELU as the activation function between layers."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # regression loss function",
+                    "acceptable": [
+                        "MSELoss",
+                        "L1Loss",
+                        "SmoothL1Loss",
+                        "HuberLoss"
+                    ],
+                    "hint": "Use MSELoss (or another regression loss) for predicting continuous half-life values."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "optimizer.???() # update parameters",
+                    "acceptable": [
+                        "step"
+                    ],
+                    "hint": "Call step() on the optimizer to update model parameters using computed gradients."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_protein_halflife",
+            "title": "Protein Half-Life Prediction from N-terminal and Sequence Features",
+            "difficulty": "easy",
+            "description": "Train a model to predict intracellular protein half-life using the N-end rule degron features and sequence-derived properties.",
+            "info": "Protein half-life determines steady-state abundance and is governed by the ubiquitin-proteasome and autophagy-lysosome pathways. The N-end rule (Varshavsky, Genes Dev 2011) relates the N-terminal residue identity to protein stability, providing a biologically interpretable feature. Genome-wide protein stability measurements from pulse-chase SILAC experiments (McShane et al., Cell 2016) provide training data for ML approaches. Features include N-terminal residue, PEST motifs, disorder content, ubiquitination site predictions, and protein length. McShane et al. showed that protein half-lives span four orders of magnitude and are cell-type dependent. Gradient boosting on curated features provides strong baselines for half-life regression. Reference: Varshavsky, 'The N-end rule pathway and regulation by proteolysis', Protein Sci 2011; McShane et al., 'Kinetic analysis of protein stability reveals age-dependent degradation', Cell 2016.",
+            "code": "import numpy as np\nfrom sklearn.ensemble import GradientBoostingRegressor\nfrom sklearn.metrics import mean_absolute_error\nfrom scipy.stats import spearmanr\n\nnp.random.seed(42)\nn = 500\n# Features: N-terminal AA (one-hot 20), length, disorder%, PEST count,\n# lysine count, mol weight\nX = np.random.randn(n, 26)\ny = np.random.normal(3.0, 1.5, n)  # log2 half-life in hours\n\nfrom sklearn.model_selection import train_test_split\nX_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2,\n                                            random_state=42)\n\nmodel = GradientBoostingRegressor(\n    n_estimators=150, max_depth=5, learning_rate={{b1}},\n    random_state=42)\nmodel.fit(X_tr, y_tr)\ny_pred = model.predict(X_te)\n\nmae = mean_absolute_error(y_te, y_pred)\nrho, pval = {{b2}}(y_te, y_pred)\nprint(f'MAE: {mae:.4f} log2(hours)')\nprint(f'Spearman rho: {rho:.4f}, p={pval:.2e}')\n\n# Convert to actual hours\nhalf_life_hours = 2 ** {{b3}}\nprint(f'Example pred half-life: {half_life_hours[0]:.1f} hours')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "learning_rate=??? # step size",
+                    "acceptable": [
+                        "0.1",
+                        "0.05"
+                    ],
+                    "hint": "A learning rate of 0.05-0.1 is typical for gradient boosting."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???(y_te, y_pred) # rank correlation",
+                    "acceptable": [
+                        "spearmanr"
+                    ],
+                    "hint": "Use spearmanr to compute rank correlation between true and predicted half-lives."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "2 ** ??? # convert from log2",
+                    "acceptable": [
+                        "y_pred"
+                    ],
+                    "hint": "Raise 2 to the power of predicted log2 half-life to get actual hours."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_disorder_pred",
+            "title": "Intrinsically Disordered Region Prediction",
+            "difficulty": "medium",
+            "description": "Implement a bidirectional LSTM model for per-residue prediction of intrinsic disorder from protein sequence features.",
+            "info": "Intrinsically disordered regions (IDRs) lack stable 3D structure and are involved in signaling, regulation, and phase separation. IUPred (Dosztanyi et al., Bioinformatics 2005) estimates disorder tendency from amino acid pairwise interaction energies. SPOT-Disorder (Hanson et al., Bioinformatics 2017) showed that deep learning on sequence profiles (PSSM) significantly improves disorder prediction over physicochemical approaches. ESMFold confidence scores (pLDDT) from AlphaFold2 (Jumper et al., Nature 2021) are now commonly used as disorder proxies, with low-confidence regions corresponding to disordered segments. The DisProt database provides curated experimental annotations of disordered regions for benchmarking. Bidirectional LSTMs capture long-range sequence context important for disorder boundary detection. Reference: Dosztanyi et al., 'IUPred: prediction of intrinsically unstructured proteins', Bioinformatics 2005; Jumper et al., 'Highly accurate protein structure prediction with AlphaFold', Nature 2021.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DisorderPredictor(nn.Module):\n    def __init__(self, input_dim=20, hidden=128, n_layers=2):\n        super().__init__()\n        self.lstm = nn.LSTM(input_dim, hidden, num_layers=n_layers,\n                            batch_first=True, bidirectional={{b1}},\n                            dropout=0.3)\n        self.fc = nn.Linear(hidden * 2, 1)  # *2 for bidirectional\n\n    def forward(self, x):\n        # x: (batch, seq_len, input_dim)\n        output, _ = self.lstm(x)  # (batch, seq_len, hidden*2)\n        disorder_scores = torch.sigmoid(self.fc(output)).squeeze(-1)\n        return disorder_scores\n\nmodel = DisorderPredictor()\nseq_features = torch.randn(8, 200, 20)  # PSSM features\nlabels = torch.randint(0, 2, (8, 200)).float()  # 1=disordered\n\npred = model(seq_features)\nloss = nn.{{b2}}()(pred, labels)\nloss.backward()\n\n# Evaluate: threshold at 0.5\npred_binary = (pred > {{b3}}).float()\nacc = (pred_binary == labels).float().mean()\nprint(f'Disorder prediction accuracy: {acc.item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "bidirectional=??? # use both directions",
+                    "acceptable": [
+                        "True"
+                    ],
+                    "hint": "Set bidirectional=True to read the sequence in both forward and reverse directions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # binary loss for per-residue",
+                    "acceptable": [
+                        "BCELoss"
+                    ],
+                    "hint": "Use BCELoss since sigmoid is already applied in the model (or use BCEWithLogitsLoss without sigmoid)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "(pred > ???) # classification threshold",
+                    "acceptable": [
+                        "0.5"
+                    ],
+                    "hint": "A threshold of 0.5 is the standard decision boundary for binary classification."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_phase_separation",
+            "title": "Liquid-Liquid Phase Separation Propensity Prediction",
+            "difficulty": "hard",
+            "description": "Build a model to predict protein propensity for liquid-liquid phase separation (LLPS) using sequence composition, disorder features, and charge patterning.",
+            "info": "Liquid-liquid phase separation (LLPS) drives the formation of membraneless organelles like stress granules and nucleoli. Proteins that undergo LLPS are enriched in intrinsically disordered regions, low-complexity sequences, and multivalent interaction domains. The PhaSePro database (Meszaros et al., Nucleic Acids Res 2020) catalogs experimentally validated phase-separating proteins for ML training. Key predictive features include charge patterning (kappa parameter), aromatic residue content, prion-like domain composition, and pi-pi stacking capacity. DeePhase (Saar et al., PNAS 2021) used gradient boosting on sequence features and achieved high accuracy distinguishing LLPS-prone from non-LLPS proteins. The sequence valence framework captures how multivalent interactions drive phase separation. Reference: Meszaros et al., 'PhaSePro: the database of proteins driving LLPS', Nucleic Acids Res 2020; Saar et al., 'Learning the molecular grammar of protein condensates', PNAS 2021.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\nclass LLPSPredictor(nn.Module):\n    def __init__(self, comp_dim=20, pattern_dim=15, hidden=64):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(comp_dim + pattern_dim, hidden),\n            nn.ReLU(), nn.BatchNorm1d(hidden),\n            nn.Linear(hidden, hidden),\n            nn.ReLU(), nn.Dropout(0.3),\n            nn.Linear(hidden, 1))\n\n    def forward(self, composition, charge_pattern):\n        x = torch.{{b1}}([composition, charge_pattern], dim=-1)\n        return self.net(x).squeeze(-1)\n\ndef compute_kappa(charges, seq_len, blob_size=5):\n    \"\"\"Compute charge patterning parameter kappa.\"\"\"\n    n_blobs = seq_len // blob_size\n    sigma_max = np.sqrt(np.mean(charges**2))\n    if sigma_max == 0:\n        return 0.0\n    blob_charges = [charges[i*blob_size:(i+1)*blob_size].mean()\n                    for i in range(n_blobs)]\n    sigma_seq = np.std(blob_charges)\n    return (sigma_seq / sigma_max) if sigma_max > 0 else 0.0\n\nmodel = LLPSPredictor()\ncomp = torch.randn(16, 20)   # AA composition\npattern = torch.randn(16, 15) # charge patterning features\nlabels = torch.randint(0, 2, (16,)).float()\n\nlogits = model(comp, pattern)\nloss = nn.BCEWithLogitsLoss()(logits, labels)\nloss.backward()\nprob = torch.sigmoid(logits)\nllps_pred = (prob > 0.5).{{b2}}()\nprint(f'Predicted LLPS-prone: {llps_pred.sum().{{b3}}()}/{len(labels)}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???([composition, charge_pattern], dim=-1) # combine",
+                    "acceptable": [
+                        "cat"
+                    ],
+                    "hint": "Use torch.cat to concatenate composition and charge pattern features."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(prob > 0.5).???() # convert boolean to int",
+                    "acceptable": [
+                        "long",
+                        "int",
+                        "float"
+                    ],
+                    "hint": "Convert boolean predictions to integer type for counting."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": ".sum().???() # get count as scalar",
+                    "acceptable": [
+                        "item"
+                    ],
+                    "hint": "Use .item() to extract the sum as a Python integer."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_allosteric_site",
+            "title": "Allosteric Binding Site Detection from Structural Features",
+            "difficulty": "hard",
+            "description": "Implement a residue-level classifier to identify allosteric binding sites using features derived from protein structure and dynamics.",
+            "info": "Allosteric sites are regulatory binding pockets distant from the active site that modulate protein function upon ligand binding. Detecting allosteric sites is valuable for drug design as allosteric drugs can achieve higher selectivity. The ASBench dataset (Huang et al., Bioinformatics 2015) provides known allosteric sites for benchmarking prediction methods. PASSer (Tian et al., J Chem Inf Model 2023) uses graph neural networks on residue contact graphs with structural features for allosteric site prediction. Key features include residue depth, pocket volume, local flexibility (B-factors), evolutionary conservation, and normal mode analysis perturbation scores. Allosteric communication pathways can be detected through dynamical network analysis of molecular dynamics simulations. Reference: Huang et al., 'ASBench: benchmarking sets for allosteric discovery', Bioinformatics 2015; Tian et al., 'PASSer: fast and accurate prediction of protein allosteric sites', J Chem Inf Model 2023.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass AllostericSiteDetector(nn.Module):\n    def __init__(self, node_feat=32, edge_feat=8, hidden=64, n_layers=3):\n        super().__init__()\n        self.node_embed = nn.Linear(node_feat, hidden)\n        self.edge_embed = nn.Linear(edge_feat, hidden)\n        self.convs = nn.ModuleList([\n            nn.Linear(hidden * 2, hidden) for _ in range(n_layers)])\n        self.classifier = nn.Linear(hidden, 2)  # allosteric vs non\n\n    def forward(self, node_feats, edge_feats, adj):\n        h = self.node_embed(node_feats)\n        e = self.edge_embed(edge_feats.mean(dim=1))  # simplified\n        for conv in self.convs:\n            neighbor_msg = adj @ h\n            combined = torch.cat([h, neighbor_msg], dim={{b1}})\n            h = torch.relu(conv(combined))\n        return self.classifier(h)\n\nn_residues = 150\nnode_feat = torch.randn(n_residues, 32)  # depth, bfactor, conservation...\nedge_feat = torch.randn(n_residues, n_residues, 8)\nadj = (torch.randn(n_residues, n_residues) > 1.0).float()  # contact map\nadj = (adj + adj.T).clamp(max=1)  # symmetric\nadj = adj / adj.sum(dim=1, keepdim=True).clamp(min=1)\n\nmodel = AllostericSiteDetector()\nlogits = model(node_feat, edge_feat, adj)\nlabels = torch.zeros(n_residues, dtype=torch.long)\nlabels[50:60] = 1  # allosteric site residues\n\nloss = nn.{{b2}}()(logits, labels)\nloss.backward()\npred_sites = logits.{{b3}}(dim=-1)\nprint(f'Predicted allosteric residues: {(pred_sites == 1).sum().item()}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "dim=??? # concatenation along features",
+                    "acceptable": [
+                        "-1",
+                        "1"
+                    ],
+                    "hint": "Concatenate self and neighbor features along the last (feature) dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # multi-class loss",
+                    "acceptable": [
+                        "CrossEntropyLoss"
+                    ],
+                    "hint": "CrossEntropyLoss handles multi-class (allosteric vs non-allosteric) classification."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "logits.???(dim=-1) # get predicted class",
+                    "acceptable": [
+                        "argmax"
+                    ],
+                    "hint": "Use argmax along the class dimension to get the predicted label for each residue."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_cryptic_sites",
+            "title": "Cryptic Binding Site Detection from Conformational Ensembles",
+            "difficulty": "hard",
+            "description": "Build a model to detect cryptic (hidden) binding sites by comparing structural features across conformational ensembles.",
+            "info": "Cryptic binding sites are pockets that are not visible in a single static structure but become exposed through conformational dynamics. CryptoSite (Cimermancic et al., J Mol Biol 2016) pioneered ML-based cryptic site prediction by training on pairs of apo/holo structures. Features include local flexibility, pocket propensity changes between conformations, and evolutionary conservation. AlphaFold2 predicted structures with varying confidence can sample conformational diversity relevant to cryptic pocket opening. PocketMiner (Meller et al., Nature Communications 2023) uses graph neural networks on MD simulation snapshots to identify transient pockets. The key insight is that residues near cryptic sites show higher local structural variability across the ensemble. Reference: Cimermancic et al., 'CryptoSite: expanding the druggable proteome by characterization of cryptic binding sites', J Mol Biol 2016; Meller et al., 'Predicting locations of cryptic pockets from single protein structures using the PocketMiner GNN', Nature Communications 2023.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\nclass CrypticSiteDetector(nn.Module):\n    def __init__(self, feat_dim=40, hidden=128):\n        super().__init__()\n        self.encoder = nn.Sequential(\n            nn.Linear(feat_dim, hidden), nn.ReLU(),\n            nn.Linear(hidden, hidden), nn.ReLU())\n        self.classifier = nn.Linear(hidden, 1)\n\n    def forward(self, ensemble_features):\n        # ensemble_features: (n_residues, feat_dim)\n        h = self.encoder(ensemble_features)\n        return self.classifier(h).squeeze(-1)\n\ndef compute_ensemble_features(conformations):\n    \"\"\"Compute per-residue features from structural ensemble.\n    conformations: (n_conf, n_residues, 3) CA coordinates\"\"\"\n    mean_pos = conformations.mean(axis=0)\n    rmsf = np.sqrt(((conformations - mean_pos)**2).{{b1}}(axis=0).mean(axis=-1))\n    # Compute SASA variance, pocket scores etc. (simplified)\n    variance_features = conformations.{{b2}}(axis=0).mean(axis=-1)\n    return np.column_stack([rmsf, variance_features,\n                           np.random.randn(len(rmsf), 38)])\n\nn_residues = 200\nn_conf = 50\nconformations = np.random.randn(n_conf, n_residues, 3)\nfeatures = compute_ensemble_features(conformations)\n\nmodel = CrypticSiteDetector()\nfeat_tensor = torch.tensor(features, dtype=torch.float32)\nscores = model(feat_tensor)\nlabels = torch.zeros(n_residues)\nlabels[80:90] = 1.0  # known cryptic site\n\nloss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([{{b3}}]))(scores, labels)\nloss.backward()\nprint(f'Loss: {loss.item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": ".???(axis=0) # average over conformations",
+                    "acceptable": [
+                        "mean"
+                    ],
+                    "hint": "Average the squared deviations across all conformations for RMSF calculation."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "conformations.???(axis=0) # spread measure",
+                    "acceptable": [
+                        "std",
+                        "var"
+                    ],
+                    "hint": "Compute standard deviation or variance across conformations to measure structural variability."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.tensor([???]) # positive class weight",
+                    "acceptable": [
+                        "10.0",
+                        "19.0",
+                        "20.0",
+                        "15.0"
+                    ],
+                    "hint": "Use a high positive weight (e.g., 10-20) to handle the imbalance between cryptic site and non-site residues."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_eng_scoring",
+            "title": "Protein Engineering Fitness Scoring with Ensemble Models",
+            "difficulty": "medium",
+            "description": "Implement an ensemble scoring function combining evolutionary, structural, and learned features for ranking protein engineering variants.",
+            "info": "Protein engineering scoring functions rank designed variants by predicted fitness to guide experimental testing. Ensemble methods combining diverse feature sources consistently outperform single-model approaches. EVmutation (Hopf et al., Nature Biotech 2017) provides evolutionary coupling-based scores from multiple sequence alignments. ESM-1v (Meier et al., NeurIPS 2021) computes zero-shot mutation scores using protein language model log-likelihoods. Rosetta energy functions provide physics-based stability estimates (ddG). The ProteinGym benchmark (Notin et al., NeurIPS 2023) evaluates predictor combinations on hundreds of DMS assays, showing that ensemble approaches combining evolutionary, language model, and structural predictors achieve the highest average Spearman correlations. Reference: Notin et al., 'ProteinGym: Large-Scale Benchmarks for Protein Fitness Prediction and Design', NeurIPS 2023; Meier et al., 'Language models enable zero-shot prediction of the effects of mutations on protein function', NeurIPS 2021.",
+            "code": "import numpy as np\nfrom sklearn.linear_model import Ridge\nfrom scipy.stats import spearmanr, rankdata\n\nnp.random.seed(42)\nn_variants = 300\n\n# Individual predictor scores\nev_scores = np.random.randn(n_variants)      # EVmutation\nesm_scores = np.random.randn(n_variants)     # ESM-1v\nrosetta_scores = np.random.randn(n_variants)  # Rosetta ddG\ny_true = np.random.randn(n_variants)          # experimental fitness\n\n# Stack features for ensemble\nX = np.column_stack([ev_scores, esm_scores, rosetta_scores])\n\n# Rank-based normalization\nX_ranked = np.apply_along_axis({{b1}}, 0, X) / n_variants\n\n# Fit ensemble on first 200, evaluate on last 100\nX_tr, X_te = X_ranked[:200], X_ranked[200:]\ny_tr, y_te = y_true[:200], y_true[200:]\n\nensemble = Ridge(alpha=1.0)\nensemble.fit(X_tr, y_tr)\ny_pred = ensemble.predict(X_te)\nrho, _ = spearmanr(y_te, y_pred)\n\n# Compare individual vs ensemble\nfor name, scores in [('EVmutation', ev_scores[200:]),\n                     ('ESM-1v', esm_scores[200:]),\n                     ('Rosetta', rosetta_scores[200:])]:\n    r, _ = spearmanr(y_te, scores)\n    print(f'{name}: rho={r:.4f}')\nprint(f'Ensemble: rho={rho:.4f}')\nprint(f'Weights: {dict({{b2}}([\\'Ev\\',\\'ESM\\',\\'Rosetta\\'], ensemble.{{b3}}))}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.apply_along_axis(???, 0, X) # rank transform",
+                    "acceptable": [
+                        "rankdata"
+                    ],
+                    "hint": "Use rankdata to convert scores to ranks for normalization."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "dict(???([\\'Ev\\',\\'ESM\\',\\'Rosetta\\'], ...)) # pair names with weights",
+                    "acceptable": [
+                        "zip"
+                    ],
+                    "hint": "Use zip() to pair feature names with their learned ensemble weights."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "ensemble.??? # learned coefficients",
+                    "acceptable": [
+                        "coef_"
+                    ],
+                    "hint": "Access coef_ attribute to get the learned Ridge regression weights."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_directed_evolution",
+            "title": "ML-Guided Directed Evolution with Bayesian Optimization",
+            "difficulty": "hard",
+            "description": "Implement a Bayesian optimization loop for ML-guided directed evolution that selects the most informative variants to test experimentally.",
+            "info": "ML-guided directed evolution (MLDE) uses machine learning to propose high-fitness variants between experimental rounds, dramatically reducing screening costs. Bayesian optimization with Gaussian Process (GP) surrogates balances exploration of uncertain regions with exploitation of predicted high-fitness variants. Wu et al. (PNAS 2019) demonstrated that MLDE can find optimal variants while testing fewer than 1% of a combinatorial library. The acquisition function (e.g., Expected Improvement, Upper Confidence Bound) determines which variants to test next. Thompson sampling provides another effective acquisition strategy by sampling from the posterior predictive distribution. Each round consists of: fit GP on observed data, compute acquisition scores, select batch, observe experimentally, repeat. Reference: Wu et al., 'Machine learning-assisted directed protein evolution with combinatorial libraries', PNAS 2019; Yang et al., 'Machine-learning-guided directed evolution for protein engineering', Nature Methods 2019.",
+            "code": "import numpy as np\nfrom sklearn.gaussian_process import GaussianProcessRegressor\nfrom sklearn.gaussian_process.kernels import RBF, ConstantKernel\n\nnp.random.seed(42)\nn_total = 1000\nX_all = np.random.randn(n_total, 10)  # variant encodings\ny_all = np.sin(X_all[:, 0]) + 0.5 * X_all[:, 1]  # true fitness\n\n# Start with 20 random variants\ninitial_n = 20\nobserved_idx = list(np.random.choice(n_total, initial_n, replace=False))\n\ndef upper_confidence_bound(mu, sigma, beta=2.0):\n    \"\"\"UCB acquisition: balance exploration and exploitation.\"\"\"\n    return mu + beta * {{b1}}\n\nfor round_num in range(5):\n    X_obs = X_all[observed_idx]\n    y_obs = y_all[observed_idx]\n    \n    kernel = ConstantKernel() * RBF()\n    gp = GaussianProcessRegressor(kernel=kernel, random_state=42)\n    gp.fit(X_obs, y_obs)\n    \n    # Score all unobserved variants\n    unobserved = [i for i in range(n_total) if i not in observed_idx]\n    X_cand = X_all[unobserved]\n    mu, sigma = gp.predict(X_cand, return_std={{b2}})\n    \n    acq_scores = upper_confidence_bound(mu, sigma)\n    # Select top-5 for next round\n    top_k = np.argsort(acq_scores)[{{b3}}:]\n    new_idx = [unobserved[i] for i in top_k]\n    observed_idx.extend(new_idx)\n    \n    best = y_all[observed_idx].max()\n    print(f'Round {round_num+1}: tested={len(observed_idx)}, best={best:.3f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "mu + beta * ??? # exploration term",
+                    "acceptable": [
+                        "sigma"
+                    ],
+                    "hint": "UCB adds beta times the standard deviation (sigma) to the mean prediction to encourage exploring uncertain regions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "return_std=??? # request uncertainty",
+                    "acceptable": [
+                        "True"
+                    ],
+                    "hint": "Set return_std=True to get both mean predictions and standard deviations from the GP."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.argsort(acq_scores)[???:] # select top-5",
+                    "acceptable": [
+                        "-5"
+                    ],
+                    "hint": "Slice the last 5 elements from the sorted indices to get the 5 highest acquisition scores."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_bcell_epitope",
+            "title": "B-Cell Epitope Prediction from Sequence and Structure",
+            "difficulty": "medium",
+            "description": "Build a residue-level classifier to predict linear B-cell epitopes using sequence features like hydrophilicity, accessibility, and flexibility.",
+            "info": "B-cell epitope prediction identifies protein surface regions recognized by antibodies, crucial for vaccine design and diagnostic development. Linear B-cell epitopes are continuous sequence stretches of 5-20 residues. BepiPred-2.0 (Jespersen et al., Nucleic Acids Res 2017) uses random forests on sequence and structural features, and BepiPred-3.0 uses ESM-2 embeddings with improved accuracy. Key predictive features include solvent accessibility, hydrophilicity (Parker scale), flexibility (Karplus-Schulz), and turns propensity. Epitope datasets are inherently imbalanced since most residues are non-epitope, requiring careful handling of class imbalance. The IEDB provides curated experimental epitope mapping data from antibody-antigen co-crystal structures. Reference: Jespersen et al., 'BepiPred-2.0: improving sequence-based B-cell epitope prediction using conformational epitopes', Nucleic Acids Res 2017; Clifford et al., 'BepiPred-3.0: Improved B-cell epitope prediction using protein language models', Protein Science 2022.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass BcellEpitopePredictor(nn.Module):\n    def __init__(self, feat_dim=30, hidden=64):\n        super().__init__()\n        self.conv1 = nn.Conv1d(feat_dim, hidden, kernel_size=9, padding=4)\n        self.conv2 = nn.Conv1d(hidden, hidden, kernel_size=5, padding=2)\n        self.fc = nn.Linear(hidden, 1)\n        self.dropout = nn.Dropout(0.2)\n\n    def forward(self, x):\n        # x: (batch, seq_len, feat_dim)\n        h = x.transpose(1, 2)  # (batch, feat_dim, seq_len)\n        h = torch.relu(self.conv1(h))\n        h = self.dropout(h)\n        h = torch.relu(self.conv2(h))\n        h = h.transpose(1, 2)  # back to (batch, seq_len, hidden)\n        return self.fc(h).{{b1}}(-1)\n\nmodel = BcellEpitopePredictor()\nseq_feats = torch.randn(4, 200, 30)  # hydrophilicity, accessibility, etc.\nlabels = torch.zeros(4, 200)\nlabels[:, 50:65] = 1.0  # epitope region\n\n# Handle class imbalance with pos_weight\nn_pos = labels.sum()\nn_neg = labels.numel() - n_pos\npos_weight = torch.tensor([n_neg / n_pos])\nloss = nn.BCEWithLogitsLoss(pos_weight={{b2}})\n\nlogits = model(seq_feats)\ntotal_loss = loss(logits, labels)\ntotal_loss.backward()\npred = (torch.{{b3}}(logits) > 0.5).float()\nprint(f'Predicted epitope residues: {pred.sum().item():.0f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": ".???(-1) # remove last dimension",
+                    "acceptable": [
+                        "squeeze"
+                    ],
+                    "hint": "Use squeeze(-1) to remove the trailing dimension of size 1 from the linear output."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "pos_weight=??? # balance classes",
+                    "acceptable": [
+                        "pos_weight"
+                    ],
+                    "hint": "Pass the computed pos_weight tensor to weight the positive class higher."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.???(logits) # convert to probabilities",
+                    "acceptable": [
+                        "sigmoid"
+                    ],
+                    "hint": "Apply sigmoid to convert logits to probabilities for thresholding."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_conformational_epitope",
+            "title": "Conformational B-Cell Epitope Prediction with GNN",
+            "difficulty": "hard",
+            "description": "Implement a graph neural network for predicting conformational (discontinuous) B-cell epitopes using the protein residue contact graph.",
+            "info": "Conformational epitopes consist of residues that are distant in sequence but proximal in 3D structure, constituting over 90% of B-cell epitopes. Graph neural networks naturally model spatial residue proximity through contact-based edges. DiscoTope (Kringelum et al., PLoS Comput Biol 2012) was among the first structure-based epitope predictors, using spatial neighborhood statistics. EPMP (Dai & Bailey-Kellogg, Bioinformatics 2021) uses message passing on residue contact graphs with evolutionary and geometric features. Node features typically include solvent accessibility, B-factors, conservation scores, and amino acid properties. The protein graph is constructed with edges between residues within a distance cutoff (e.g., 8-10 Angstroms between C-alpha atoms). Reference: Kringelum et al., 'Reliable B cell epitope predictions: impacts of method development and improved benchmarking', PLoS Comput Biol 2012; Dai & Bailey-Kellogg, 'Protein interaction interface region prediction by geometric deep learning', Bioinformatics 2021.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass EpitopeGNN(nn.Module):\n    def __init__(self, node_dim=40, hidden=64, n_layers=3):\n        super().__init__()\n        self.input_proj = nn.Linear(node_dim, hidden)\n        self.gnn_layers = nn.ModuleList([\n            nn.Linear(hidden, hidden) for _ in range(n_layers)])\n        self.norms = nn.ModuleList([\n            nn.LayerNorm(hidden) for _ in range(n_layers)])\n        self.output = nn.Linear(hidden, 1)\n\n    def forward(self, node_feats, adj_norm):\n        h = torch.relu(self.input_proj(node_feats))\n        for conv, norm in zip(self.gnn_layers, self.norms):\n            msg = {{b1}} @ h  # neighbor aggregation\n            h = torch.relu(norm(conv(msg))) + h  # residual\n        return self.output(h).squeeze(-1)\n\n# Build contact graph from C-alpha coordinates\nn_res = 180\ncoords = torch.randn(n_res, 3) * 10  # C-alpha coordinates\ndist_matrix = torch.cdist(coords.unsqueeze(0), coords.unsqueeze(0)).squeeze(0)\ncontact_map = (dist_matrix < {{b2}}).float()  # 8A cutoff\ncontact_map.fill_diagonal_(1.0)  # self-loops\nadj_norm = contact_map / contact_map.sum(dim=1, keepdim=True)\n\nnode_feats = torch.randn(n_res, 40)  # ASA, B-factor, conservation, ...\nmodel = EpitopeGNN()\nscores = model(node_feats, adj_norm)\n\nlabels = torch.zeros(n_res)\nlabels[torch.randint(0, n_res, (20,))] = 1.0  # epitope residues\nloss = nn.BCEWithLogitsLoss()(scores, labels)\nloss.{{b3}}()\nprint(f'Epitope score range: [{scores.min():.2f}, {scores.max():.2f}]')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? @ h # graph convolution step",
+                    "acceptable": [
+                        "adj_norm"
+                    ],
+                    "hint": "Multiply the normalized adjacency matrix by node features for message passing."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(dist_matrix < ???) # contact distance threshold",
+                    "acceptable": [
+                        "8.0",
+                        "8",
+                        "10.0",
+                        "10"
+                    ],
+                    "hint": "Use 8 or 10 Angstroms as the C-alpha contact distance cutoff."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "loss.???() # backpropagate gradients",
+                    "acceptable": [
+                        "backward"
+                    ],
+                    "hint": "Call backward() to compute gradients through the computational graph."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_aqueous_solubility",
+            "title": "Aqueous Drug Solubility Prediction with Molecular Fingerprints",
+            "difficulty": "easy",
+            "description": "Train a regression model to predict aqueous solubility (logS) of drug molecules from extended-connectivity fingerprints (ECFP).",
+            "info": "Aqueous solubility is one of the most important physicochemical properties in drug development, as poorly soluble compounds have low oral bioavailability. Solubility is typically expressed as logS (log of molar solubility). The AqSolDB dataset (Sorkun et al., Scientific Data 2019) provides over 9,000 experimental solubility measurements for benchmarking. Extended-connectivity fingerprints (ECFP/Morgan fingerprints) encode molecular substructures as fixed-length binary or count vectors. The Delaney solubility dataset is a smaller but widely used benchmark with 1,144 compounds. Simple models like random forests on ECFP4 fingerprints achieve RMSE around 0.7-1.0 logS units, competitive with more complex approaches. Reference: Sorkun et al., 'AqSolDB, a curated reference set of aqueous solubility', Scientific Data 2019; Delaney, 'ESOL: Estimating Aqueous Solubility Directly from Molecular Structure', J Chem Inf Comput Sci 2004.",
+            "code": "import numpy as np\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_squared_error, r2_score\nfrom sklearn.model_selection import train_test_split\n\nnp.random.seed(42)\nn_compounds = 1000\nX = np.random.randint(0, 2, (n_compounds, 1024))  # ECFP4 bits\ny = np.random.normal(-3.0, 2.0, n_compounds)  # logS values\n\nX_tr, X_te, y_tr, y_te = train_test_split(\n    X, y, test_size=0.2, random_state=42)\n\nrf = RandomForestRegressor(n_estimators=200, max_depth=None,\n                            min_samples_leaf=2, random_state=42)\nrf.{{b1}}(X_tr, y_tr)\ny_pred = rf.predict(X_te)\n\nrmse = np.sqrt({{b2}}(y_te, y_pred))\nr2 = r2_score(y_te, y_pred)\nprint(f'RMSE: {rmse:.4f} logS')\nprint(f'R2: {r2:.4f}')\n\n# Check prediction distribution\nprint(f'Pred range: [{y_pred.{{b3}}():.2f}, {y_pred.max():.2f}]')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "rf.???(X_tr, y_tr) # train the model",
+                    "acceptable": [
+                        "fit"
+                    ],
+                    "hint": "Use fit() to train the random forest on training data."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.sqrt(???(y_te, y_pred)) # RMSE from MSE",
+                    "acceptable": [
+                        "mean_squared_error"
+                    ],
+                    "hint": "RMSE is the square root of mean_squared_error."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "y_pred.???() # minimum value",
+                    "acceptable": [
+                        "min"
+                    ],
+                    "hint": "Use .min() to get the minimum predicted solubility value."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_interaction_fingerprint",
+            "title": "Protein-Ligand Interaction Fingerprint Classification",
+            "difficulty": "medium",
+            "description": "Build a classifier using protein-ligand interaction fingerprints (PLIF) to distinguish active binders from decoys based on interaction patterns.",
+            "info": "Protein-ligand interaction fingerprints (PLIFs) encode the types of interactions (hydrogen bonds, hydrophobic contacts, pi-stacking, salt bridges) between a ligand and binding site residues. PLIFs provide interpretable descriptors that capture binding mode information lost in simple molecular fingerprints. The ProLIF library (Bouysset & Fiorucci, J Cheminformatics 2021) computes PLIFs from docking poses or MD trajectories. PLIF-based models can distinguish true binders from decoys that happen to dock well but lack key pharmacophoric interactions. Each bit in the fingerprint represents a specific interaction type at a specific binding site residue. Combining PLIFs with molecular descriptors often improves virtual screening performance over either representation alone. Reference: Bouysset & Fiorucci, 'ProLIF: a library to encode molecular interactions as fingerprints', J Cheminformatics 2021; Da & Bhatt, 'Harnessing the Power of Interaction Fingerprints', J Chem Inf Model 2014.",
+            "code": "import numpy as np\nfrom sklearn.svm import SVC\nfrom sklearn.metrics import roc_auc_score, classification_report\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.model_selection import train_test_split\n\nnp.random.seed(42)\nn_poses = 500\nn_interactions = 80  # residue x interaction-type combinations\n\n# PLIF: binary interaction presence\nX_plif = np.random.randint(0, 2, (n_poses, n_interactions))\ny = np.concatenate([np.ones(50), np.zeros(450)])  # 50 active, 450 decoy\n\nX_tr, X_te, y_tr, y_te = train_test_split(\n    X_plif, y, test_size=0.3, stratify=y, random_state=42)\n\nscaler = StandardScaler()\nX_tr_s = scaler.fit_transform(X_tr)\nX_te_s = scaler.{{b1}}(X_te)\n\nsvm = SVC(kernel='rbf', probability=True,\n          class_weight='balanced', C=1.0, random_state=42)\nsvm.fit(X_tr_s, y_tr)\n\ny_prob = svm.predict_proba(X_te_s)[:, 1]\ny_pred = svm.{{b2}}(X_te_s)\n\nauroc = roc_auc_score(y_te, y_prob)\nprint(f'AUROC: {auroc:.4f}')\nprint(classification_report(y_te, y_pred,\n      target_names=['Decoy', '{{b3}}']))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "scaler.???(X_te) # apply fitted transform",
+                    "acceptable": [
+                        "transform"
+                    ],
+                    "hint": "Use transform() (not fit_transform) on test data to apply the scaling learned from training data."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "svm.???(X_te_s) # get class predictions",
+                    "acceptable": [
+                        "predict"
+                    ],
+                    "hint": "Use predict() to get binary class labels from the SVM."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "target_names=['Decoy', '???'] # positive class name",
+                    "acceptable": [
+                        "Active"
+                    ],
+                    "hint": "The positive class represents active (binding) compounds."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_mhcii_binding",
+            "title": "MHC Class II Binding Prediction for CD4+ T-Cell Epitopes",
+            "difficulty": "medium",
+            "description": "Implement a convolutional model for predicting MHC class II binding peptides, handling variable peptide lengths and the open binding groove.",
+            "info": "MHC class II molecules present longer peptides (13-25 residues) to CD4+ helper T cells, with an open binding groove allowing peptide ends to extend beyond the molecule. The 9-residue binding core within the longer peptide is the critical determinant of binding specificity. NetMHCIIpan (Reynisson et al., Nucleic Acids Res 2020) identifies the binding core position as part of the prediction. Training data includes both binding affinity measurements and eluted ligand mass spectrometry data from the IEDB. MHC-II alleles are represented by pseudo-sequences capturing the polymorphic residues lining the binding groove. The binding core identification problem makes MHC-II prediction harder than MHC-I, as the model must learn which 9-mer within a longer peptide is presented. Reference: Reynisson et al., 'NetMHCpan-4.1 and NetMHCIIpan-4.0: improved predictions of MHC antigen presentation', Nucleic Acids Res 2020; Abelin et al., 'Defining HLA-II Ligand Processing and Binding Rules with Mass Spectrometry', Immunity 2019.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass MHCIIPredictor(nn.Module):\n    def __init__(self, aa_vocab=21, embed_dim=32, hidden=64):\n        super().__init__()\n        self.embed = nn.Embedding(aa_vocab, embed_dim)\n        # Multiple kernel sizes to capture binding cores\n        self.conv9 = nn.Conv1d(embed_dim, hidden, kernel_size=9)\n        self.conv11 = nn.Conv1d(embed_dim, hidden, kernel_size=11)\n        self.fc = nn.Linear(hidden * 2, 1)\n\n    def forward(self, peptide_seq):\n        # peptide_seq: (batch, max_len) padded token indices\n        emb = self.embed(peptide_seq).transpose(1, 2)\n        # Global max pool captures strongest binding core signal\n        c9 = self.conv9(emb)\n        c11 = self.conv11(emb)\n        p9 = c9.max(dim={{b1}})[0]   # (batch, hidden)\n        p11 = c11.max(dim=-1)[0]\n        combined = torch.cat([p9, p11], dim=-1)\n        return self.fc(combined).squeeze(-1)\n\nmodel = MHCIIPredictor()\npeptides = torch.randint(0, 21, (32, 25))  # max length 25\naffinity = torch.randn(32)  # log-transformed IC50\n\npred = model(peptides)\nloss = nn.{{b2}}()(pred, affinity)\n\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\noptimizer.{{b3}}()\nloss.backward()\noptimizer.step()\nprint(f'Prediction range: [{pred.min():.2f}, {pred.max():.2f}]')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "c9.max(dim=???)[0] # pool along sequence",
+                    "acceptable": [
+                        "-1",
+                        "2"
+                    ],
+                    "hint": "Max-pool along the sequence (last) dimension to find the strongest activation for any binding core position."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # regression loss for affinity",
+                    "acceptable": [
+                        "MSELoss",
+                        "SmoothL1Loss",
+                        "HuberLoss"
+                    ],
+                    "hint": "Use MSELoss or another regression loss for binding affinity prediction."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "optimizer.???() # clear previous gradients",
+                    "acceptable": [
+                        "zero_grad"
+                    ],
+                    "hint": "Call zero_grad() before backward() to clear accumulated gradients from the previous step."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_thermal_stability",
+            "title": "Thermal Stability (Tm) Prediction for Protein Engineering",
+            "difficulty": "easy",
+            "description": "Train a model to predict protein melting temperature (Tm) from global sequence and structural features for thermostability engineering.",
+            "info": "Thermal stability (melting temperature, Tm) is a key target for protein engineering in industrial and therapeutic applications. ProThermDB (Nikam et al., Nucleic Acids Res 2021) provides experimentally measured thermodynamic stability data for thousands of protein variants. Sequence-derived features like amino acid composition (especially proline and charged residue content), hydrophobic core packing, and salt bridge counts correlate with Tm. Thermophilic organism proteins provide positive examples with naturally high Tm values for comparative studies. FireProtDB (Stourac et al., Nucleic Acids Res 2021) aggregates stabilizing mutation data useful for engineering. Simple regression models on curated features serve as interpretable baselines before applying deep learning. Reference: Nikam et al., 'ProThermDB: thermodynamic database for proteins and mutants revisited', Nucleic Acids Res 2021; Stourac et al., 'FireProtDB: database of manually curated protein stability data', Nucleic Acids Res 2021.",
+            "code": "import numpy as np\nfrom sklearn.linear_model import Lasso\nfrom sklearn.metrics import mean_absolute_error\nfrom sklearn.model_selection import cross_val_score\n\nnp.random.seed(42)\nn = 400\n# Features: AA composition (20), length, MW, pI, gravy,\n# helix%, sheet%, disorder%\nX = np.random.randn(n, 27)\ny = np.random.normal(55.0, 15.0, n)  # Tm in Celsius\n\nmodel = Lasso(alpha={{b1}})\n\n# 5-fold CV with negative MAE scoring\nscores = cross_val_score(model, X, y, cv=5,\n                          scoring='neg_mean_absolute_error')\nmae_scores = -scores  # convert negative to positive\nprint(f'CV MAE: {mae_scores.{{b2}}():.2f} +/- {mae_scores.std():.2f} deg C')\n\n# Final model\nmodel.fit(X, y)\ncoef_nonzero = np.sum(model.coef_ != {{b3}})\nprint(f'Non-zero coefficients: {coef_nonzero}/{X.shape[1]}')\nprint(f'Feature selection via L1 regularization')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "alpha=??? # regularization strength",
+                    "acceptable": [
+                        "0.1",
+                        "1.0",
+                        "0.5"
+                    ],
+                    "hint": "Use an alpha value like 0.1-1.0 for L1 regularization strength."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "mae_scores.???() # average MAE",
+                    "acceptable": [
+                        "mean"
+                    ],
+                    "hint": "Compute the mean of MAE scores across folds."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "model.coef_ != ??? # check sparsity",
+                    "acceptable": [
+                        "0",
+                        "0.0"
+                    ],
+                    "hint": "Lasso (L1) regularization drives some coefficients exactly to zero."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_signal_peptide",
+            "title": "Signal Peptide and Subcellular Localization Prediction",
+            "difficulty": "medium",
+            "description": "Build a model that predicts signal peptide presence and cleavage site position from the N-terminal region of protein sequences.",
+            "info": "Signal peptides are short N-terminal sequences (15-30 residues) directing proteins to the secretory pathway, with a conserved tripartite structure: positive n-region, hydrophobic h-region, and cleavage c-region. SignalP 6.0 (Teufel et al., Nature Biotech 2022) uses protein language models to predict five types of signal peptides across all domains of life. The cleavage site follows the (-3, -1) rule where small neutral residues (Ala, Gly, Ser) occupy positions -1 and -3. Training data comes from UniProt signal peptide annotations and experimentally validated N-terminal sequences. Accurate signal peptide prediction is essential for recombinant protein production and secretome analysis. The model must distinguish signal peptides from transmembrane helices, which share hydrophobic character. Reference: Teufel et al., 'SignalP 6.0 predicts all five types of signal peptides using protein language models', Nature Biotech 2022; Almagro Armenteros et al., 'SignalP 5.0 improves signal peptide predictions', Nature Biotech 2019.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SignalPeptidePredictor(nn.Module):\n    def __init__(self, vocab=21, embed=32, hidden=64, max_len=70):\n        super().__init__()\n        self.embed = nn.Embedding(vocab, embed)\n        self.encoder = nn.LSTM(embed, hidden, batch_first=True,\n                               bidirectional=True)\n        # Per-position classification: SP-region labels\n        self.position_head = nn.Linear(hidden * 2, 4)  # n/h/c/non-SP\n        # Global: has signal peptide?\n        self.global_head = nn.Linear(hidden * 2, 1)\n\n    def forward(self, seq):\n        emb = self.embed(seq)\n        output, (h_n, _) = self.encoder(emb)\n        pos_logits = self.position_head(output)  # per-residue\n        # Global prediction from mean pooling\n        global_repr = output.{{b1}}(dim=1)\n        global_logit = self.global_head(global_repr).squeeze(-1)\n        return pos_logits, global_logit\n\nmodel = SignalPeptidePredictor()\nseqs = torch.randint(0, 21, (8, 70))  # N-terminal 70 residues\nregion_labels = torch.randint(0, 4, (8, 70))  # n/h/c/non-SP\nhas_sp = torch.randint(0, 2, (8,)).float()\n\npos_logits, glob_logit = model(seqs)\npos_loss = nn.{{b2}}()(pos_logits.view(-1, 4), region_labels.view(-1))\nglob_loss = nn.BCEWithLogitsLoss()(glob_logit, has_sp)\ntotal_loss = pos_loss + {{b3}} * glob_loss\ntotal_loss.backward()\nprint(f'Position loss: {pos_loss.item():.4f}, Global loss: {glob_loss.item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "output.???(dim=1) # pool over sequence",
+                    "acceptable": [
+                        "mean"
+                    ],
+                    "hint": "Mean pool over the sequence dimension to get a fixed-size representation for global classification."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # multi-class position loss",
+                    "acceptable": [
+                        "CrossEntropyLoss"
+                    ],
+                    "hint": "Use CrossEntropyLoss for the 4-class per-residue region classification (n/h/c/non-SP)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "pos_loss + ??? * glob_loss # loss weight",
+                    "acceptable": [
+                        "0.5",
+                        "1.0",
+                        "0.1"
+                    ],
+                    "hint": "Weight the global loss relative to the position loss (e.g., 0.5 or 1.0)."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_binding_ddg",
+            "title": "Binding Affinity Change Prediction for Protein-Protein Interface Mutations",
+            "difficulty": "hard",
+            "description": "Build a model to predict changes in binding free energy (ddG) upon mutation at protein-protein interfaces using structural and evolutionary features.",
+            "info": "Predicting binding affinity changes (ddG_bind) upon mutation is essential for understanding disease mutations and engineering protein complexes like antibodies. The SKEMPI 2.0 database (Jankauskaite et al., Bioinformatics 2019) provides 7,085 experimental ddG values for interface mutations. Key features include change in interface buried surface area, electrostatic complementarity shifts, and evolutionary conservation at the mutation site. mCSM-PPI2 (Rodrigues et al., Nucleic Acids Res 2019) uses graph-based signatures to capture the structural environment around mutations. Antisymmetry is an important property: ddG(A->B) should approximately equal -ddG(B->A), which can be enforced as an architectural constraint. Models are typically evaluated using Pearson correlation and classification accuracy for stabilizing vs. destabilizing mutations. Reference: Jankauskaite et al., 'SKEMPI 2.0: an updated benchmark of changes in protein-protein binding energy', Bioinformatics 2019; Rodrigues et al., 'mCSM-PPI2: predicting the effects of mutations on protein-protein interactions', Nucleic Acids Res 2019.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\nclass BindingDDGPredictor(nn.Module):\n    def __init__(self, feat_dim=50, hidden=128):\n        super().__init__()\n        self.encoder = nn.Sequential(\n            nn.Linear(feat_dim, hidden), nn.ReLU(),\n            nn.Dropout(0.2),\n            nn.Linear(hidden, hidden), nn.ReLU(),\n            nn.Linear(hidden, 1))\n\n    def forward(self, wt_features, mut_features):\n        # Antisymmetric: swap WT/mut should flip sign\n        delta = mut_features - wt_features\n        return self.encoder(delta).squeeze(-1)\n\nmodel = BindingDDGPredictor()\nwt_feat = torch.randn(32, 50)   # structural env of WT residue\nmut_feat = torch.randn(32, 50)  # structural env of mutant\nddg_true = torch.randn(32)       # experimental ddG\n\npred = model(wt_feat, mut_feat)\nloss = nn.SmoothL1Loss()(pred, ddg_true)\nloss.backward()\n\n# Verify antisymmetry\npred_forward = model(wt_feat, mut_feat)\npred_reverse = model(mut_feat, wt_feat)\nasymmetry = (pred_forward + pred_reverse).{{b1}}().item()\nprint(f'Asymmetry check (should be ~0): {asymmetry:.4f}')\n\n# Classification: stabilizing vs destabilizing\npred_class = (pred > {{b2}}).long()  # positive ddG = destabilizing\ntrue_class = (ddg_true > 0).long()\nacc = (pred_class == true_class).float().{{b3}}()\nprint(f'Stab/Destab accuracy: {acc.item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": ").???(). # mean absolute deviation from antisymmetry",
+                    "acceptable": [
+                        "abs().mean",
+                        "mean"
+                    ],
+                    "hint": "Take the mean of the sum to check how close forward + reverse predictions are to zero (antisymmetry)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(pred > ???) # destabilizing threshold",
+                    "acceptable": [
+                        "0",
+                        "0.0"
+                    ],
+                    "hint": "Positive ddG values indicate destabilizing mutations; threshold at 0."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": ".float().???() # average accuracy",
+                    "acceptable": [
+                        "mean"
+                    ],
+                    "hint": "Take the mean of the boolean comparison to get classification accuracy."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_conservation_scoring",
+            "title": "Evolutionary Conservation Scoring for Functional Site Identification",
+            "difficulty": "easy",
+            "description": "Compute position-specific conservation scores from a multiple sequence alignment (MSA) and use them to identify functionally important residues.",
+            "info": "Evolutionary conservation is one of the strongest signals for identifying functional sites, as critical residues are under purifying selection. Shannon entropy measures conservation at each MSA column, with low entropy indicating high conservation. The ConSurf method (Ashkenazy et al., Nucleic Acids Res 2016) maps conservation scores onto protein structures to identify functional regions. Rate4Site (Pupko et al., Mol Biol Evol 2002) uses phylogenetic rate estimation for more accurate conservation scoring. Active sites, binding interfaces, and structural core residues all show elevated conservation. Conservation scores complement machine learning predictions by providing an orthogonal evolutionary signal. Reference: Ashkenazy et al., 'ConSurf 2016: an improved methodology to estimate and visualize evolutionary conservation', Nucleic Acids Res 2016; Pupko et al., 'Rate4Site: an algorithmic tool for the identification of functional regions', Mol Biol Evol 2002.",
+            "code": "import numpy as np\n\ndef shannon_entropy(column):\n    \"\"\"Compute Shannon entropy of an MSA column.\"\"\"\n    aa_counts = {}\n    total = 0\n    for aa in column:\n        if aa != '-':  # skip gaps\n            aa_counts[aa] = aa_counts.get(aa, 0) + 1\n            total += 1\n    if total == 0:\n        return 0.0\n    entropy = 0.0\n    for count in aa_counts.values():\n        p = count / total\n        entropy -= p * np.{{b1}}(p)\n    return entropy\n\nnp.random.seed(42)\nn_seqs, seq_len = 100, 200\namino_acids = list('ACDEFGHIKLMNPQRSTVWY')\n\n# Simulate MSA: mostly conserved with some variable positions\nmsa = np.array([[amino_acids[np.random.randint(0, 20)]\n                  for _ in range(seq_len)] for _ in range(n_seqs)])\n# Make some positions highly conserved (functional sites)\nfor pos in [45, 46, 100, 101, 102]:  # active site\n    msa[:, pos] = 'H'  # all histidine\n    msa[np.random.choice(n_seqs, 5), pos] = amino_acids[\n        np.random.randint(0, 20)]  # few mutations\n\nconservation = np.array([shannon_entropy(msa[:, i])\n                          for i in range(seq_len)])\n# Low entropy = high conservation\nthreshold = np.{{b2}}(conservation, 10)  # 10th percentile\nconserved_positions = np.where(conservation <= threshold)[0]\n\nprint(f'Most conserved positions: {conserved_positions[:{{b3}}]}')\nprint(f'Mean entropy conserved: {conservation[conserved_positions].mean():.3f}')\nprint(f'Mean entropy overall: {conservation.mean():.3f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???(p) # logarithm for entropy",
+                    "acceptable": [
+                        "log2",
+                        "log"
+                    ],
+                    "hint": "Use log2 (or natural log) to compute Shannon entropy from amino acid frequencies."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.???(conservation, 10) # find threshold",
+                    "acceptable": [
+                        "percentile"
+                    ],
+                    "hint": "Use np.percentile to find the 10th percentile of entropy values as the conservation threshold."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "conserved_positions[:???] # show top results",
+                    "acceptable": [
+                        "10",
+                        "15",
+                        "20"
+                    ],
+                    "hint": "Display the first 10-20 most conserved positions."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_new_docking_scoring",
+            "title": "Protein-Protein Docking Pose Scoring with Deep Learning",
+            "difficulty": "hard",
+            "description": "Implement a neural network scoring function to rank protein-protein docking poses using interface residue pair features.",
+            "info": "Protein-protein docking generates candidate complex structures that must be scored to identify near-native poses. Traditional scoring functions (ZRANK, pyDock) use physics-based energy terms, while deep learning approaches learn scoring functions from structural data. The ZDOCK/ZRANK benchmark (Pierce & Weng, Proteins 2007) provides docking decoy sets for evaluating scoring methods. Interface features include residue-residue distance distributions, contact counts, shape complementarity, and electrostatic complementarity. DL-based scoring functions like DeepRank (Renaud et al., Nature Communications 2021) use 3D CNNs or GNNs on interface residue graphs. The CAPRI assessment (Lensink et al., Proteins 2020) provides community-wide evaluation of docking and scoring methods. Reference: Renaud et al., 'DeepRank: a deep learning framework for data mining 3D protein-protein interfaces', Nature Communications 2021; Lensink et al., 'Prediction of protein assemblies, the next frontier: The CAPRI experiment', Proteins 2020.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DockingScoringFunction(nn.Module):\n    def __init__(self, pair_feat_dim=40, hidden=128):\n        super().__init__()\n        self.pair_encoder = nn.Sequential(\n            nn.Linear(pair_feat_dim, hidden), nn.ReLU(),\n            nn.Linear(hidden, hidden), nn.ReLU())\n        self.attention = nn.Linear(hidden, 1)\n        self.scorer = nn.Linear(hidden, 1)\n\n    def forward(self, pair_features, mask):\n        # pair_features: (batch, max_pairs, pair_feat_dim)\n        # mask: (batch, max_pairs) 1=real pair, 0=padding\n        h = self.pair_encoder(pair_features)\n        # Attention-weighted aggregation of interface pairs\n        attn_logits = self.attention(h).squeeze(-1)\n        attn_logits = attn_logits.masked_fill(mask == 0, float('-inf'))\n        attn_weights = torch.softmax(attn_logits, dim={{b1}})\n        interface_repr = (h * attn_weights.unsqueeze(-1)).sum(dim=1)\n        return self.scorer(interface_repr).squeeze(-1)\n\nmodel = DockingScoringFunction()\nn_poses = 100  # docking decoys\npair_feats = torch.randn(n_poses, 50, 40)  # max 50 interface pairs\nmask = torch.ones(n_poses, 50)\nmask[:, 30:] = 0  # some poses have fewer interface contacts\n\nscores = model(pair_feats, mask)\n# Ranking loss: near-native should score higher\ntrue_quality = torch.randn(n_poses)  # i-RMSD or DockQ scores\n\n# Pairwise ranking loss\ni_idx = torch.randint(0, n_poses, (500,))\nj_idx = torch.randint(0, n_poses, (500,))\ntarget = torch.{{b2}}(true_quality[i_idx] - true_quality[j_idx])\nloss = nn.MarginRankingLoss(margin=0.1)(\n    scores[i_idx], scores[j_idx], target)\nloss.{{b3}}()\nprint(f'Ranking loss: {loss.item():.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "dim=??? # softmax over interface pairs",
+                    "acceptable": [
+                        "-1",
+                        "1"
+                    ],
+                    "hint": "Apply softmax along the pairs dimension to compute attention weights."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(true_quality[i_idx] - true_quality[j_idx]) # direction",
+                    "acceptable": [
+                        "sign"
+                    ],
+                    "hint": "Use torch.sign() to get +1 or -1 indicating which pose has higher quality."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "loss.???() # compute gradients",
+                    "acceptable": [
+                        "backward"
+                    ],
+                    "hint": "Call backward() to backpropagate the ranking loss through the scoring function."
                 }
             ]
         }

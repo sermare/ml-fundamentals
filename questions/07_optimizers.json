@@ -78,6 +78,664 @@
                     "hint": "Update the parameters."
                 }
             ]
+        },
+        {
+            "id": "opt_new_adam_constructor",
+            "title": "Adam Optimizer Construction",
+            "difficulty": "easy",
+            "description": "Create an Adam optimizer in PyTorch with a learning rate of 1e-3 and default betas.",
+            "info": "Adam (Adaptive Moment Estimation) combines momentum (first moment) and RMSProp (second moment) to adapt the learning rate per parameter. The default betas=(0.9, 0.999) control the exponential decay rates for the first and second moment estimates respectively. Adam is the most widely used optimizer in deep learning due to its robustness across different architectures and hyperparameter settings. The epsilon term (default 1e-8) prevents division by zero in the update rule.",
+            "code": "import torch.optim as optim\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optim.???(model.parameters(), lr=???)",
+                    "acceptable": [
+                        "optim.Adam(model.parameters(), lr=1e-3)",
+                        "optim.Adam(model.parameters(), lr=0.001)"
+                    ],
+                    "hint": "Use optim.Adam with model.parameters() and lr=1e-3."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_adam_update",
+            "title": "Adam Update Rule: Bias-Corrected Moments",
+            "difficulty": "hard",
+            "description": "Implement Adam's bias-corrected first moment estimate. Given m (first moment), beta1, and t (timestep).",
+            "info": "Adam maintains running averages of the gradient (first moment m) and squared gradient (second moment v). Because these are initialized to zero, they are biased toward zero in early training steps. The bias correction m_hat = m / (1 - beta1**t) compensates for this initialization bias and is especially important in the first few iterations. Without bias correction, the effective learning rate would be much larger than intended during early training, potentially causing instability.",
+            "code": "# m has already been updated: m = beta1 * m + (1 - beta1) * grad\n# Compute bias-corrected first moment estimate\nm_hat = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "m / (1 - ???)",
+                    "acceptable": [
+                        "m / (1 - beta1 ** t)",
+                        "m / (1 - beta1**t)"
+                    ],
+                    "hint": "Divide m by (1 - beta1^t) to correct the initialization bias."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_adamw",
+            "title": "AdamW: Decoupled Weight Decay",
+            "difficulty": "medium",
+            "description": "Create an AdamW optimizer with lr=1e-3 and weight_decay=0.01 in PyTorch.",
+            "info": "AdamW decouples weight decay from the gradient-based update, applying decay directly to the weights rather than adding an L2 penalty to the loss. In the original Adam with L2 regularization, the regularization term is scaled by the adaptive learning rate, making its effect inconsistent across parameters. AdamW fixes this by performing the weight decay step separately: param = param - lr * weight_decay * param. This decoupled approach was shown by Loshchilov & Hutter (2019) to produce better generalization, and AdamW is now the default optimizer for training transformers.",
+            "code": "import torch.optim as optim\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optim.???(model.parameters(), lr=???, weight_decay=???)",
+                    "acceptable": [
+                        "optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)",
+                        "optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)"
+                    ],
+                    "hint": "Use optim.AdamW with lr=1e-3 and weight_decay=0.01."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_rmsprop",
+            "title": "RMSProp Optimizer",
+            "difficulty": "easy",
+            "description": "Create an RMSProp optimizer with lr=0.01 and alpha=0.99 in PyTorch.",
+            "info": "RMSProp (Root Mean Square Propagation) was proposed by Geoff Hinton in a Coursera lecture and adapts the learning rate for each parameter by dividing by a running average of recent gradient magnitudes. The alpha parameter (default 0.99) controls the decay rate of this moving average of squared gradients. RMSProp effectively handles the problem of vanishing and exploding gradients for recurrent neural networks and was one of the first adaptive learning rate methods. It can be seen as a precursor to Adam, which extends RMSProp by also incorporating momentum.",
+            "code": "import torch.optim as optim\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optim.???(model.parameters(), lr=???, alpha=???)",
+                    "acceptable": [
+                        "optim.RMSprop(model.parameters(), lr=0.01, alpha=0.99)"
+                    ],
+                    "hint": "Use optim.RMSprop (note the lowercase p) with lr=0.01 and alpha=0.99."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_adagrad",
+            "title": "Adagrad Optimizer",
+            "difficulty": "easy",
+            "description": "Create an Adagrad optimizer with lr=0.01 in PyTorch.",
+            "info": "Adagrad (Adaptive Gradient) adapts the learning rate for each parameter based on the historical sum of squared gradients. Parameters that receive large gradients get smaller effective learning rates, while parameters with small gradients get larger rates. This makes Adagrad well-suited for sparse data (e.g., NLP with embeddings) where infrequent features need larger updates. The main drawback is that the accumulated squared gradients grow monotonically, causing the learning rate to shrink and eventually become infinitesimally small, which can stop learning prematurely.",
+            "code": "import torch.optim as optim\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optim.???(model.parameters(), lr=???)",
+                    "acceptable": [
+                        "optim.Adagrad(model.parameters(), lr=0.01)"
+                    ],
+                    "hint": "Use optim.Adagrad with lr=0.01."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_adadelta",
+            "title": "Adadelta Optimizer",
+            "difficulty": "easy",
+            "description": "Create an Adadelta optimizer with rho=0.9 in PyTorch. Adadelta does not require an initial learning rate.",
+            "info": "Adadelta is an extension of Adagrad that seeks to reduce its aggressive, monotonically decreasing learning rate. Instead of accumulating all past squared gradients, Adadelta restricts the window of accumulated past gradients to a fixed size using a decay rate rho. It also replaces the global learning rate with a ratio of parameter update magnitudes, making it almost hyperparameter-free. The rho parameter (default 0.9) controls the decay rate of the running average of squared gradients. While less popular than Adam, Adadelta remains useful when minimal hyperparameter tuning is desired.",
+            "code": "import torch.optim as optim\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optim.???(model.parameters(), rho=???)",
+                    "acceptable": [
+                        "optim.Adadelta(model.parameters(), rho=0.9)"
+                    ],
+                    "hint": "Use optim.Adadelta with rho=0.9."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_nadam",
+            "title": "NAdam Optimizer",
+            "difficulty": "medium",
+            "description": "Create a NAdam optimizer with lr=2e-3 and default settings in PyTorch.",
+            "info": "NAdam (Nesterov-accelerated Adaptive Moment Estimation) incorporates Nesterov momentum into the Adam optimizer. While standard Adam uses the current momentum to update parameters, NAdam uses the look-ahead momentum from Nesterov's method, which often leads to better convergence. In PyTorch, NAdam is available as torch.optim.NAdam since version 1.10. NAdam tends to outperform Adam on tasks where Nesterov momentum provides a benefit, such as training recurrent networks and some classification tasks.",
+            "code": "import torch.optim as optim\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optim.???(model.parameters(), lr=???)",
+                    "acceptable": [
+                        "optim.NAdam(model.parameters(), lr=2e-3)",
+                        "optim.NAdam(model.parameters(), lr=0.002)"
+                    ],
+                    "hint": "Use optim.NAdam with lr=2e-3."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_radam",
+            "title": "RAdam Optimizer",
+            "difficulty": "medium",
+            "description": "Create a RAdam optimizer with lr=1e-3 in PyTorch.",
+            "info": "RAdam (Rectified Adam) addresses the high variance of the adaptive learning rate in the early stages of training. It uses a variance rectification term that automatically switches between SGD (when variance is high) and Adam (once variance stabilizes). This eliminates the need for a manual warmup period that is often required with Adam. RAdam was shown to be more robust to the choice of learning rate and can match or exceed Adam's performance without warmup. It is available in PyTorch as torch.optim.RAdam.",
+            "code": "import torch.optim as optim\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optim.???(model.parameters(), lr=???)",
+                    "acceptable": [
+                        "optim.RAdam(model.parameters(), lr=1e-3)",
+                        "optim.RAdam(model.parameters(), lr=0.001)"
+                    ],
+                    "hint": "Use optim.RAdam with lr=1e-3."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_nesterov_momentum",
+            "title": "Nesterov Momentum in PyTorch SGD",
+            "difficulty": "medium",
+            "description": "Create an SGD optimizer with lr=0.1, momentum=0.9, and Nesterov momentum enabled.",
+            "info": "Nesterov momentum (also called Nesterov Accelerated Gradient) is a variant of momentum that computes the gradient at the look-ahead position rather than the current position. Instead of computing the gradient at the current parameters and then applying momentum, Nesterov first makes a momentum step and then computes the gradient at that look-ahead point. This provides a form of correction that prevents the optimizer from going too fast and overshooting. In PyTorch, Nesterov momentum is enabled by passing nesterov=True to SGD along with a non-zero momentum value.",
+            "code": "import torch.optim as optim\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optim.SGD(model.parameters(), lr=???, momentum=???, nesterov=???)",
+                    "acceptable": [
+                        "optim.SGD(model.parameters(), lr=0.1, momentum=0.9, nesterov=True)"
+                    ],
+                    "hint": "Use optim.SGD with lr=0.1, momentum=0.9, and nesterov=True."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_steplr",
+            "title": "StepLR Scheduler",
+            "difficulty": "easy",
+            "description": "Create a StepLR scheduler that decays the learning rate by a factor of 0.1 every 30 epochs.",
+            "info": "StepLR is the simplest learning rate scheduler, reducing the learning rate by a multiplicative factor (gamma) at fixed epoch intervals (step_size). For example, with step_size=30 and gamma=0.1, the learning rate is multiplied by 0.1 every 30 epochs. This produces a staircase decay pattern. StepLR is commonly used in image classification (e.g., ResNet training on ImageNet uses step_size=30, gamma=0.1). The scheduler.step() method must be called once per epoch in the training loop.",
+            "code": "from torch.optim.lr_scheduler import StepLR\n\nscheduler = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "StepLR(optimizer, step_size=???, gamma=???)",
+                    "acceptable": [
+                        "StepLR(optimizer, step_size=30, gamma=0.1)"
+                    ],
+                    "hint": "StepLR with step_size=30 and gamma=0.1."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_cosine_annealing",
+            "title": "Cosine Annealing LR Scheduler",
+            "difficulty": "medium",
+            "description": "Create a CosineAnnealingLR scheduler with T_max=200 epochs and eta_min=0.",
+            "info": "CosineAnnealingLR reduces the learning rate following a cosine curve from the initial value to eta_min over T_max steps, then restarts. The cosine shape provides a smooth decay that spends more time at lower learning rates where fine-tuning occurs. This scheduler is very popular in modern training recipes, especially for vision transformers and contrastive learning. The smooth annealing avoids the abrupt drops of StepLR and has been shown to yield better generalization in many settings.",
+            "code": "from torch.optim.lr_scheduler import CosineAnnealingLR\n\nscheduler = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "CosineAnnealingLR(optimizer, T_max=???, eta_min=???)",
+                    "acceptable": [
+                        "CosineAnnealingLR(optimizer, T_max=200, eta_min=0)",
+                        "CosineAnnealingLR(optimizer, T_max=200)"
+                    ],
+                    "hint": "Use CosineAnnealingLR with T_max=200 and eta_min=0."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_warmup_cosine",
+            "title": "Linear Warmup with Cosine Decay",
+            "difficulty": "hard",
+            "description": "Create a learning rate scheduler with 1000 warmup steps followed by cosine decay using SequentialLR.",
+            "info": "Warmup gradually increases the learning rate from near-zero to the target value during early training, preventing large parameter updates when the model is randomly initialized. This is critical for training transformers and large models, where Adam's adaptive learning rate estimates are unreliable in the first few steps. PyTorch's SequentialLR can chain a LinearLR warmup with CosineAnnealingLR decay. The combination of warmup + cosine decay is the standard schedule for BERT, GPT, and ViT training.",
+            "code": "from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR\n\nwarmup = LinearLR(optimizer, start_factor=0.01, total_iters=1000)\ncosine = CosineAnnealingLR(optimizer, T_max=9000)\nscheduler = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "SequentialLR(optimizer, schedulers=[???, ???], milestones=[???])",
+                    "acceptable": [
+                        "SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[1000])"
+                    ],
+                    "hint": "Chain warmup and cosine schedulers with SequentialLR, switching at milestone 1000."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_cyclic_lr",
+            "title": "Cyclic Learning Rate Scheduler",
+            "difficulty": "medium",
+            "description": "Create a CyclicLR scheduler that oscillates between base_lr=1e-4 and max_lr=1e-2 with step_size_up=2000.",
+            "info": "CyclicLR varies the learning rate cyclically between a minimum (base_lr) and maximum (max_lr) value, following the insight that periodically increasing the learning rate can help escape sharp minima. The step_size_up parameter controls how many iterations it takes to go from base_lr to max_lr. Leslie Smith's cyclical learning rate policy showed that this approach eliminates the need to find the optimal learning rate, as the network will spend time near it during each cycle. CyclicLR is called per batch (not per epoch), making it different from most other schedulers.",
+            "code": "from torch.optim.lr_scheduler import CyclicLR\n\nscheduler = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "CyclicLR(optimizer, base_lr=???, max_lr=???, step_size_up=???)",
+                    "acceptable": [
+                        "CyclicLR(optimizer, base_lr=1e-4, max_lr=1e-2, step_size_up=2000)",
+                        "CyclicLR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=2000)"
+                    ],
+                    "hint": "Use CyclicLR with base_lr=1e-4, max_lr=1e-2, and step_size_up=2000."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_onecycle",
+            "title": "One-Cycle Learning Rate Policy",
+            "difficulty": "medium",
+            "description": "Create a OneCycleLR scheduler with max_lr=0.01 for 10 epochs with a dataloader of 1000 batches per epoch.",
+            "info": "OneCycleLR implements Leslie Smith's 1cycle policy, which uses a single cycle of learning rate that first warms up to max_lr then anneals down to a very small value. The total_steps parameter must account for every batch across all epochs. This policy is known for enabling super-convergence, where models train faster with higher learning rates than conventional schedules allow. OneCycleLR also anneals momentum inversely to the learning rate (high momentum when lr is low, and vice versa), which further improves training dynamics.",
+            "code": "from torch.optim.lr_scheduler import OneCycleLR\n\nscheduler = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "OneCycleLR(optimizer, max_lr=???, total_steps=???)",
+                    "acceptable": [
+                        "OneCycleLR(optimizer, max_lr=0.01, total_steps=10000)",
+                        "OneCycleLR(optimizer, max_lr=0.01, epochs=10, steps_per_epoch=1000)"
+                    ],
+                    "hint": "Use OneCycleLR with max_lr=0.01. Total steps = epochs * batches_per_epoch = 10 * 1000."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_reduce_plateau",
+            "title": "ReduceLROnPlateau Scheduler",
+            "difficulty": "medium",
+            "description": "Create a ReduceLROnPlateau scheduler that halves the LR when validation loss stops improving for 5 epochs.",
+            "info": "ReduceLROnPlateau monitors a metric (typically validation loss) and reduces the learning rate when the metric has stopped improving for a given number of epochs (patience). Unlike other schedulers, it is reactive rather than following a fixed schedule, making it robust when the optimal schedule is unknown. The factor parameter controls the reduction amount (0.5 = halve the LR), and mode='min' means improvement is a decrease in the metric. This scheduler is especially popular for fine-tuning and when training dynamics are unpredictable.",
+            "code": "from torch.optim.lr_scheduler import ReduceLROnPlateau\n\nscheduler = {{b1}}\n# In training loop: scheduler.step(val_loss)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "ReduceLROnPlateau(optimizer, mode=???, factor=???, patience=???)",
+                    "acceptable": [
+                        "ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)"
+                    ],
+                    "hint": "Use ReduceLROnPlateau with mode='min', factor=0.5, patience=5."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_gradient_accumulation",
+            "title": "Gradient Accumulation",
+            "difficulty": "medium",
+            "description": "Implement gradient accumulation over accum_steps mini-batches before performing an optimizer step.",
+            "info": "Gradient accumulation simulates a larger effective batch size by accumulating gradients across multiple mini-batches before updating parameters. This is essential when the desired batch size does not fit in GPU memory. The loss is typically divided by accum_steps to keep the gradient magnitude consistent with what a single large batch would produce. The optimizer.step() and optimizer.zero_grad() calls happen only every accum_steps iterations, while loss.backward() runs every iteration to accumulate gradients in the .grad attributes.",
+            "code": "accum_steps = 4\nfor i, (inputs, targets) in enumerate(dataloader):\n    outputs = model(inputs)\n    loss = criterion(outputs, targets)\n    loss = {{b1}}\n    loss.backward()\n    if (i + 1) % accum_steps == 0:\n        {{b2}}\n        {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "loss / ???",
+                    "acceptable": [
+                        "loss / accum_steps"
+                    ],
+                    "hint": "Normalize the loss by the number of accumulation steps."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.step()"
+                    ],
+                    "hint": "Update the parameters after accumulating gradients."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.zero_grad()"
+                    ],
+                    "hint": "Zero the gradients after the update."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_amp_scaler",
+            "title": "Mixed Precision Training with GradScaler",
+            "difficulty": "hard",
+            "description": "Complete the mixed precision training loop using torch.amp autocast and GradScaler.",
+            "info": "Mixed precision training uses float16 for forward and backward passes to speed up computation and reduce memory, while keeping the optimizer states and master weights in float32 for numerical stability. The GradScaler scales the loss before backward to prevent gradient underflow in float16, then unscales before the optimizer step. If the scaler detects infs or NaNs from overflow, it skips the optimizer step and reduces the scale factor. This technique can provide 2-3x speedup on modern GPUs with Tensor Cores while maintaining model accuracy.",
+            "code": "from torch.amp import autocast, GradScaler\n\nscaler = GradScaler()\nfor inputs, targets in dataloader:\n    optimizer.zero_grad()\n    with {{b1}}:\n        outputs = model(inputs)\n        loss = criterion(outputs, targets)\n    {{b2}}\n    scaler.step(optimizer)\n    scaler.update()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "autocast(device_type=???)",
+                    "acceptable": [
+                        "autocast(device_type='cuda')",
+                        "autocast('cuda')"
+                    ],
+                    "hint": "Use autocast(device_type='cuda') to enable mixed precision."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "scaler.???(loss)",
+                    "acceptable": [
+                        "scaler.scale(loss).backward()"
+                    ],
+                    "hint": "Scale the loss and call backward: scaler.scale(loss).backward()."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_weight_decay_vs_l2",
+            "title": "Weight Decay vs L2 Regularization",
+            "difficulty": "hard",
+            "description": "Show the difference: implement L2-regularized loss (adding penalty to loss) and decoupled weight decay (applied directly to params).",
+            "info": "L2 regularization adds the squared norm of weights to the loss function, so the gradient includes a term proportional to the weights. Decoupled weight decay instead subtracts a fraction of the weights directly during the parameter update, independent of the gradient. For SGD these are equivalent (with a factor of 2), but for adaptive optimizers like Adam, they differ because L2 regularization gets scaled by the adaptive learning rate per parameter. AdamW implements decoupled weight decay and typically generalizes better than Adam with L2, which is why it has become the standard for training transformers.",
+            "code": "# L2 regularization: add penalty to loss\nl2_loss = loss + {{b1}}\n\n# Decoupled weight decay: applied directly in update\nfor param in model.parameters():\n    param.data = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "lambda * sum(???)",
+                    "acceptable": [
+                        "lam * sum(p.pow(2).sum() for p in model.parameters())",
+                        "lam * sum(torch.sum(p ** 2) for p in model.parameters())",
+                        "lam * sum(torch.sum(p**2) for p in model.parameters())",
+                        "lam * sum((p**2).sum() for p in model.parameters())"
+                    ],
+                    "hint": "Sum the squared L2 norm of all parameters, scaled by lambda."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "param.data - lr * wd * ???",
+                    "acceptable": [
+                        "param.data - lr * wd * param.data",
+                        "param.data * (1 - lr * wd)"
+                    ],
+                    "hint": "Subtract lr * weight_decay * param.data directly from the parameter."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_param_groups",
+            "title": "Parameter Groups with Different Learning Rates",
+            "difficulty": "medium",
+            "description": "Create an Adam optimizer with different learning rates: 1e-5 for the backbone and 1e-3 for the classifier head.",
+            "info": "PyTorch optimizers accept a list of parameter group dictionaries, each with its own hyperparameters. This is essential for transfer learning, where you want a small learning rate for pretrained layers (to preserve learned features) and a larger rate for the new task-specific head. Each dict must contain a 'params' key with an iterable of parameters, plus any group-specific hyperparameters like 'lr'. Parameters not in any group will not be optimized, so be careful to include all trainable parameters.",
+            "code": "import torch.optim as optim\n\noptimizer = optim.Adam([\n    {{b1}},\n    {{b2}}\n])",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "{'params': ???, 'lr': ???}",
+                    "acceptable": [
+                        "{'params': model.backbone.parameters(), 'lr': 1e-5}",
+                        "{\"params\": model.backbone.parameters(), \"lr\": 1e-5}"
+                    ],
+                    "hint": "Dict with 'params' for backbone parameters and 'lr': 1e-5."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "{'params': ???, 'lr': ???}",
+                    "acceptable": [
+                        "{'params': model.head.parameters(), 'lr': 1e-3}",
+                        "{'params': model.classifier.parameters(), 'lr': 1e-3}",
+                        "{\"params\": model.head.parameters(), \"lr\": 1e-3}",
+                        "{\"params\": model.classifier.parameters(), \"lr\": 1e-3}"
+                    ],
+                    "hint": "Dict with 'params' for head/classifier parameters and 'lr': 1e-3."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_save_state_dict",
+            "title": "Save and Load Optimizer State Dict",
+            "difficulty": "easy",
+            "description": "Save the optimizer state dict to a file and load it back for resuming training.",
+            "info": "The optimizer state dict contains all optimizer states including per-parameter momentum buffers, adaptive learning rate accumulators, and the current step count. Saving and loading it is essential for resuming training from a checkpoint, as the optimizer state significantly affects training dynamics. Without restoring the optimizer state, momentum and adaptive rate information would be lost, potentially causing a spike in the loss. The state dict is saved alongside the model state dict, typically in the same checkpoint file.",
+            "code": "import torch\n\n# Save\ntorch.save({{b1}}, 'optimizer.pth')\n\n# Load\noptimizer.load_state_dict({{b2}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.state_dict()"
+                    ],
+                    "hint": "Use optimizer.state_dict() to get the saveable state."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(???)",
+                    "acceptable": [
+                        "torch.load('optimizer.pth')",
+                        "torch.load(\"optimizer.pth\")"
+                    ],
+                    "hint": "Use torch.load('optimizer.pth') to reload the saved state."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_grad_clipping",
+            "title": "Gradient Clipping by Norm",
+            "difficulty": "easy",
+            "description": "Clip gradients to a maximum norm of 1.0 before the optimizer step.",
+            "info": "Gradient clipping prevents exploding gradients by rescaling the gradient vector when its norm exceeds a threshold. torch.nn.utils.clip_grad_norm_ computes the total norm across all parameters and scales all gradients proportionally if it exceeds max_norm. This is essential for training RNNs and transformers, where gradient magnitudes can vary wildly across time steps. The function returns the total gradient norm before clipping, which is useful for monitoring training stability. Clipping must be called after backward() but before optimizer.step().",
+            "code": "loss.backward()\n{{b1}}\noptimizer.step()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.nn.utils.???(model.parameters(), max_norm=???)",
+                    "acceptable": [
+                        "torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)",
+                        "torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)"
+                    ],
+                    "hint": "Use torch.nn.utils.clip_grad_norm_ with max_norm=1.0."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_lbfgs",
+            "title": "L-BFGS Second-Order Optimizer",
+            "difficulty": "hard",
+            "description": "Create an L-BFGS optimizer and implement its training step with the required closure function.",
+            "info": "L-BFGS is a quasi-Newton second-order optimizer that approximates the inverse Hessian matrix using a limited history of gradient differences. Unlike first-order methods, it uses curvature information to take better-informed steps. In PyTorch, L-BFGS requires a closure function that recomputes the model output and loss, because the optimizer may evaluate the function multiple times per step. L-BFGS is most effective for small models or when full-batch gradients are available, such as in neural style transfer or physics-informed neural networks.",
+            "code": "import torch.optim as optim\n\noptimizer = optim.LBFGS(model.parameters(), lr=1)\n\ndef closure():\n    {{b1}}\n    output = model(input)\n    loss = criterion(output, target)\n    {{b2}}\n    return loss\n\noptimizer.step({{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.zero_grad()"
+                    ],
+                    "hint": "Zero gradients inside the closure."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "loss.???()",
+                    "acceptable": [
+                        "loss.backward()"
+                    ],
+                    "hint": "Backpropagate inside the closure."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "closure"
+                    ],
+                    "hint": "Pass the closure function to optimizer.step()."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_swa",
+            "title": "Stochastic Weight Averaging (SWA)",
+            "difficulty": "hard",
+            "description": "Set up Stochastic Weight Averaging using PyTorch's built-in SWA utilities.",
+            "info": "Stochastic Weight Averaging (SWA) averages model weights traversed during training with a modified learning rate schedule, producing a solution that tends to lie in a flatter region of the loss landscape. SWA improves generalization with virtually no computational overhead. In PyTorch, torch.optim.swa_utils provides AveragedModel which maintains a running average of model parameters. After SWA training is complete, you must call torch.optim.swa_utils.update_bn to recompute batch normalization statistics for the averaged model.",
+            "code": "from torch.optim.swa_utils import AveragedModel, SWALR\n\nswa_model = {{b1}}\nswa_scheduler = SWALR(optimizer, swa_lr=0.05)\n\n# After SWA training:\n{{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "AveragedModel(???)",
+                    "acceptable": [
+                        "AveragedModel(model)"
+                    ],
+                    "hint": "Wrap the model with AveragedModel."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.optim.swa_utils.update_bn(???, ???)",
+                    "acceptable": [
+                        "torch.optim.swa_utils.update_bn(dataloader, swa_model)",
+                        "torch.optim.swa_utils.update_bn(train_loader, swa_model)"
+                    ],
+                    "hint": "Call update_bn with the dataloader and the SWA model."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_ema",
+            "title": "Exponential Moving Average of Model Weights",
+            "difficulty": "medium",
+            "description": "Implement an EMA update for model weights with decay=0.999.",
+            "info": "Exponential Moving Average (EMA) maintains a shadow copy of model parameters that is a smoothed version of the training weights. After each training step, each EMA parameter is updated as ema_param = decay * ema_param + (1 - decay) * param. EMA typically uses high decay values (0.999 or 0.9999) to produce stable, slowly evolving weights. At inference time, the EMA weights often perform better than the raw training weights because they average out the noise from stochastic optimization. EMA is standard practice in GANs, diffusion models, and self-supervised learning.",
+            "code": "decay = 0.999\nwith torch.no_grad():\n    for ema_param, param in zip(ema_model.parameters(), model.parameters()):\n        ema_param.data = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "decay * ??? + (1 - decay) * ???",
+                    "acceptable": [
+                        "decay * ema_param.data + (1 - decay) * param.data"
+                    ],
+                    "hint": "EMA update: decay * ema_param + (1 - decay) * current_param."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_lamb",
+            "title": "LAMB Optimizer Concept",
+            "difficulty": "hard",
+            "description": "Implement the LAMB trust ratio computation that scales the Adam update per layer.",
+            "info": "LAMB (Layer-wise Adaptive Moments optimizer for Batch training) extends Adam by introducing a per-layer trust ratio that normalizes the update by the ratio of the parameter norm to the update norm. This layer-wise scaling allows LAMB to train with extremely large batch sizes (up to 64K for BERT) without divergence. The trust ratio r = ||param|| / ||adam_update|| ensures that the relative change in each layer's weights is bounded regardless of the layer's magnitude. LAMB was critical in reducing BERT pretraining time from 3 days to 76 minutes.",
+            "code": "# Given: param_norm = torch.norm(param), update_norm = torch.norm(adam_update)\n# Compute LAMB trust ratio\ntrust_ratio = {{b1}}\nparam = param - lr * trust_ratio * adam_update",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? / ???",
+                    "acceptable": [
+                        "param_norm / update_norm"
+                    ],
+                    "hint": "Trust ratio = norm of parameters / norm of the Adam update."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_lars",
+            "title": "LARS Layer-wise Learning Rate Scaling",
+            "difficulty": "hard",
+            "description": "Compute the LARS local learning rate for a layer given its parameter norm, gradient norm, and a trust coefficient eta.",
+            "info": "LARS (Layer-wise Adaptive Rate Scaling) adjusts the learning rate for each layer based on the ratio of the parameter norm to the gradient norm, multiplied by a trust coefficient eta. This per-layer scaling prevents layers with large gradients from dominating the update and enables training with very large batch sizes (up to 32K for ResNet). LARS was a precursor to LAMB, using SGD with momentum as the base optimizer rather than Adam. The local learning rate formula is local_lr = eta * ||w|| / ||grad||, and the final update uses lr * local_lr * grad.",
+            "code": "# Compute LARS local learning rate for one layer\nlocal_lr = {{b1}}\nupdate = lr * local_lr * (grad + weight_decay * param)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "eta * ??? / ???",
+                    "acceptable": [
+                        "eta * param_norm / grad_norm",
+                        "eta * torch.norm(param) / torch.norm(grad)"
+                    ],
+                    "hint": "local_lr = eta * ||param|| / ||grad||."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_grad_scaling_amp",
+            "title": "Manual Gradient Unscaling for AMP",
+            "difficulty": "hard",
+            "description": "Manually unscale gradients from the GradScaler before gradient clipping in mixed precision training.",
+            "info": "When using GradScaler for mixed precision training, gradients are scaled by a large factor to prevent underflow in float16. Before performing operations that depend on gradient magnitudes (such as gradient clipping), you must unscale the gradients back to their true values. The scaler.unscale_(optimizer) method divides all gradients by the current scale factor in-place. If any gradient contains inf or NaN (from overflow), the scaler will skip the optimizer step when scaler.step(optimizer) is called. This unscale-clip-step pattern is the recommended approach for combining AMP with gradient clipping.",
+            "code": "scaler.scale(loss).backward()\n{{b1}}\ntorch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)\n{{b2}}\nscaler.update()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "scaler.???(optimizer)",
+                    "acceptable": [
+                        "scaler.unscale_(optimizer)"
+                    ],
+                    "hint": "Call scaler.unscale_(optimizer) to restore true gradient magnitudes."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "scaler.???(optimizer)",
+                    "acceptable": [
+                        "scaler.step(optimizer)"
+                    ],
+                    "hint": "Use scaler.step(optimizer) instead of optimizer.step()."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_zero_grad_set_none",
+            "title": "Efficient Gradient Zeroing with set_to_none",
+            "difficulty": "easy",
+            "description": "Zero out gradients using the more memory-efficient set_to_none option.",
+            "info": "By default, optimizer.zero_grad() fills gradient tensors with zeros, which requires a memory write to every gradient element. Setting set_to_none=True instead sets each parameter's .grad attribute to None, which is faster and reduces memory usage because no zero tensor is allocated. The gradients are then lazily re-created during the next backward pass. This optimization is recommended by PyTorch and became the default in PyTorch 2.0. The only caveat is that user code must handle the case where .grad might be None instead of a zero tensor.",
+            "code": "# More efficient way to zero gradients\n{{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optimizer.zero_grad(set_to_none=???)",
+                    "acceptable": [
+                        "optimizer.zero_grad(set_to_none=True)"
+                    ],
+                    "hint": "Pass set_to_none=True to zero_grad for better performance."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_exclude_wd",
+            "title": "Exclude Bias and LayerNorm from Weight Decay",
+            "difficulty": "hard",
+            "description": "Create parameter groups that apply weight decay only to weight matrices, not biases or LayerNorm parameters.",
+            "info": "Applying weight decay to bias terms and normalization layer parameters is generally harmful because these parameters have different roles than weight matrices. Bias terms shift activations and should not be penalized toward zero, and LayerNorm parameters control feature scaling/shifting. The standard practice in transformer training is to separate parameters into two groups: those that receive weight decay (typically 2D+ weight tensors) and those that do not (biases, LayerNorm weights, and embeddings). This pattern is used in virtually all modern LLM and ViT training recipes.",
+            "code": "decay_params = [p for n, p in model.named_parameters() if p.dim() >= 2]\nno_decay_params = [p for n, p in model.named_parameters() if {{b1}}]\n\noptimizer = torch.optim.AdamW([\n    {'params': decay_params, 'weight_decay': 0.01},\n    {'params': no_decay_params, {{b2}}}\n], lr=1e-4)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "p.dim() ???",
+                    "acceptable": [
+                        "p.dim() < 2"
+                    ],
+                    "hint": "Select parameters with fewer than 2 dimensions (biases, norms)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "'weight_decay': ???",
+                    "acceptable": [
+                        "'weight_decay': 0.0",
+                        "'weight_decay': 0"
+                    ],
+                    "hint": "Set weight_decay to 0 for bias/norm parameters."
+                }
+            ]
+        },
+        {
+            "id": "opt_new_scheduler_step_placement",
+            "title": "Correct Scheduler Step Placement",
+            "difficulty": "medium",
+            "description": "Place the scheduler.step() call correctly in a training loop that steps the scheduler per epoch.",
+            "info": "In PyTorch, the learning rate scheduler should be stepped after the optimizer step, typically at the end of each epoch for epoch-level schedulers. A common bug is placing scheduler.step() before optimizer.step(), which causes the first epoch to use the second epoch's learning rate. Since PyTorch 1.1, calling scheduler.step() before optimizer.step() triggers a warning. For batch-level schedulers like OneCycleLR or CyclicLR, the scheduler is stepped after every optimizer step inside the batch loop instead.",
+            "code": "for epoch in range(num_epochs):\n    for inputs, targets in dataloader:\n        optimizer.zero_grad()\n        loss = criterion(model(inputs), targets)\n        loss.backward()\n        {{b1}}\n    {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.step()"
+                    ],
+                    "hint": "Step the optimizer inside the batch loop."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "scheduler.???()",
+                    "acceptable": [
+                        "scheduler.step()"
+                    ],
+                    "hint": "Step the scheduler once per epoch, after all optimizer steps."
+                }
+            ]
         }
     ]
 }

@@ -53,6 +53,911 @@
                     "hint": "Use the hidden state from the last layer: h_n[-1]."
                 }
             ]
+        },
+        {
+            "id": "rnn_new_gru_cell_scratch",
+            "title": "GRU Cell from Scratch",
+            "difficulty": "hard",
+            "description": "Implement a single GRU cell step from scratch using NumPy. Compute the update gate z_t, reset gate r_t, candidate hidden state h_tilde, and final hidden state h_t.",
+            "info": "The Gated Recurrent Unit (GRU) simplifies the LSTM by combining the forget and input gates into a single update gate z_t, and merging the cell state with the hidden state. The reset gate r_t controls how much of the previous hidden state to forget when computing the candidate. The update gate z_t interpolates between the previous hidden state and the candidate via h_t = (1 - z_t) * h_prev + z_t * h_tilde. GRUs have fewer parameters than LSTMs and often achieve comparable performance, making them a popular alternative for many sequence modeling tasks.",
+            "code": "import numpy as np\n\ndef sigmoid(x):\n    return 1 / (1 + np.exp(-x))\n\ndef gru_cell(x_t, h_prev, W_z, U_z, b_z, W_r, U_r, b_r, W_h, U_h, b_h):\n    # Update gate\n    z_t = {{b1}}\n    # Reset gate\n    r_t = {{b2}}\n    # Candidate hidden state\n    h_tilde = {{b3}}\n    # Final hidden state\n    h_t = {{b4}}\n    return h_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "sigmoid(??? @ x_t + ??? @ h_prev + b_z)",
+                    "acceptable": [
+                        "sigmoid(W_z @ x_t + U_z @ h_prev + b_z)"
+                    ],
+                    "hint": "z_t = sigma(W_z @ x_t + U_z @ h_prev + b_z)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "sigmoid(??? @ x_t + ??? @ h_prev + b_r)",
+                    "acceptable": [
+                        "sigmoid(W_r @ x_t + U_r @ h_prev + b_r)"
+                    ],
+                    "hint": "r_t = sigma(W_r @ x_t + U_r @ h_prev + b_r)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.tanh(??? @ x_t + ??? @ (r_t * h_prev) + b_h)",
+                    "acceptable": [
+                        "np.tanh(W_h @ x_t + U_h @ (r_t * h_prev) + b_h)"
+                    ],
+                    "hint": "h_tilde = tanh(W_h @ x_t + U_h @ (r_t * h_prev) + b_h). The reset gate masks the previous hidden state."
+                },
+                {
+                    "id": "b4",
+                    "placeholder": "(1 - ???) * h_prev + ??? * h_tilde",
+                    "acceptable": [
+                        "(1 - z_t) * h_prev + z_t * h_tilde"
+                    ],
+                    "hint": "h_t = (1 - z_t) * h_prev + z_t * h_tilde. The update gate interpolates."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_lstm_cell_scratch",
+            "title": "LSTM Cell from Scratch",
+            "difficulty": "hard",
+            "description": "Implement a single LSTM cell step from scratch using NumPy. Compute the forget gate f_t, input gate i_t, cell candidate g_t, output gate o_t, cell state c_t, and hidden state h_t.",
+            "info": "The LSTM cell uses three gates to regulate information flow through a dedicated cell state. The forget gate f_t decides what to discard from the previous cell state, the input gate i_t decides which new information to store, and the output gate o_t decides what part of the cell state to expose as the hidden state. The cell state c_t = f_t * c_prev + i_t * g_t acts as a gradient highway that mitigates vanishing gradients. This explicit gating mechanism allows LSTMs to learn long-range dependencies over hundreds of time steps, which vanilla RNNs cannot achieve.",
+            "code": "import numpy as np\n\ndef sigmoid(x):\n    return 1 / (1 + np.exp(-x))\n\ndef lstm_cell(x_t, h_prev, c_prev, W_f, U_f, b_f, W_i, U_i, b_i, W_g, U_g, b_g, W_o, U_o, b_o):\n    f_t = {{b1}}\n    i_t = sigmoid(W_i @ x_t + U_i @ h_prev + b_i)\n    g_t = np.tanh(W_g @ x_t + U_g @ h_prev + b_g)\n    o_t = sigmoid(W_o @ x_t + U_o @ h_prev + b_o)\n    c_t = {{b2}}\n    h_t = {{b3}}\n    return h_t, c_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "sigmoid(??? @ x_t + ??? @ h_prev + b_f)",
+                    "acceptable": [
+                        "sigmoid(W_f @ x_t + U_f @ h_prev + b_f)"
+                    ],
+                    "hint": "f_t = sigma(W_f @ x_t + U_f @ h_prev + b_f). The forget gate."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? * c_prev + ??? * g_t",
+                    "acceptable": [
+                        "f_t * c_prev + i_t * g_t"
+                    ],
+                    "hint": "c_t = f_t * c_prev + i_t * g_t. Forget old, add new."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? * np.tanh(c_t)",
+                    "acceptable": [
+                        "o_t * np.tanh(c_t)"
+                    ],
+                    "hint": "h_t = o_t * tanh(c_t). The output gate controls exposure."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_bidirectional",
+            "title": "Bidirectional LSTM in PyTorch",
+            "difficulty": "medium",
+            "description": "Define a bidirectional LSTM model for sequence classification. Input size=50, hidden size=128, 1 layer, bidirectional, output=5 classes. The forward pass should concatenate the final hidden states from both directions.",
+            "info": "Bidirectional RNNs process sequences in both forward and backward directions, allowing each time step to have context from the entire sequence rather than only past tokens. In PyTorch, setting bidirectional=True doubles the output feature size to 2*hidden_size because the forward and backward outputs are concatenated. The final hidden state h_n has shape (num_layers*2, batch, hidden_size), where h_n[-2] is the last forward state and h_n[-1] is the last backward state. Concatenating these two states produces a rich representation for classification that captures patterns from both ends of the sequence.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass BiLSTMClassifier(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.lstm = {{b1}}\n        self.fc = {{b2}}\n\n    def forward(self, x):\n        # x: (batch, seq_len, 50)\n        output, (h_n, c_n) = self.lstm(x)\n        # Concatenate final forward and backward hidden states\n        h_cat = {{b3}}\n        return self.fc(h_cat)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.LSTM(?, ?, num_layers=?, batch_first=True, bidirectional=?)",
+                    "acceptable": [
+                        "nn.LSTM(50, 128, num_layers=1, batch_first=True, bidirectional=True)"
+                    ],
+                    "hint": "nn.LSTM(input_size=50, hidden_size=128, num_layers=1, batch_first=True, bidirectional=True)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(256, 5)",
+                        "nn.Linear(128 * 2, 5)"
+                    ],
+                    "hint": "Bidirectional doubles hidden size: nn.Linear(256, 5)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.cat([h_n[?], h_n[?]], dim=?)",
+                    "acceptable": [
+                        "torch.cat([h_n[-2], h_n[-1]], dim=1)",
+                        "torch.cat((h_n[-2], h_n[-1]), dim=1)"
+                    ],
+                    "hint": "Concatenate h_n[-2] (forward) and h_n[-1] (backward) along dim=1."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_stacked_rnn",
+            "title": "Stacked Multi-Layer GRU",
+            "difficulty": "medium",
+            "description": "Build a stacked 3-layer GRU with dropout between layers. Input size=64, hidden size=128, dropout=0.3, output=10 classes.",
+            "info": "Stacking multiple RNN layers creates a deep recurrent network where each layer processes the hidden-state sequence produced by the layer below it. This hierarchical structure allows lower layers to capture local patterns while higher layers learn more abstract temporal features. In PyTorch, the dropout argument applies dropout between RNN layers (but not after the last layer), regularizing intermediate representations. Deeper RNNs generally improve performance on complex tasks, but they also increase the risk of overfitting and require careful regularization.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass StackedGRU(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.gru = {{b1}}\n        self.fc = nn.Linear(128, 10)\n\n    def forward(self, x):\n        # x: (batch, seq_len, 64)\n        output, h_n = {{b2}}\n        return self.fc(h_n[-1])",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.GRU(?, ?, num_layers=?, dropout=?, batch_first=True)",
+                    "acceptable": [
+                        "nn.GRU(64, 128, num_layers=3, dropout=0.3, batch_first=True)"
+                    ],
+                    "hint": "nn.GRU(64, 128, num_layers=3, dropout=0.3, batch_first=True)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.gru(???)",
+                    "acceptable": [
+                        "self.gru(x)"
+                    ],
+                    "hint": "Simply pass x through the GRU: self.gru(x)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_embedding_layer",
+            "title": "Embedding Layer for Text",
+            "difficulty": "easy",
+            "description": "Create an nn.Embedding layer to map a vocabulary of 10000 words to 300-dimensional dense vectors, with a padding index of 0.",
+            "info": "An embedding layer is a lookup table that maps discrete token indices to dense continuous vectors. Unlike one-hot encoding, embeddings are low-dimensional and learned during training, capturing semantic relationships between words. The padding_idx argument tells PyTorch to keep the embedding at that index as a zero vector and exclude it from gradient updates, which is essential for handling variable-length sequences padded to a uniform length. Pre-trained embeddings like GloVe or Word2Vec can be loaded into this layer to transfer linguistic knowledge.",
+            "code": "import torch.nn as nn\n\nvocab_size = 10000\nembed_dim = 300\npad_idx = 0\n\nembedding = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Embedding(?, ?, padding_idx=?)",
+                    "acceptable": [
+                        "nn.Embedding(10000, 300, padding_idx=0)",
+                        "nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)",
+                        "nn.Embedding(vocab_size, embed_dim, padding_idx=0)",
+                        "nn.Embedding(10000, 300, padding_idx=pad_idx)"
+                    ],
+                    "hint": "nn.Embedding(num_embeddings, embedding_dim, padding_idx=0)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_packed_sequences",
+            "title": "Packing Variable-Length Sequences",
+            "difficulty": "hard",
+            "description": "Use pack_padded_sequence and pad_packed_sequence to efficiently process a batch of variable-length sequences through an LSTM. Sequences are already sorted by length in descending order.",
+            "info": "When batching sequences of different lengths, shorter sequences must be padded to match the longest. However, the RNN should not waste computation on padding tokens. pack_padded_sequence compresses the padded tensor by removing padding and storing length metadata, so the RNN only processes real tokens. After the RNN, pad_packed_sequence restores the output to a padded tensor. The enforce_sorted=True default requires sequences to be sorted by descending length, which allows the packing operation to be more efficient.",
+            "code": "import torch\nimport torch.nn as nn\nfrom torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence\n\nlstm = nn.LSTM(50, 128, batch_first=True)\n\n# x_padded: (batch, max_seq_len, 50), lengths: list of actual lengths\ndef forward_packed(x_padded, lengths):\n    packed = {{b1}}\n    packed_out, (h_n, c_n) = lstm(packed)\n    output, out_lengths = {{b2}}\n    return output, h_n",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "pack_padded_sequence(x_padded, lengths, ???)",
+                    "acceptable": [
+                        "pack_padded_sequence(x_padded, lengths, batch_first=True)",
+                        "pack_padded_sequence(x_padded, lengths, batch_first=True, enforce_sorted=True)"
+                    ],
+                    "hint": "pack_padded_sequence(x_padded, lengths, batch_first=True)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "pad_packed_sequence(packed_out, ???)",
+                    "acceptable": [
+                        "pad_packed_sequence(packed_out, batch_first=True)"
+                    ],
+                    "hint": "pad_packed_sequence(packed_out, batch_first=True) to restore the padded tensor."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_seq2seq_encoder",
+            "title": "Seq2Seq Encoder",
+            "difficulty": "medium",
+            "description": "Implement the encoder of a sequence-to-sequence model. The encoder uses an embedding layer (vocab=5000, dim=256) and a 2-layer GRU (hidden=512). It should return all hidden states and the final hidden state.",
+            "info": "The encoder in a sequence-to-sequence architecture reads the entire input sequence and compresses it into a fixed-size context representation. Each input token is first mapped to a dense embedding and then processed by the recurrent layers. The final hidden state acts as the initial context for the decoder, summarizing the input meaning. Returning all encoder outputs (not just the final state) is important for attention mechanisms, which allow the decoder to focus on different parts of the input at each decoding step.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass Encoder(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.embedding = {{b1}}\n        self.gru = {{b2}}\n\n    def forward(self, src):\n        # src: (batch, src_len) token indices\n        embedded = self.embedding(src)\n        outputs, hidden = self.gru(embedded)\n        return outputs, hidden",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Embedding(?, ?)",
+                    "acceptable": [
+                        "nn.Embedding(5000, 256)"
+                    ],
+                    "hint": "nn.Embedding(5000, 256) maps vocab indices to dense vectors."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.GRU(?, ?, num_layers=?, batch_first=True)",
+                    "acceptable": [
+                        "nn.GRU(256, 512, num_layers=2, batch_first=True)"
+                    ],
+                    "hint": "nn.GRU(embed_dim=256, hidden=512, num_layers=2, batch_first=True)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_seq2seq_decoder",
+            "title": "Seq2Seq Decoder",
+            "difficulty": "medium",
+            "description": "Implement the decoder of a sequence-to-sequence model. The decoder uses an embedding (vocab=5000, dim=256), a 2-layer GRU (hidden=512), and a linear projection to vocab size. It processes one token at a time.",
+            "info": "The decoder generates the output sequence one token at a time, using the encoder's final hidden state as its initial hidden state. At each step, it embeds the previous output token, passes it through the GRU along with the current hidden state, and projects the output to a distribution over the vocabulary. During training, the previous token is often the ground truth (teacher forcing), while during inference it is the model's own prediction. This autoregressive nature means errors can compound during inference, which is why techniques like beam search are used.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass Decoder(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.embedding = nn.Embedding(5000, 256)\n        self.gru = nn.GRU(256, 512, num_layers=2, batch_first=True)\n        self.fc_out = {{b1}}\n\n    def forward(self, input_token, hidden):\n        # input_token: (batch, 1)\n        embedded = self.embedding(input_token)\n        output, hidden = {{b2}}\n        prediction = self.fc_out(output.squeeze(1))\n        return prediction, hidden",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(512, 5000)"
+                    ],
+                    "hint": "Project from hidden_size=512 to vocab_size=5000."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.gru(embedded, ???)",
+                    "acceptable": [
+                        "self.gru(embedded, hidden)"
+                    ],
+                    "hint": "Pass both the embedded input and the previous hidden state to the GRU."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_teacher_forcing",
+            "title": "Teacher Forcing Training Loop",
+            "difficulty": "medium",
+            "description": "Implement a training step for a seq2seq model that uses teacher forcing with a given ratio. With probability teacher_forcing_ratio, feed the ground-truth token; otherwise feed the model's own prediction.",
+            "info": "Teacher forcing accelerates training by feeding the ground-truth previous token to the decoder instead of its own prediction, preventing error accumulation during training. However, using teacher forcing 100% of the time creates a train-test mismatch because the model never learns to recover from its own mistakes. A common strategy is to use a teacher forcing ratio (e.g., 0.5) that randomly decides at each step whether to use the ground truth or the model's prediction. This scheduled sampling approach helps the model become more robust at inference time.",
+            "code": "import torch\nimport random\n\ndef train_step(encoder, decoder, src, trg, teacher_forcing_ratio=0.5):\n    # trg: (batch, trg_len)\n    batch_size, trg_len = trg.shape\n    outputs = []\n    enc_out, hidden = encoder(src)\n    input_token = trg[:, 0].unsqueeze(1)  # <sos>\n\n    for t in range(1, trg_len):\n        prediction, hidden = decoder(input_token, hidden)\n        outputs.append(prediction)\n        if {{b1}}:\n            input_token = {{b2}}\n        else:\n            input_token = {{b3}}\n    return torch.stack(outputs, dim=1)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "random.random() < ???",
+                    "acceptable": [
+                        "random.random() < teacher_forcing_ratio"
+                    ],
+                    "hint": "Use teacher forcing if random.random() < teacher_forcing_ratio."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "trg[:, ???].unsqueeze(1)",
+                    "acceptable": [
+                        "trg[:, t].unsqueeze(1)"
+                    ],
+                    "hint": "Feed ground-truth token at position t: trg[:, t].unsqueeze(1)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "prediction.argmax(???).unsqueeze(1)",
+                    "acceptable": [
+                        "prediction.argmax(1).unsqueeze(1)",
+                        "prediction.argmax(-1).unsqueeze(1)",
+                        "prediction.argmax(dim=1).unsqueeze(1)",
+                        "prediction.argmax(dim=-1).unsqueeze(1)"
+                    ],
+                    "hint": "Feed the model's own prediction: prediction.argmax(1).unsqueeze(1)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_beam_search",
+            "title": "Beam Search Decoding",
+            "difficulty": "hard",
+            "description": "Implement greedy decoding vs beam search initialization for a seq2seq decoder. In greedy decoding, select the token with the highest probability at each step. Set up beam search by keeping the top-k candidates.",
+            "info": "Greedy decoding selects the single most likely token at each step, which is fast but can miss globally optimal sequences because a locally suboptimal choice may lead to a better overall sequence. Beam search maintains k (beam width) candidate sequences at each step, expanding each by all possible next tokens and keeping only the top-k scoring partial sequences. This explores a broader search space and typically produces higher-quality outputs than greedy decoding. The trade-off is increased computation proportional to the beam width, and beam search can still miss the global optimum if the beam is too narrow.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef greedy_decode(decoder, hidden, sos_idx, max_len):\n    input_token = torch.tensor([[sos_idx]])\n    outputs = []\n    for _ in range(max_len):\n        logits, hidden = decoder(input_token, hidden)\n        next_token = {{b1}}\n        outputs.append(next_token.item())\n        input_token = next_token.unsqueeze(0)\n    return outputs\n\ndef beam_search_init(decoder, hidden, sos_idx, beam_width):\n    input_token = torch.tensor([[sos_idx]])\n    logits, hidden = decoder(input_token, hidden)\n    log_probs = {{b2}}\n    topk_log_probs, topk_indices = {{b3}}\n    return topk_log_probs, topk_indices, hidden",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "logits.argmax(???)",
+                    "acceptable": [
+                        "logits.argmax(dim=-1)",
+                        "logits.argmax(-1)",
+                        "logits.argmax(dim=1)",
+                        "logits.argmax(1)"
+                    ],
+                    "hint": "Select the most likely token: logits.argmax(dim=-1)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.log_softmax(logits, dim=???)",
+                    "acceptable": [
+                        "F.log_softmax(logits, dim=-1)",
+                        "F.log_softmax(logits, dim=1)"
+                    ],
+                    "hint": "Compute log probabilities: F.log_softmax(logits, dim=-1)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.topk(log_probs, ???, dim=-1)",
+                    "acceptable": [
+                        "torch.topk(log_probs, beam_width, dim=-1)",
+                        "log_probs.topk(beam_width, dim=-1)"
+                    ],
+                    "hint": "Get top-k candidates: torch.topk(log_probs, beam_width, dim=-1)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_attention_mechanism",
+            "title": "Additive (Bahdanau) Attention for Seq2Seq",
+            "difficulty": "hard",
+            "description": "Implement additive (Bahdanau) attention. Given encoder outputs and decoder hidden state, compute attention weights and context vector.",
+            "info": "Bahdanau attention computes alignment scores between the decoder hidden state and each encoder output using a learned additive function: score = V * tanh(W1 @ encoder_output + W2 @ decoder_hidden). These scores are normalized via softmax to produce attention weights that form a probability distribution over source positions. The context vector is the weighted sum of encoder outputs, allowing the decoder to focus on relevant parts of the input at each generation step. This mechanism was a breakthrough that dramatically improved seq2seq translation quality by removing the information bottleneck of fixed-size encoder vectors.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass BahdanauAttention(nn.Module):\n    def __init__(self, hidden_size):\n        super().__init__()\n        self.W1 = nn.Linear(hidden_size, hidden_size)\n        self.W2 = nn.Linear(hidden_size, hidden_size)\n        self.V = nn.Linear(hidden_size, 1)\n\n    def forward(self, decoder_hidden, encoder_outputs):\n        # decoder_hidden: (batch, hidden)\n        # encoder_outputs: (batch, src_len, hidden)\n        decoder_hidden = decoder_hidden.unsqueeze(1)  # (batch, 1, hidden)\n        scores = {{b1}}\n        attn_weights = {{b2}}\n        context = {{b3}}\n        return context, attn_weights",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.V(torch.tanh(self.W1(???) + self.W2(???))).squeeze(-1)",
+                    "acceptable": [
+                        "self.V(torch.tanh(self.W1(encoder_outputs) + self.W2(decoder_hidden))).squeeze(-1)"
+                    ],
+                    "hint": "scores = V(tanh(W1(encoder_outputs) + W2(decoder_hidden))).squeeze(-1)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.softmax(scores, dim=???)",
+                    "acceptable": [
+                        "F.softmax(scores, dim=-1)",
+                        "F.softmax(scores, dim=1)"
+                    ],
+                    "hint": "Normalize scores over source positions: F.softmax(scores, dim=-1)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.bmm(attn_weights.unsqueeze(1), ???).squeeze(1)",
+                    "acceptable": [
+                        "torch.bmm(attn_weights.unsqueeze(1), encoder_outputs).squeeze(1)"
+                    ],
+                    "hint": "Weighted sum: torch.bmm(attn_weights.unsqueeze(1), encoder_outputs).squeeze(1)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_masking_attention",
+            "title": "Masking Padded Positions in Attention",
+            "difficulty": "medium",
+            "description": "Apply a mask to attention scores before softmax so that padded positions receive zero attention weight. The mask is True where tokens are real and False where they are padding.",
+            "info": "When sequences in a batch have different lengths and are padded to a common length, attention scores for padding positions must be suppressed so the model does not attend to meaningless padding tokens. The standard approach is to set the attention scores at padded positions to negative infinity before applying softmax, which drives the corresponding attention weights to zero. This masking is crucial for correctness because without it, the context vector would be contaminated by padding representations. The mask tensor is typically a boolean with True at valid positions and False at padding positions.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef masked_attention(scores, mask):\n    # scores: (batch, seq_len), mask: (batch, seq_len) True=valid, False=pad\n    scores = {{b1}}\n    attn_weights = {{b2}}\n    return attn_weights",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "scores.masked_fill(~mask, ???)",
+                    "acceptable": [
+                        "scores.masked_fill(~mask, float('-inf'))",
+                        "scores.masked_fill(mask == False, float('-inf'))",
+                        "scores.masked_fill(~mask, -float('inf'))"
+                    ],
+                    "hint": "Set padding positions to -inf: scores.masked_fill(~mask, float('-inf'))."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.softmax(scores, dim=???)",
+                    "acceptable": [
+                        "F.softmax(scores, dim=-1)",
+                        "F.softmax(scores, dim=1)"
+                    ],
+                    "hint": "Apply softmax over the sequence dimension: F.softmax(scores, dim=-1)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_truncated_bptt",
+            "title": "Truncated Backpropagation Through Time",
+            "difficulty": "medium",
+            "description": "Implement truncated BPTT by splitting a long sequence into chunks and detaching the hidden state between chunks to prevent gradients from flowing beyond one chunk.",
+            "info": "Standard BPTT for very long sequences is memory-intensive because gradients must be stored for every time step. Truncated BPTT addresses this by splitting the sequence into fixed-length chunks and only backpropagating through each chunk independently. The hidden state is passed between chunks to maintain temporal continuity, but it is detached from the computation graph so gradients do not flow across chunk boundaries. This trades off some gradient accuracy for dramatically reduced memory usage and is the standard approach for training language models on long documents.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef train_truncated_bptt(model, data, chunk_size, optimizer, criterion):\n    # data: (batch, total_seq_len, features)\n    hidden = None\n    total_loss = 0\n    for i in range(0, data.size(1) - 1, chunk_size):\n        chunk_input = data[:, i:i+chunk_size, :]\n        chunk_target = data[:, i+1:i+chunk_size+1, :]\n        if hidden is not None:\n            hidden = {{b1}}\n        output, hidden = model(chunk_input, hidden)\n        loss = criterion(output, chunk_target)\n        optimizer.zero_grad()\n        {{b2}}\n        optimizer.step()\n        total_loss += loss.item()\n    return total_loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "hidden.???()",
+                    "acceptable": [
+                        "hidden.detach()",
+                        "tuple(h.detach() for h in hidden)"
+                    ],
+                    "hint": "Detach hidden state from the computation graph: hidden.detach()."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "loss.???()",
+                    "acceptable": [
+                        "loss.backward()"
+                    ],
+                    "hint": "Backpropagate through the chunk: loss.backward()."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_hidden_init",
+            "title": "Learned Hidden State Initialization",
+            "difficulty": "easy",
+            "description": "Initialize the hidden state of an LSTM as a learnable parameter instead of zeros. The LSTM has hidden_size=256 and num_layers=2.",
+            "info": "By default, PyTorch initializes RNN hidden states to zeros, but making the initial hidden state a learnable parameter can improve performance by giving the model a better starting point. The h_0 and c_0 parameters are registered as nn.Parameter so they are updated during training. They are expanded at runtime to match the batch size by repeating along the batch dimension. This technique is particularly helpful for short sequences where the initial hidden state has a proportionally larger influence on the output.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass LSTMWithLearnedInit(nn.Module):\n    def __init__(self, input_size, hidden_size=256, num_layers=2):\n        super().__init__()\n        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)\n        self.h_0 = {{b1}}\n        self.c_0 = nn.Parameter(torch.zeros(num_layers, 1, hidden_size))\n\n    def forward(self, x):\n        batch_size = x.size(0)\n        h_0 = {{b2}}\n        c_0 = self.c_0.expand(-1, batch_size, -1).contiguous()\n        output, (h_n, c_n) = self.lstm(x, (h_0, c_0))\n        return output, (h_n, c_n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Parameter(torch.zeros(?, ?, ?))",
+                    "acceptable": [
+                        "nn.Parameter(torch.zeros(num_layers, 1, hidden_size))",
+                        "nn.Parameter(torch.zeros(2, 1, 256))"
+                    ],
+                    "hint": "Shape is (num_layers, 1, hidden_size) so it can be expanded to batch size."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.h_0.expand(?, batch_size, ?).contiguous()",
+                    "acceptable": [
+                        "self.h_0.expand(-1, batch_size, -1).contiguous()"
+                    ],
+                    "hint": "Expand along the batch dim: self.h_0.expand(-1, batch_size, -1).contiguous()."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_sequence_labeling",
+            "title": "Sequence Labeling (POS Tagging)",
+            "difficulty": "medium",
+            "description": "Build a model for sequence labeling (e.g., POS tagging) using a bidirectional LSTM. The model should produce a tag prediction for every token in the sequence. Vocab=8000, embed_dim=128, hidden=64, num_tags=45.",
+            "info": "Sequence labeling assigns a label to every token in a sequence, making it fundamentally different from sequence classification which produces a single label for the entire sequence. The model must output a prediction at each time step, so the full output tensor (not just the final hidden state) is passed through the linear layer. A bidirectional LSTM is preferred because the correct tag for a word often depends on both preceding and following context. The output dimension is 2*hidden_size due to bidirectionality, which is projected to the number of tags.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass POSTagger(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.embedding = nn.Embedding(8000, 128)\n        self.lstm = {{b1}}\n        self.fc = {{b2}}\n\n    def forward(self, x):\n        # x: (batch, seq_len) token indices\n        embedded = self.embedding(x)\n        lstm_out, _ = self.lstm(embedded)\n        # Predict a tag for every position\n        tags = {{b3}}\n        return tags",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.LSTM(128, 64, batch_first=True, bidirectional=???)",
+                    "acceptable": [
+                        "nn.LSTM(128, 64, batch_first=True, bidirectional=True)"
+                    ],
+                    "hint": "Bidirectional LSTM: nn.LSTM(128, 64, batch_first=True, bidirectional=True)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(?, 45)",
+                    "acceptable": [
+                        "nn.Linear(128, 45)",
+                        "nn.Linear(64 * 2, 45)"
+                    ],
+                    "hint": "Bidirectional doubles hidden: nn.Linear(128, 45)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.fc(???)",
+                    "acceptable": [
+                        "self.fc(lstm_out)"
+                    ],
+                    "hint": "Apply fc to all time steps: self.fc(lstm_out). Shape: (batch, seq_len, num_tags)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_language_model",
+            "title": "Character-Level Language Model",
+            "difficulty": "medium",
+            "description": "Build a character-level language model that predicts the next character given the sequence so far. Vocab=128 (ASCII), embed_dim=64, hidden=256, 1-layer LSTM.",
+            "info": "A character-level language model predicts the next character in a sequence, learning spelling, grammar, and even some semantics purely from raw text. The model embeds each character, processes the sequence through an LSTM, and projects every hidden state to a distribution over the character vocabulary. During training, the target at each position is the next character in the input sequence (shifted by one). Character-level models have the advantage of a small, fixed vocabulary and can handle any word including rare or unseen ones, but they require processing longer sequences compared to word-level models.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass CharLM(nn.Module):\n    def __init__(self, vocab_size=128, embed_dim=64, hidden_size=256):\n        super().__init__()\n        self.embedding = {{b1}}\n        self.lstm = nn.LSTM(embed_dim, hidden_size, batch_first=True)\n        self.fc = {{b2}}\n\n    def forward(self, x, hidden=None):\n        # x: (batch, seq_len) character indices\n        emb = self.embedding(x)\n        output, hidden = self.lstm(emb, hidden)\n        logits = {{b3}}\n        return logits, hidden",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Embedding(?, ?)",
+                    "acceptable": [
+                        "nn.Embedding(vocab_size, embed_dim)",
+                        "nn.Embedding(128, 64)"
+                    ],
+                    "hint": "nn.Embedding(vocab_size, embed_dim) maps characters to embeddings."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(hidden_size, vocab_size)",
+                        "nn.Linear(256, 128)"
+                    ],
+                    "hint": "Project from hidden_size to vocab_size: nn.Linear(hidden_size, vocab_size)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.fc(???)",
+                    "acceptable": [
+                        "self.fc(output)"
+                    ],
+                    "hint": "Apply the linear layer to all time steps: self.fc(output)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_text_generation",
+            "title": "Text Generation with Temperature Sampling",
+            "difficulty": "medium",
+            "description": "Implement autoregressive text generation using temperature-scaled sampling. Given a trained character-level language model, generate text by sampling from the softmax distribution scaled by a temperature parameter.",
+            "info": "Temperature controls the randomness of text generation by scaling logits before softmax. A temperature of 1.0 gives the original distribution; lower temperatures (e.g., 0.5) make the distribution sharper, favoring high-probability tokens and producing more conservative text. Higher temperatures (e.g., 1.5) flatten the distribution, increasing diversity but also increasing the chance of generating nonsensical text. This technique is simple yet effective and is used in virtually all neural text generation systems as a basic controllable generation strategy.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef generate(model, start_char_idx, length, temperature=1.0):\n    model.eval()\n    input_token = torch.tensor([[start_char_idx]])\n    hidden = None\n    generated = [start_char_idx]\n\n    with torch.no_grad():\n        for _ in range(length):\n            logits, hidden = model(input_token, hidden)\n            scaled_logits = {{b1}}\n            probs = {{b2}}\n            next_token = {{b3}}\n            generated.append(next_token.item())\n            input_token = next_token.unsqueeze(0)\n    return generated",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "logits[:, -1, :] / ???",
+                    "acceptable": [
+                        "logits[:, -1, :] / temperature",
+                        "logits[0, -1, :] / temperature"
+                    ],
+                    "hint": "Scale the last time step's logits by temperature: logits[:, -1, :] / temperature."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.softmax(scaled_logits, dim=???)",
+                    "acceptable": [
+                        "F.softmax(scaled_logits, dim=-1)"
+                    ],
+                    "hint": "Convert scaled logits to probabilities: F.softmax(scaled_logits, dim=-1)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.multinomial(probs, ???)",
+                    "acceptable": [
+                        "torch.multinomial(probs, 1)",
+                        "torch.multinomial(probs, num_samples=1)"
+                    ],
+                    "hint": "Sample one token: torch.multinomial(probs, 1)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_word2vec_skipgram",
+            "title": "Skip-Gram Word2Vec Model",
+            "difficulty": "medium",
+            "description": "Implement a basic Skip-Gram model for Word2Vec. Given a center word, predict the surrounding context words. Vocab=10000, embed_dim=300.",
+            "info": "The Skip-Gram model learns word embeddings by predicting context words given a center word. It uses two embedding matrices: one for center words and one for context words. The model computes the dot product between the center embedding and context embedding to produce a score, which is passed through a sigmoid for negative sampling or through softmax for full vocabulary prediction. After training, the center word embeddings capture semantic relationships like king - man + woman = queen. Skip-Gram tends to work better for rare words than CBOW because each context word provides a separate training signal.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SkipGram(nn.Module):\n    def __init__(self, vocab_size=10000, embed_dim=300):\n        super().__init__()\n        self.center_embeddings = {{b1}}\n        self.context_embeddings = {{b2}}\n\n    def forward(self, center, context):\n        # center: (batch,), context: (batch,)\n        center_emb = self.center_embeddings(center)   # (batch, 300)\n        context_emb = self.context_embeddings(context) # (batch, 300)\n        score = {{b3}}\n        return score",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Embedding(?, ?)",
+                    "acceptable": [
+                        "nn.Embedding(vocab_size, embed_dim)",
+                        "nn.Embedding(10000, 300)"
+                    ],
+                    "hint": "nn.Embedding(vocab_size, embed_dim) for center word embeddings."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Embedding(?, ?)",
+                    "acceptable": [
+                        "nn.Embedding(vocab_size, embed_dim)",
+                        "nn.Embedding(10000, 300)"
+                    ],
+                    "hint": "Separate embedding matrix for context words: nn.Embedding(vocab_size, embed_dim)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.sum(??? * ???, dim=???)",
+                    "acceptable": [
+                        "torch.sum(center_emb * context_emb, dim=1)",
+                        "torch.sum(center_emb * context_emb, dim=-1)",
+                        "(center_emb * context_emb).sum(dim=1)",
+                        "(center_emb * context_emb).sum(dim=-1)"
+                    ],
+                    "hint": "Dot product via element-wise multiply + sum: torch.sum(center_emb * context_emb, dim=1)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_gru_pytorch",
+            "title": "GRU Sentiment Classifier in PyTorch",
+            "difficulty": "easy",
+            "description": "Build a simple GRU-based sentiment classifier. Vocab=5000, embed_dim=100, hidden=128, output=2 (positive/negative). Use the last hidden state for classification.",
+            "info": "GRU-based classifiers are a lightweight alternative to LSTMs for sequence classification tasks like sentiment analysis. The model embeds input token indices into dense vectors, processes them through a GRU, and uses the final hidden state as a fixed-size representation of the entire sequence. Unlike nn.LSTM, nn.GRU only returns hidden states (no cell state), simplifying the interface. For binary sentiment classification, the output layer maps the hidden state to two logits, and cross-entropy loss handles the classification.",
+            "code": "import torch.nn as nn\n\nclass GRUSentiment(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.embedding = nn.Embedding(5000, 100)\n        self.gru = {{b1}}\n        self.fc = {{b2}}\n\n    def forward(self, x):\n        emb = self.embedding(x)\n        output, h_n = self.gru(emb)\n        return self.fc(h_n.squeeze(0))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.GRU(?, ?, batch_first=True)",
+                    "acceptable": [
+                        "nn.GRU(100, 128, batch_first=True)"
+                    ],
+                    "hint": "nn.GRU(input_size=100, hidden_size=128, batch_first=True)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(128, 2)"
+                    ],
+                    "hint": "Map hidden_size=128 to num_classes=2: nn.Linear(128, 2)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_peephole_lstm",
+            "title": "Peephole LSTM Connection",
+            "difficulty": "hard",
+            "description": "Implement a peephole LSTM cell where the gates also have access to the cell state. The forget gate and input gate peek at c_prev, and the output gate peeks at the new c_t.",
+            "info": "Standard LSTM gates only see the hidden state h_prev and input x_t, but the cell state c_t carries the most important long-term information. Peephole connections allow the gates to directly observe the cell state, giving them more precise control over information flow. The forget and input gates peek at c_prev (the previous cell state), while the output gate peeks at c_t (the updated cell state). This modification was proposed by Gers and Schmidhuber and can help with tasks requiring precise timing, though in practice the improvement over standard LSTMs is task-dependent.",
+            "code": "import numpy as np\n\ndef sigmoid(x):\n    return 1 / (1 + np.exp(-x))\n\ndef peephole_lstm_cell(x_t, h_prev, c_prev, W_f, U_f, P_f, b_f,\n                        W_i, U_i, P_i, b_i,\n                        W_g, U_g, b_g,\n                        W_o, U_o, P_o, b_o):\n    # Forget gate with peephole to c_prev\n    f_t = {{b1}}\n    # Input gate with peephole to c_prev\n    i_t = sigmoid(W_i @ x_t + U_i @ h_prev + P_i * c_prev + b_i)\n    # Cell candidate (no peephole)\n    g_t = np.tanh(W_g @ x_t + U_g @ h_prev + b_g)\n    # New cell state\n    c_t = f_t * c_prev + i_t * g_t\n    # Output gate with peephole to c_t (new cell state)\n    o_t = {{b2}}\n    h_t = o_t * np.tanh(c_t)\n    return h_t, c_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "sigmoid(W_f @ x_t + U_f @ h_prev + P_f * ??? + b_f)",
+                    "acceptable": [
+                        "sigmoid(W_f @ x_t + U_f @ h_prev + P_f * c_prev + b_f)"
+                    ],
+                    "hint": "The forget gate peeks at the previous cell state: P_f * c_prev."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "sigmoid(W_o @ x_t + U_o @ h_prev + P_o * ??? + b_o)",
+                    "acceptable": [
+                        "sigmoid(W_o @ x_t + U_o @ h_prev + P_o * c_t + b_o)"
+                    ],
+                    "hint": "The output gate peeks at the NEW cell state c_t: P_o * c_t."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_seq_classification_pooling",
+            "title": "Sequence Classification with Mean Pooling",
+            "difficulty": "easy",
+            "description": "Instead of using the last hidden state for classification, use mean pooling over all LSTM output time steps. This is often more robust for variable-length inputs.",
+            "info": "Using only the last hidden state for sequence classification can be suboptimal because it forces all information through a single bottleneck at the final time step. Mean pooling averages the LSTM outputs across all time steps, giving every position equal contribution to the final representation. This approach is more robust to sequence length variation and often outperforms last-hidden-state approaches on tasks where important information appears throughout the sequence rather than near the end. When using padded sequences, a masked mean (excluding padding positions) should be used for correctness.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass LSTMMeanPool(nn.Module):\n    def __init__(self, input_size=100, hidden_size=128, num_classes=5):\n        super().__init__()\n        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)\n        self.fc = nn.Linear(hidden_size, num_classes)\n\n    def forward(self, x):\n        # x: (batch, seq_len, input_size)\n        output, _ = self.lstm(x)  # (batch, seq_len, hidden_size)\n        pooled = {{b1}}\n        return self.fc(pooled)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "output.mean(dim=???)",
+                    "acceptable": [
+                        "output.mean(dim=1)",
+                        "torch.mean(output, dim=1)"
+                    ],
+                    "hint": "Average over the time dimension (dim=1): output.mean(dim=1)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_dropout_rnn",
+            "title": "Applying Dropout in RNN Models",
+            "difficulty": "easy",
+            "description": "Add dropout to an LSTM-based classifier. Apply dropout between LSTM layers (via LSTM's dropout arg) and also apply dropout to the LSTM output before the final linear layer.",
+            "info": "Dropout regularization in RNNs must be applied carefully. The dropout argument in nn.LSTM applies dropout between stacked layers but not within the recurrent connection itself, because naive dropout on recurrent connections can destroy long-term memory. Applying a separate nn.Dropout after the LSTM output regularizes the representation before classification. Variational dropout, which uses the same dropout mask across all time steps, is theoretically preferred for recurrent connections. Standard dropout rates of 0.2-0.5 are common for RNN models.",
+            "code": "import torch.nn as nn\n\nclass LSTMWithDropout(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.lstm = {{b1}}\n        self.dropout = {{b2}}\n        self.fc = nn.Linear(256, 10)\n\n    def forward(self, x):\n        output, (h_n, c_n) = self.lstm(x)\n        dropped = self.dropout(h_n[-1])\n        return self.fc(dropped)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.LSTM(100, 256, num_layers=2, batch_first=True, dropout=???)",
+                    "acceptable": [
+                        "nn.LSTM(100, 256, num_layers=2, batch_first=True, dropout=0.5)",
+                        "nn.LSTM(100, 256, num_layers=2, batch_first=True, dropout=0.3)"
+                    ],
+                    "hint": "nn.LSTM with dropout between layers: dropout=0.5 (or 0.3)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Dropout(???)",
+                    "acceptable": [
+                        "nn.Dropout(0.5)",
+                        "nn.Dropout(0.3)",
+                        "nn.Dropout(p=0.5)",
+                        "nn.Dropout(p=0.3)"
+                    ],
+                    "hint": "nn.Dropout(0.5) for output dropout before the linear layer."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_gradient_clipping",
+            "title": "Gradient Clipping for RNN Training",
+            "difficulty": "easy",
+            "description": "Apply gradient clipping during RNN training to prevent exploding gradients. Use clip_grad_norm_ with a max norm of 5.0.",
+            "info": "Exploding gradients are a common problem when training RNNs because gradients are multiplied by the recurrent weight matrix at each time step during BPTT. If the largest singular value of this matrix exceeds 1, gradients can grow exponentially. Gradient clipping rescales the entire gradient vector when its norm exceeds a threshold, preserving the direction while limiting the magnitude. clip_grad_norm_ is preferred over clip_grad_value_ because it clips the global norm of all parameters together rather than each parameter independently, maintaining the relative gradient magnitudes.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.LSTM(50, 128, batch_first=True)\noptimizer = torch.optim.Adam(model.parameters())\ncriterion = nn.CrossEntropyLoss()\n\ndef train_step(x, y):\n    optimizer.zero_grad()\n    output, _ = model(x)\n    loss = criterion(output[:, -1, :], y)\n    loss.backward()\n    {{b1}}\n    optimizer.step()\n    return loss.item()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.nn.utils.clip_grad_norm_(model.parameters(), ???)",
+                    "acceptable": [
+                        "torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)",
+                        "nn.utils.clip_grad_norm_(model.parameters(), 5.0)",
+                        "torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)",
+                        "nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)"
+                    ],
+                    "hint": "torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_variable_length_collate",
+            "title": "Custom Collate for Variable-Length Sequences",
+            "difficulty": "hard",
+            "description": "Write a custom collate function for a DataLoader that pads variable-length sequences to the longest sequence in the batch, sorts them by length (descending), and returns the padded tensor along with original lengths.",
+            "info": "When using PyTorch DataLoaders for sequence data, a custom collate function is needed because the default collator cannot stack tensors of different lengths. The function pads all sequences in a batch to the length of the longest sequence using pad_sequence, which adds zeros by default. Sorting by descending length is required for pack_padded_sequence with enforce_sorted=True. Returning the original lengths allows downstream code to pack sequences and correctly ignore padding. This pattern is fundamental to efficient batched RNN training with variable-length inputs.",
+            "code": "import torch\nfrom torch.nn.utils.rnn import pad_sequence\n\ndef collate_fn(batch):\n    # batch: list of (sequence_tensor, label) tuples\n    sequences, labels = zip(*batch)\n    lengths = torch.tensor([len(s) for s in sequences])\n    # Sort by descending length\n    sorted_indices = {{b1}}\n    sequences = [sequences[i] for i in sorted_indices]\n    labels = torch.tensor(labels)[sorted_indices]\n    lengths = lengths[sorted_indices]\n    # Pad sequences\n    padded = {{b2}}\n    return padded, labels, lengths",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "lengths.argsort(descending=???)",
+                    "acceptable": [
+                        "lengths.argsort(descending=True)"
+                    ],
+                    "hint": "Sort indices by descending length: lengths.argsort(descending=True)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "pad_sequence(sequences, batch_first=???)",
+                    "acceptable": [
+                        "pad_sequence(sequences, batch_first=True)",
+                        "pad_sequence(sequences, batch_first=True, padding_value=0)",
+                        "pad_sequence(sequences, batch_first=True, padding_value=0.0)"
+                    ],
+                    "hint": "pad_sequence(sequences, batch_first=True) pads to the max length."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_encoder_decoder_attention",
+            "title": "Decoder with Attention",
+            "difficulty": "hard",
+            "description": "Implement a seq2seq decoder that uses attention over encoder outputs. At each step, the decoder computes a context vector from attention, concatenates it with the embedded input, and feeds it through the GRU.",
+            "info": "An attention-augmented decoder combines the embedded input token with a context vector before passing it to the recurrent layer. The context vector is computed by attending over all encoder outputs using the previous decoder hidden state. This allows the decoder to dynamically focus on different parts of the source sequence at each generation step. The concatenation of the embedded input and context vector is passed through the GRU, and the output is projected to vocabulary logits. This architecture is the foundation of the original neural machine translation models.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass AttnDecoder(nn.Module):\n    def __init__(self, vocab_size, embed_dim, hidden_size):\n        super().__init__()\n        self.embedding = nn.Embedding(vocab_size, embed_dim)\n        self.attention = BahdanauAttention(hidden_size)  # defined earlier\n        self.gru = nn.GRU(embed_dim + hidden_size, hidden_size, batch_first=True)\n        self.fc = nn.Linear(hidden_size, vocab_size)\n\n    def forward(self, input_token, hidden, encoder_outputs):\n        # input_token: (batch, 1), hidden: (1, batch, hidden)\n        embedded = self.embedding(input_token)  # (batch, 1, embed_dim)\n        context, attn_w = self.attention(hidden.squeeze(0), encoder_outputs)\n        context = context.unsqueeze(1)  # (batch, 1, hidden)\n        gru_input = {{b1}}\n        output, hidden = self.gru(gru_input, hidden)\n        prediction = {{b2}}\n        return prediction, hidden, attn_w",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.cat([embedded, context], dim=???)",
+                    "acceptable": [
+                        "torch.cat([embedded, context], dim=2)",
+                        "torch.cat([embedded, context], dim=-1)",
+                        "torch.cat((embedded, context), dim=2)",
+                        "torch.cat((embedded, context), dim=-1)"
+                    ],
+                    "hint": "Concatenate along the feature dim: torch.cat([embedded, context], dim=2)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.fc(output.squeeze(???))",
+                    "acceptable": [
+                        "self.fc(output.squeeze(1))"
+                    ],
+                    "hint": "Project to vocab: self.fc(output.squeeze(1))."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_embedding_pretrained",
+            "title": "Loading Pre-trained Embeddings",
+            "difficulty": "medium",
+            "description": "Load a pre-trained embedding matrix (e.g., GloVe) into an nn.Embedding layer and optionally freeze it so it does not update during training.",
+            "info": "Pre-trained embeddings like GloVe or FastText capture rich semantic relationships learned from large text corpora and can significantly improve performance on downstream tasks, especially with limited training data. The from_pretrained class method creates an nn.Embedding from a weight matrix tensor. Setting freeze=True makes the embeddings non-trainable, which is useful when you want to preserve the pre-trained representations. Alternatively, setting freeze=False allows fine-tuning the embeddings for the specific task, which often helps when sufficient task-specific data is available.",
+            "code": "import torch\nimport torch.nn as nn\n\n# Assume pretrained_weights is a (vocab_size, embed_dim) tensor\npretrained_weights = torch.randn(10000, 300)  # placeholder\n\n# Load as frozen (non-trainable) embedding\nfrozen_embedding = {{b1}}\n\n# Load as trainable (fine-tunable) embedding\ntrainable_embedding = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Embedding.from_pretrained(???, freeze=???)",
+                    "acceptable": [
+                        "nn.Embedding.from_pretrained(pretrained_weights, freeze=True)"
+                    ],
+                    "hint": "nn.Embedding.from_pretrained(pretrained_weights, freeze=True) for frozen embeddings."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Embedding.from_pretrained(???, freeze=???)",
+                    "acceptable": [
+                        "nn.Embedding.from_pretrained(pretrained_weights, freeze=False)"
+                    ],
+                    "hint": "nn.Embedding.from_pretrained(pretrained_weights, freeze=False) for fine-tuning."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_multiplicative_attention",
+            "title": "Multiplicative (Luong) Attention",
+            "difficulty": "medium",
+            "description": "Implement multiplicative (Luong/dot-product) attention. Compute attention weights using the dot product between decoder hidden states and encoder outputs.",
+            "info": "Luong attention computes alignment scores using a simple dot product between the decoder hidden state and each encoder output, making it computationally cheaper than Bahdanau's additive attention. The general variant uses a learned weight matrix W: score = decoder_hidden @ W @ encoder_output, while the dot variant requires matching dimensions and computes score = decoder_hidden @ encoder_output directly. After softmax normalization, the context vector is computed as a weighted sum of encoder outputs. Luong attention is applied after the decoder RNN step, whereas Bahdanau attention is applied before it.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass LuongAttention(nn.Module):\n    def __init__(self, hidden_size):\n        super().__init__()\n        # 'general' variant\n        self.W = nn.Linear(hidden_size, hidden_size, bias=False)\n\n    def forward(self, decoder_hidden, encoder_outputs):\n        # decoder_hidden: (batch, hidden), encoder_outputs: (batch, src_len, hidden)\n        query = {{b1}}\n        scores = {{b2}}\n        attn_weights = F.softmax(scores, dim=-1)\n        context = torch.bmm(attn_weights.unsqueeze(1), encoder_outputs).squeeze(1)\n        return context, attn_weights",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.W(???)",
+                    "acceptable": [
+                        "self.W(decoder_hidden)"
+                    ],
+                    "hint": "Transform decoder hidden: self.W(decoder_hidden)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.bmm(???.unsqueeze(1), encoder_outputs.transpose(1, 2)).squeeze(1)",
+                    "acceptable": [
+                        "torch.bmm(query.unsqueeze(1), encoder_outputs.transpose(1, 2)).squeeze(1)"
+                    ],
+                    "hint": "Dot product: torch.bmm(query.unsqueeze(1), encoder_outputs.transpose(1,2)).squeeze(1)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_bidirectional_encoder_decoder",
+            "title": "Bridging Bidirectional Encoder to Decoder",
+            "difficulty": "hard",
+            "description": "When using a bidirectional encoder with a unidirectional decoder, the encoder's final hidden states (forward + backward) must be combined. Implement a bridge that concatenates the two directions and projects them to the decoder's hidden size.",
+            "info": "A bidirectional encoder produces hidden states of shape (num_layers*2, batch, hidden_size), where the two directions are interleaved. For a unidirectional decoder to use these as initial hidden states, the forward and backward hidden states at each layer must be combined. A common approach is to concatenate the two directions and project them through a linear layer to match the decoder's hidden size. This bridge ensures the decoder starts with a representation that captures both left-to-right and right-to-left context from the encoder. Without proper bridging, there would be a dimension mismatch between encoder and decoder.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass EncoderDecoderBridge(nn.Module):\n    def __init__(self, enc_hidden, dec_hidden, num_layers=2):\n        super().__init__()\n        # Encoder is bidirectional, so each layer has 2 * enc_hidden\n        self.bridge = nn.Linear(enc_hidden * 2, dec_hidden)\n        self.num_layers = num_layers\n\n    def forward(self, encoder_hidden):\n        # encoder_hidden: (num_layers * 2, batch, enc_hidden)\n        # Reshape to (num_layers, 2, batch, enc_hidden)\n        batch_size = encoder_hidden.size(1)\n        hidden = encoder_hidden.view(self.num_layers, 2, batch_size, -1)\n        # Concatenate forward and backward\n        hidden = {{b1}}\n        # Project each layer\n        hidden = {{b2}}\n        return hidden",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.cat([hidden[:, 0], hidden[:, 1]], dim=???)",
+                    "acceptable": [
+                        "torch.cat([hidden[:, 0], hidden[:, 1]], dim=-1)",
+                        "torch.cat([hidden[:, 0], hidden[:, 1]], dim=2)",
+                        "torch.cat((hidden[:, 0], hidden[:, 1]), dim=-1)",
+                        "torch.cat((hidden[:, 0], hidden[:, 1]), dim=2)"
+                    ],
+                    "hint": "Concatenate forward ([:, 0]) and backward ([:, 1]) along feature dim: dim=-1."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.bridge(???)",
+                    "acceptable": [
+                        "self.bridge(hidden)",
+                        "torch.tanh(self.bridge(hidden))"
+                    ],
+                    "hint": "Project concatenated hidden through the bridge: self.bridge(hidden)."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_cross_entropy_seq",
+            "title": "Cross-Entropy Loss for Sequences with Padding",
+            "difficulty": "easy",
+            "description": "Set up CrossEntropyLoss for a sequence-to-sequence model, ignoring the padding index (0) so that padding tokens do not contribute to the loss.",
+            "info": "When training on padded sequences, the loss function must ignore padding tokens to prevent the model from being rewarded for predicting padding. PyTorch's CrossEntropyLoss has an ignore_index parameter that excludes targets with that value from the loss computation and gradient calculation. For sequence models, the output logits must be reshaped from (batch, seq_len, vocab_size) to (batch*seq_len, vocab_size) and targets from (batch, seq_len) to (batch*seq_len) before computing the loss. Setting ignore_index=0 (the padding index) ensures correct training on variable-length sequences.",
+            "code": "import torch\nimport torch.nn as nn\n\npad_idx = 0\ncriterion = {{b1}}\n\n# output: (batch, seq_len, vocab_size), target: (batch, seq_len)\ndef compute_seq_loss(output, target):\n    # Reshape for CrossEntropyLoss\n    output = {{b2}}\n    target = target.reshape(-1)\n    return criterion(output, target)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.CrossEntropyLoss(ignore_index=???)",
+                    "acceptable": [
+                        "nn.CrossEntropyLoss(ignore_index=0)",
+                        "nn.CrossEntropyLoss(ignore_index=pad_idx)"
+                    ],
+                    "hint": "nn.CrossEntropyLoss(ignore_index=0) to ignore padding."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "output.reshape(-1, output.size(???))",
+                    "acceptable": [
+                        "output.reshape(-1, output.size(-1))",
+                        "output.reshape(-1, output.size(2))",
+                        "output.view(-1, output.size(-1))",
+                        "output.view(-1, output.size(2))"
+                    ],
+                    "hint": "Reshape to (batch*seq_len, vocab_size): output.reshape(-1, output.size(-1))."
+                }
+            ]
+        },
+        {
+            "id": "rnn_new_rnn_loop_manual",
+            "title": "Manual RNN Loop with nn.RNNCell",
+            "difficulty": "medium",
+            "description": "Process a sequence step-by-step using nn.RNNCell instead of nn.RNN. This gives you explicit control over the hidden state at each time step.",
+            "info": "While nn.RNN processes an entire sequence in one call, nn.RNNCell processes a single time step, giving you explicit control over the hidden state between steps. This is useful when you need to inspect or modify the hidden state at each step, such as in attention mechanisms or custom gating logic. The cell takes input of shape (batch, input_size) and hidden of shape (batch, hidden_size), returning the new hidden state. You must manually loop over time steps, which is slower but more flexible than the fused nn.RNN implementation.",
+            "code": "import torch\nimport torch.nn as nn\n\ncell = nn.RNNCell(input_size=50, hidden_size=128)\n\ndef forward_manual(x):\n    # x: (batch, seq_len, 50)\n    batch_size, seq_len, _ = x.shape\n    h = {{b1}}\n    outputs = []\n    for t in range(seq_len):\n        h = {{b2}}\n        outputs.append(h)\n    return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.zeros(batch_size, ???)",
+                    "acceptable": [
+                        "torch.zeros(batch_size, 128)",
+                        "torch.zeros(batch_size, 128, device=x.device)"
+                    ],
+                    "hint": "Initialize hidden state: torch.zeros(batch_size, 128)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "cell(x[:, ???, :], h)",
+                    "acceptable": [
+                        "cell(x[:, t, :], h)",
+                        "cell(x[:, t], h)"
+                    ],
+                    "hint": "Process one step: cell(x[:, t, :], h)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.stack(outputs, dim=???)",
+                    "acceptable": [
+                        "torch.stack(outputs, dim=1)"
+                    ],
+                    "hint": "Stack outputs along time dimension: torch.stack(outputs, dim=1)."
+                }
+            ]
         }
     ]
 }

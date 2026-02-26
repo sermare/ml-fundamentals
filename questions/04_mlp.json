@@ -115,6 +115,737 @@
                     "hint": "No activation on the output layer (raw logits)."
                 }
             ]
+        },
+        {
+            "id": "mlp_new_xavier_init",
+            "title": "Xavier/Glorot Weight Initialization",
+            "difficulty": "medium",
+            "description": "Apply Xavier uniform initialization to all linear layers of an MLP. Xavier initialization is designed for layers with sigmoid or tanh activations.",
+            "info": "Xavier (Glorot) initialization sets weights by sampling from a uniform distribution scaled by the fan-in and fan-out of the layer, specifically U(-sqrt(6/(fan_in+fan_out)), sqrt(6/(fan_in+fan_out))). This keeps the variance of activations and gradients roughly constant across layers, preventing vanishing or exploding signals during training. It was derived under the assumption of linear activations, making it well-suited for tanh and sigmoid but suboptimal for ReLU. In PyTorch, nn.init.xavier_uniform_ modifies the weight tensor in-place (note the trailing underscore convention).",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(784, 256),\n    nn.Tanh(),\n    nn.Linear(256, 10)\n)\n\ndef init_weights(m):\n    if isinstance(m, nn.Linear):\n        {{b1}}\n\nmodel.apply({{b2}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.init.???_???(m.weight)",
+                    "acceptable": [
+                        "nn.init.xavier_uniform_(m.weight)",
+                        "torch.nn.init.xavier_uniform_(m.weight)"
+                    ],
+                    "hint": "Use the in-place Xavier uniform initializer on the weight parameter."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "init_weights"
+                    ],
+                    "hint": "Pass the initialization function to model.apply()."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_he_init",
+            "title": "He/Kaiming Initialization for ReLU Networks",
+            "difficulty": "medium",
+            "description": "Apply Kaiming (He) normal initialization to the linear layers of a ReLU-based MLP. This initialization accounts for the fact that ReLU zeros out half the activations.",
+            "info": "Kaiming (He) initialization was specifically designed for networks using ReLU activations. Because ReLU sets all negative pre-activations to zero, the variance of the output is halved compared to a linear activation. Kaiming init compensates by scaling weights by sqrt(2/fan_in), keeping activation magnitudes stable across layers. The 'fan_in' mode (default) preserves the magnitude of the variance in the forward pass, while 'fan_out' preserves it in the backward pass. Using the wrong initialization scheme (e.g., Xavier with ReLU) can lead to slow convergence or dead neurons in deep networks.",
+            "code": "import torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(512, 256),\n    nn.ReLU(),\n    nn.Linear(256, 128),\n    nn.ReLU(),\n    nn.Linear(128, 10)\n)\n\ndef init_weights(m):\n    if isinstance(m, nn.Linear):\n        {{b1}}\n\nmodel.apply(init_weights)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.init.???_???(m.weight, nonlinearity='relu')",
+                    "acceptable": [
+                        "nn.init.kaiming_normal_(m.weight, nonlinearity='relu')",
+                        "torch.nn.init.kaiming_normal_(m.weight, nonlinearity='relu')"
+                    ],
+                    "hint": "Kaiming normal initialization with ReLU nonlinearity specified."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_bias_init_zeros",
+            "title": "Bias Initialization to Zeros",
+            "difficulty": "easy",
+            "description": "Initialize all bias terms to zero in a linear layer. This is the most common bias initialization strategy.",
+            "info": "Biases are almost always initialized to zero in practice, since the weight initialization already breaks symmetry between neurons. Setting biases to zero means each neuron starts with no inherent offset, allowing the network to learn appropriate shifts during training. PyTorch's nn.Linear actually initializes biases from a uniform distribution by default, but explicitly zeroing them is common in custom initialization routines. The nn.init.zeros_ function fills a tensor with zeros in-place and is the idiomatic way to do this in PyTorch.",
+            "code": "import torch.nn as nn\n\nlayer = nn.Linear(128, 64)\n\n# Initialize bias to zeros\n{{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.init.???(layer.???)",
+                    "acceptable": [
+                        "nn.init.zeros_(layer.bias)",
+                        "torch.nn.init.zeros_(layer.bias)"
+                    ],
+                    "hint": "Use nn.init.zeros_ on the bias parameter of the layer."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_sequential",
+            "title": "Building an MLP with nn.Sequential",
+            "difficulty": "easy",
+            "description": "Create a 3-layer MLP using nn.Sequential instead of defining a custom nn.Module class. Dims: 784 -> 256 -> 128 -> 10 with ReLU activations.",
+            "info": "nn.Sequential is a convenient container that chains modules in order, automatically passing the output of one as the input to the next. It eliminates the need to write a custom forward() method for simple feed-forward architectures. Each module is registered as a submodule, so parameters are properly tracked for optimization. While nn.Sequential is great for linear chains of operations, it cannot express architectures with skip connections, multiple inputs, or branching paths -- those require a custom nn.Module subclass.",
+            "code": "import torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(784, 256),\n    {{b1}},\n    nn.Linear(256, 128),\n    {{b2}},\n    {{b3}}\n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???()",
+                    "acceptable": [
+                        "nn.ReLU()"
+                    ],
+                    "hint": "ReLU activation after the first linear layer."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???()",
+                    "acceptable": [
+                        "nn.ReLU()"
+                    ],
+                    "hint": "ReLU activation after the second linear layer."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "nn.???(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(128, 10)"
+                    ],
+                    "hint": "Final linear layer mapping 128 to 10 output classes."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_modulelist",
+            "title": "Dynamic MLP with nn.ModuleList",
+            "difficulty": "hard",
+            "description": "Build a variable-depth MLP using nn.ModuleList. Given a list of layer dimensions, construct linear layers and apply ReLU between them in the forward pass.",
+            "info": "nn.ModuleList is a container that holds nn.Module submodules in an ordered list, properly registering their parameters with the parent module. Unlike a plain Python list, modules in a ModuleList are visible to methods like .parameters() and .to(device), which is critical for optimizer setup and device transfer. This pattern is essential for building architectures where the number of layers is determined at runtime by a configuration. In the forward pass, you iterate through the ModuleList and apply each layer, adding activations as needed between them.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass DynamicMLP(nn.Module):\n    def __init__(self, dims):\n        super().__init__()\n        self.layers = {{b1}}\n        for i in range(len(dims) - 1):\n            self.layers.append(nn.Linear(dims[i], dims[i+1]))\n\n    def forward(self, x):\n        for layer in self.layers[:-1]:\n            x = {{b2}}\n        x = self.layers[-1](x)\n        return x\n\n# Example: 784 -> 256 -> 128 -> 10\nmodel = DynamicMLP([784, 256, 128, 10])",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???()",
+                    "acceptable": [
+                        "nn.ModuleList()"
+                    ],
+                    "hint": "Use nn.ModuleList to hold a dynamic number of layers."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.???(layer(x))",
+                    "acceptable": [
+                        "F.relu(layer(x))",
+                        "torch.relu(layer(x))"
+                    ],
+                    "hint": "Apply the layer then ReLU activation for all hidden layers."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_residual_connection",
+            "title": "Skip/Residual Connection in an MLP",
+            "difficulty": "hard",
+            "description": "Implement a residual MLP block that adds the input to the output of a two-layer sub-network (a skip connection). The hidden dimension matches the input/output dimension (256).",
+            "info": "Residual (skip) connections, introduced in ResNet, add the block's input directly to its output: y = F(x) + x. This allows gradients to flow directly through the identity path, mitigating vanishing gradients in deep networks. For skip connections to work with addition, the input and output dimensions must match. In MLPs, a residual block typically consists of two linear layers with an activation in between, where the block preserves the dimensionality so the shortcut addition is valid. This pattern allows training much deeper MLPs that would otherwise be difficult to optimize.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass ResidualMLPBlock(nn.Module):\n    def __init__(self, dim=256):\n        super().__init__()\n        self.fc1 = nn.Linear(dim, dim)\n        self.fc2 = nn.Linear(dim, dim)\n\n    def forward(self, x):\n        residual = {{b1}}\n        out = F.relu(self.fc1(x))\n        out = self.fc2(out)\n        return F.relu({{b2}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "x"
+                    ],
+                    "hint": "Save the input for the skip connection."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? + ???",
+                    "acceptable": [
+                        "out + residual",
+                        "residual + out"
+                    ],
+                    "hint": "Add the residual (original input) to the block's output."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_bottleneck",
+            "title": "Bottleneck Layer in an MLP",
+            "difficulty": "medium",
+            "description": "Create a bottleneck MLP block that compresses the representation from 512 dimensions down to 64 and back to 512, with ReLU activations.",
+            "info": "A bottleneck layer compresses the representation into a lower-dimensional space and then expands it back, forcing the network to learn a compact encoding of the most important features. This pattern reduces the total number of parameters compared to using full-width layers throughout and acts as an information bottleneck that can improve generalization. The compress-expand pattern is fundamental to autoencoders and is also used in architectures like ResNet (with 1x1 convolutions). The narrow middle dimension controls the trade-off between compression and information retention.",
+            "code": "import torch.nn as nn\n\nbottleneck = nn.Sequential(\n    {{b1}},\n    nn.ReLU(),\n    {{b2}},\n    nn.ReLU()\n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(512, 64)"
+                    ],
+                    "hint": "Compress from 512 down to 64 dimensions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(64, 512)"
+                    ],
+                    "hint": "Expand back from 64 to 512 dimensions."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_autoencoder",
+            "title": "Autoencoder MLP",
+            "difficulty": "hard",
+            "description": "Build a simple autoencoder with an encoder (784 -> 128 -> 32) and decoder (32 -> 128 -> 784) using an MLP. The forward pass returns the reconstruction and the latent code.",
+            "info": "An autoencoder learns to compress data into a low-dimensional latent representation (encoder) and reconstruct it back (decoder), trained by minimizing reconstruction error. The latent space dimension (32 here) is a critical hyperparameter that controls the information bottleneck: too small and reconstruction suffers, too large and the model may learn the identity function. Autoencoders are used for dimensionality reduction, denoising, anomaly detection, and as pretrained feature extractors. The sigmoid activation on the decoder output constrains values to [0,1], which is appropriate when inputs are normalized pixel values.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass Autoencoder(nn.Module):\n    def __init__(self):\n        super().__init__()\n        # Encoder\n        self.enc1 = nn.Linear(784, 128)\n        self.enc2 = {{b1}}\n        # Decoder\n        self.dec1 = {{b2}}\n        self.dec2 = nn.Linear(128, 784)\n\n    def forward(self, x):\n        z = F.relu(self.enc1(x))\n        z = F.relu(self.enc2(z))\n        out = F.relu(self.dec1(z))\n        out = {{b3}}\n        return out, z",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(128, 32)"
+                    ],
+                    "hint": "Encoder maps 128 -> 32 (the latent dimension)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(32, 128)"
+                    ],
+                    "hint": "Decoder maps 32 (latent) -> 128."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.???(self.dec2(out))",
+                    "acceptable": [
+                        "torch.sigmoid(self.dec2(out))"
+                    ],
+                    "hint": "Apply sigmoid to the final decoder output to constrain values to [0,1]."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_batchnorm",
+            "title": "Batch Normalization in an MLP",
+            "difficulty": "medium",
+            "description": "Add BatchNorm1d layers to a 2-layer MLP. BatchNorm is applied after the linear layer and before the activation function.",
+            "info": "Batch Normalization normalizes the pre-activation values across the batch dimension to have zero mean and unit variance, then applies a learnable affine transformation. This stabilizes training by reducing internal covariate shift, allowing higher learning rates and faster convergence. For 1D inputs (as in MLPs), nn.BatchNorm1d takes the number of features as its argument, matching the output dimension of the preceding linear layer. BatchNorm behaves differently during training (uses batch statistics) and evaluation (uses running statistics), so calling model.eval() before inference is essential.",
+            "code": "import torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(784, 256),\n    {{b1}},\n    nn.ReLU(),\n    nn.Linear(256, 10)\n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(???)",
+                    "acceptable": [
+                        "nn.BatchNorm1d(256)"
+                    ],
+                    "hint": "BatchNorm1d with the number of features matching the linear layer output (256)."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_layernorm",
+            "title": "Layer Normalization in an MLP",
+            "difficulty": "medium",
+            "description": "Add LayerNorm to a 2-layer MLP. Unlike BatchNorm, LayerNorm normalizes across the feature dimension and does not depend on batch size.",
+            "info": "Layer Normalization normalizes across the feature dimension for each individual sample, rather than across the batch. This makes it independent of batch size and particularly useful for variable-length sequences, small batches, or online learning scenarios where batch statistics are unreliable. In MLPs, nn.LayerNorm takes the normalized shape (typically the feature dimension) as its argument. Unlike BatchNorm, LayerNorm behaves identically during training and evaluation, eliminating the need to track running statistics.",
+            "code": "import torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(512, 256),\n    {{b1}},\n    nn.ReLU(),\n    nn.Linear(256, 10)\n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(???)",
+                    "acceptable": [
+                        "nn.LayerNorm(256)"
+                    ],
+                    "hint": "LayerNorm with the feature dimension matching the linear layer output (256)."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_param_count",
+            "title": "Counting Model Parameters",
+            "difficulty": "easy",
+            "description": "Count the total number of trainable parameters in a PyTorch model using a one-liner expression.",
+            "info": "Knowing the parameter count is essential for estimating memory usage, comparing model complexity, and debugging architecture definitions. Each nn.Linear(in, out) layer contributes in*out weight parameters plus out bias parameters. The model.parameters() iterator yields all Parameter tensors, and p.numel() returns the number of scalar elements in each. Filtering with p.requires_grad ensures you only count trainable parameters, excluding any frozen layers. For example, nn.Linear(784, 256) has 784*256 + 256 = 200,960 parameters.",
+            "code": "import torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(784, 256),\n    nn.ReLU(),\n    nn.Linear(256, 10)\n)\n\ntotal_params = {{b1}}\nprint(f'Total trainable parameters: {total_params}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "sum(p.???() for p in model.???() if p.???)",
+                    "acceptable": [
+                        "sum(p.numel() for p in model.parameters() if p.requires_grad)"
+                    ],
+                    "hint": "Sum numel() for each parameter that requires_grad."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_gradient_clipping",
+            "title": "Gradient Clipping by Norm",
+            "difficulty": "easy",
+            "description": "Apply gradient clipping by maximum norm to prevent exploding gradients during training. Clip the total gradient norm to a max value of 1.0.",
+            "info": "Gradient clipping rescales the gradient vector when its norm exceeds a specified threshold, preventing catastrophically large parameter updates that can destabilize training. The clip_grad_norm_ function computes the total norm across all parameters and scales all gradients proportionally if the norm exceeds max_norm. This is especially important in deep networks and recurrent architectures where gradient magnitudes can grow exponentially through backpropagation. Clipping is applied after loss.backward() but before optimizer.step(), ensuring the update direction is preserved while its magnitude is bounded.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(128, 10)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)\nloss_fn = nn.CrossEntropyLoss()\n\n# Training step\noutput = model(torch.randn(32, 128))\nloss = loss_fn(output, torch.randint(0, 10, (32,)))\nloss.backward()\n\n{{b1}}\n\noptimizer.step()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.nn.utils.???(model.parameters(), max_norm=???)",
+                    "acceptable": [
+                        "torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)",
+                        "nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)",
+                        "torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)",
+                        "nn.utils.clip_grad_norm_(model.parameters(), 1.0)"
+                    ],
+                    "hint": "Use clip_grad_norm_ with max_norm=1.0 on the model parameters."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_eval_mode",
+            "title": "Switching to Evaluation Mode",
+            "difficulty": "easy",
+            "description": "Set a model to evaluation mode for inference and disable gradient computation to save memory and speed up forward passes.",
+            "info": "Calling model.eval() switches modules like Dropout and BatchNorm to their inference behavior: Dropout stops dropping units, and BatchNorm uses running statistics instead of batch statistics. The torch.no_grad() context manager disables gradient tracking, reducing memory usage and speeding up computation since PyTorch no longer needs to build the computational graph. Both are essential for correct and efficient inference. Forgetting model.eval() is a common bug that leads to stochastic outputs (from Dropout) and batch-dependent results (from BatchNorm) during evaluation.",
+            "code": "import torch\n\n# Assume model is already trained\n{{b1}}\n\nwith {{b2}}:\n    predictions = model(test_data)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "model.???()",
+                    "acceptable": [
+                        "model.eval()"
+                    ],
+                    "hint": "Set the model to evaluation mode."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???()",
+                    "acceptable": [
+                        "torch.no_grad()",
+                        "torch.inference_mode()"
+                    ],
+                    "hint": "Disable gradient computation for inference."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_save_load_checkpoint",
+            "title": "Model Checkpointing (Save & Load)",
+            "difficulty": "medium",
+            "description": "Save a model checkpoint that includes model state, optimizer state, and the current epoch, then load it back to resume training.",
+            "info": "A checkpoint saves more than just model weights: it includes the optimizer state (momentum buffers, adaptive learning rate accumulators) and training metadata like epoch number. Using torch.save with a dictionary allows bundling all this information into a single file. When resuming training, you must load both the model and optimizer state dicts to continue exactly where you left off. Saving only model.state_dict() (rather than the full model object) is the recommended approach because it is more portable and not tied to a specific class definition or file path.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Linear(784, 10)\noptimizer = torch.optim.Adam(model.parameters())\nepoch = 5\n\n# Save checkpoint\ntorch.save({\n    'epoch': epoch,\n    'model_state_dict': {{b1}},\n    'optimizer_state_dict': {{b2}}\n}, 'checkpoint.pt')\n\n# Load checkpoint\ncheckpoint = torch.load('checkpoint.pt')\nmodel.load_state_dict(checkpoint['model_state_dict'])\noptimizer.load_state_dict(checkpoint['optimizer_state_dict'])",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "model.???()",
+                    "acceptable": [
+                        "model.state_dict()"
+                    ],
+                    "hint": "Get the model's state dictionary containing all parameters."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": [
+                        "optimizer.state_dict()"
+                    ],
+                    "hint": "Get the optimizer's state dictionary."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_inference_mode",
+            "title": "Using torch.inference_mode",
+            "difficulty": "easy",
+            "description": "Use torch.inference_mode for the most efficient inference. This is faster and more memory-efficient than torch.no_grad().",
+            "info": "torch.inference_mode() is a newer and more efficient alternative to torch.no_grad(). It not only disables gradient computation but also disables view tracking and version counting on tensors, providing additional speed and memory improvements. Tensors created inside inference_mode cannot be used for later gradient computation, making it unsuitable for situations where you need to backpropagate through inference results. For pure inference tasks like evaluation and deployment, inference_mode is the recommended choice over no_grad.",
+            "code": "import torch\n\nmodel.eval()\n\nwith {{b1}}:\n    output = model(input_tensor)\n    predicted = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???()",
+                    "acceptable": [
+                        "torch.inference_mode()"
+                    ],
+                    "hint": "Use inference_mode for maximum inference efficiency."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "output.???(dim=1)",
+                    "acceptable": [
+                        "output.argmax(dim=1)"
+                    ],
+                    "hint": "Get the predicted class by taking argmax along the class dimension."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_gated_mlp",
+            "title": "Gated MLP (SwiGLU-style)",
+            "difficulty": "hard",
+            "description": "Implement a Gated Linear Unit (GLU) style MLP block where one linear projection acts as a gate (via sigmoid) that modulates the other projection. Input/output dim is 256, intermediate dim is 512.",
+            "info": "Gated MLPs use element-wise multiplication between two parallel linear projections, where one projection passes through a gate activation (sigmoid, SiLU, etc.) to control information flow. The SwiGLU variant, used in LLaMA and PaLM, replaces the sigmoid gate with SiLU (Swish) and has been shown to improve training efficiency. This gating mechanism gives the network a finer-grained control over which features pass through compared to a simple activation function. Gated MLPs are now standard in modern transformer feed-forward blocks, often outperforming traditional ReLU-based MLPs.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass GatedMLP(nn.Module):\n    def __init__(self, dim=256, hidden_dim=512):\n        super().__init__()\n        self.proj = nn.Linear(dim, hidden_dim)\n        self.gate = nn.Linear(dim, hidden_dim)\n        self.out = nn.Linear(hidden_dim, dim)\n\n    def forward(self, x):\n        return self.out({{b1}} * {{b2}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(self.gate(x))",
+                    "acceptable": [
+                        "torch.sigmoid(self.gate(x))",
+                        "torch.nn.functional.silu(self.gate(x))",
+                        "F.silu(self.gate(x))"
+                    ],
+                    "hint": "Apply an activation (sigmoid or SiLU) to the gate projection."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.???(x)",
+                    "acceptable": [
+                        "self.proj(x)"
+                    ],
+                    "hint": "The value projection that gets modulated by the gate."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_multi_task",
+            "title": "Multi-Task MLP with Separate Heads",
+            "difficulty": "hard",
+            "description": "Build a multi-task MLP with a shared backbone and two separate output heads: one for classification (10 classes) and one for regression (1 value). Shared features have dimension 128.",
+            "info": "Multi-task learning uses a shared representation (backbone) to jointly learn related tasks, which acts as an inductive bias that can improve generalization on each task. The shared layers learn features useful across tasks while the task-specific heads specialize for their respective objectives. This architecture reduces total parameter count and training time compared to separate models, and the shared features often transfer useful information between tasks. The forward pass returns a dictionary of outputs, making it easy to compute separate losses for each task and combine them with task-specific weights.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass MultiTaskMLP(nn.Module):\n    def __init__(self, input_dim=784):\n        super().__init__()\n        self.shared = nn.Sequential(\n            nn.Linear(input_dim, 256),\n            nn.ReLU(),\n            nn.Linear(256, 128),\n            nn.ReLU()\n        )\n        self.cls_head = {{b1}}\n        self.reg_head = {{b2}}\n\n    def forward(self, x):\n        features = self.shared(x)\n        return {\n            'classification': self.cls_head(features),\n            'regression': self.reg_head(features)\n        }",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(128, 10)"
+                    ],
+                    "hint": "Classification head: 128 features -> 10 classes."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(128, 1)"
+                    ],
+                    "hint": "Regression head: 128 features -> 1 continuous value."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_weight_tying",
+            "title": "Weight Tying Between Layers",
+            "difficulty": "hard",
+            "description": "Create an autoencoder where the decoder weight matrix is the transpose of the encoder weight matrix (tied weights). This reduces parameters and acts as a regularizer.",
+            "info": "Weight tying constrains the decoder to use the transpose of the encoder's weight matrix, cutting the number of weight parameters in half and enforcing a symmetry that acts as a regularizer. In PyTorch, this is implemented by assigning the encoder's weight as a transposed parameter for the decoder rather than using a separate nn.Linear. The F.linear function allows performing a linear transformation with an explicitly provided weight and bias. Weight tying is commonly used in autoencoders and in language models where the input embedding and output projection share weights.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass TiedAutoencoder(nn.Module):\n    def __init__(self, input_dim=784, hidden_dim=128):\n        super().__init__()\n        self.encoder = nn.Linear(input_dim, hidden_dim)\n        self.decoder_bias = nn.Parameter(torch.zeros(input_dim))\n\n    def forward(self, x):\n        z = torch.relu(self.encoder(x))\n        # Decode using transposed encoder weights\n        x_recon = {{b1}}\n        return x_recon, z",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "F.linear(z, self.encoder.weight.?, self.decoder_bias)",
+                    "acceptable": [
+                        "F.linear(z, self.encoder.weight.t(), self.decoder_bias)",
+                        "F.linear(z, self.encoder.weight.T, self.decoder_bias)"
+                    ],
+                    "hint": "Use F.linear with the transposed encoder weight matrix."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_input_norm",
+            "title": "Input Feature Normalization",
+            "difficulty": "easy",
+            "description": "Normalize input features to zero mean and unit variance before feeding them to an MLP, using precomputed training set statistics.",
+            "info": "Input normalization ensures all features are on a similar scale, preventing features with large magnitudes from dominating gradient updates and slowing convergence. Standardization (subtract mean, divide by standard deviation) transforms each feature to have zero mean and unit variance. The mean and std must be computed from the training set only and applied identically to validation and test data to prevent data leakage. Adding a small epsilon to the denominator prevents division by zero for constant features.",
+            "code": "import torch\n\n# Precomputed from training set\ntrain_mean = torch.tensor([0.5, 2.0, 100.0])\ntrain_std = torch.tensor([0.2, 1.0, 50.0])\n\ndef normalize(x, mean, std):\n    return {{b1}}\n\nx_normalized = normalize(x_input, train_mean, train_std)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(x - ???) / (??? + 1e-8)",
+                    "acceptable": [
+                        "(x - mean) / (std + 1e-8)"
+                    ],
+                    "hint": "Subtract the mean and divide by std with a small epsilon for numerical stability."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_mlp_mixer_block",
+            "title": "MLP-Mixer Token-Mixing Block",
+            "difficulty": "hard",
+            "description": "Implement the token-mixing MLP from MLP-Mixer. Given input of shape (batch, num_patches, dim), transpose to mix across the patch (token) dimension, then transpose back.",
+            "info": "MLP-Mixer is a vision architecture that replaces attention with two types of MLP blocks: token-mixing and channel-mixing. The token-mixing MLP transposes the input to apply a shared MLP across the patch (spatial) dimension, allowing communication between different spatial locations. This is conceptually similar to attention but with a fixed mixing pattern that does not depend on the input content. The transpose operation is key: it swaps the patch and channel dimensions so that a standard MLP along the last dimension effectively mixes information across patches.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass TokenMixingMLP(nn.Module):\n    def __init__(self, num_patches, hidden_dim):\n        super().__init__()\n        self.norm = nn.LayerNorm(hidden_dim)\n        self.mlp = nn.Sequential(\n            nn.Linear(num_patches, num_patches),\n            nn.GELU(),\n            nn.Linear(num_patches, num_patches)\n        )\n\n    def forward(self, x):\n        # x: (batch, num_patches, dim)\n        residual = x\n        x = self.norm(x)\n        x = {{b1}}  # swap patches and channels\n        x = self.mlp(x)\n        x = {{b2}}  # swap back\n        return x + residual",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x.???(?, ?)",
+                    "acceptable": [
+                        "x.transpose(1, 2)",
+                        "x.permute(0, 2, 1)"
+                    ],
+                    "hint": "Transpose dimensions 1 and 2 to mix across the patch dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x.???(?, ?)",
+                    "acceptable": [
+                        "x.transpose(1, 2)",
+                        "x.permute(0, 2, 1)"
+                    ],
+                    "hint": "Transpose back to restore (batch, num_patches, dim) shape."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_multi_head",
+            "title": "Multi-Head MLP",
+            "difficulty": "hard",
+            "description": "Implement a multi-head MLP where the input is split into multiple heads, each processed independently by its own MLP, and the outputs are concatenated. Use 4 heads with input dim 256.",
+            "info": "A multi-head MLP splits the input features into groups (heads), processes each group with an independent MLP, and concatenates the results. This factorization reduces the parameter count and computational cost since each head only operates on a fraction of the features. It also encourages the model to learn diverse feature transformations across different subsets of the input. This pattern is inspired by multi-head attention and is useful when you want specialized processing of different feature groups without the quadratic cost of full cross-feature interaction.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass MultiHeadMLP(nn.Module):\n    def __init__(self, dim=256, num_heads=4, hidden_mult=2):\n        super().__init__()\n        self.num_heads = num_heads\n        self.head_dim = dim // num_heads\n        self.heads = nn.ModuleList([\n            nn.Sequential(\n                nn.Linear(self.head_dim, self.head_dim * hidden_mult),\n                nn.ReLU(),\n                nn.Linear(self.head_dim * hidden_mult, self.head_dim)\n            ) for _ in range(num_heads)\n        ])\n\n    def forward(self, x):\n        # x: (batch, dim)\n        chunks = {{b1}}\n        out = [head(chunk) for head, chunk in zip(self.heads, chunks)]\n        return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x.???(self.head_dim, dim=???)",
+                    "acceptable": [
+                        "x.split(self.head_dim, dim=-1)",
+                        "x.split(self.head_dim, dim=1)",
+                        "x.chunk(self.num_heads, dim=-1)",
+                        "x.chunk(self.num_heads, dim=1)"
+                    ],
+                    "hint": "Split the input along the feature dimension into num_heads chunks."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(out, dim=???)",
+                    "acceptable": [
+                        "torch.cat(out, dim=-1)",
+                        "torch.cat(out, dim=1)"
+                    ],
+                    "hint": "Concatenate all head outputs along the feature dimension."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_custom_forward",
+            "title": "Custom Forward Pass with Intermediate Features",
+            "difficulty": "medium",
+            "description": "Write a custom forward method that returns both the final output and intermediate hidden features from each layer, useful for feature visualization or auxiliary losses.",
+            "info": "Returning intermediate features from a forward pass is useful for visualization, debugging, auxiliary loss computation, and feature distillation. By storing each hidden representation, you can analyze what the network learns at each depth level. This pattern is common in knowledge distillation where a student network is trained to match the intermediate representations of a teacher network. The custom forward pass gives full control over the computation flow, something that nn.Sequential alone cannot provide.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass MLPWithFeatures(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(784, 256)\n        self.fc2 = nn.Linear(256, 128)\n        self.fc3 = nn.Linear(128, 10)\n\n    def forward(self, x, return_features=False):\n        features = []\n        x = F.relu(self.fc1(x))\n        features.append(x)\n        x = F.relu(self.fc2(x))\n        {{b1}}\n        x = self.fc3(x)\n        if return_features:\n            return x, {{b2}}\n        return x",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "features.???(x)",
+                    "acceptable": [
+                        "features.append(x)"
+                    ],
+                    "hint": "Store the second hidden layer's features in the list."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???",
+                    "acceptable": [
+                        "features"
+                    ],
+                    "hint": "Return the list of intermediate features alongside the output."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_vae_reparameterize",
+            "title": "VAE Reparameterization Trick",
+            "difficulty": "hard",
+            "description": "Implement the reparameterization trick for a Variational Autoencoder. The encoder outputs mu and log_var, and you must sample z = mu + std * epsilon where epsilon ~ N(0,1).",
+            "info": "The reparameterization trick makes the stochastic sampling step in a VAE differentiable by expressing the random variable z as a deterministic function of the parameters (mu, log_var) and an independent noise source (epsilon). Instead of sampling z ~ N(mu, sigma^2) directly (which blocks gradients), we sample epsilon ~ N(0,1) and compute z = mu + sigma * epsilon. Converting log_var to std via exp(0.5 * log_var) is numerically more stable than directly parameterizing the variance. This trick is fundamental to training VAEs with backpropagation since it moves the stochasticity outside the computational graph.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass VAEEncoder(nn.Module):\n    def __init__(self, input_dim=784, latent_dim=32):\n        super().__init__()\n        self.fc = nn.Linear(input_dim, 256)\n        self.fc_mu = nn.Linear(256, latent_dim)\n        self.fc_logvar = nn.Linear(256, latent_dim)\n\n    def reparameterize(self, mu, log_var):\n        std = {{b1}}\n        eps = {{b2}}\n        return mu + std * eps\n\n    def forward(self, x):\n        h = torch.relu(self.fc(x))\n        mu = self.fc_mu(h)\n        log_var = self.fc_logvar(h)\n        z = self.reparameterize(mu, log_var)\n        return z, mu, log_var",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.exp(??? * log_var)",
+                    "acceptable": [
+                        "torch.exp(0.5 * log_var)"
+                    ],
+                    "hint": "Convert log variance to standard deviation: std = exp(0.5 * log_var)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???_like(std)",
+                    "acceptable": [
+                        "torch.randn_like(std)"
+                    ],
+                    "hint": "Sample epsilon from a standard normal distribution with the same shape as std."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_no_bias_linear",
+            "title": "Linear Layer Without Bias",
+            "difficulty": "easy",
+            "description": "Create a linear layer without a bias term. This is useful when the layer is followed by BatchNorm, which already includes a learnable bias.",
+            "info": "When a linear layer is immediately followed by Batch Normalization, the bias term is redundant because BatchNorm subtracts the mean (canceling the bias) and then adds its own learnable shift parameter. Setting bias=False saves memory and computation without affecting model expressiveness. In PyTorch, nn.Linear accepts a bias argument that defaults to True. This optimization is particularly relevant in large models with many layers where the accumulated savings become significant.",
+            "code": "import torch.nn as nn\n\n# Linear layer followed by BatchNorm -- bias is redundant\nlayer = nn.Sequential(\n    {{b1}},\n    nn.BatchNorm1d(256),\n    nn.ReLU()\n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(512, 256, ???=False)",
+                    "acceptable": [
+                        "nn.Linear(512, 256, bias=False)"
+                    ],
+                    "hint": "Set bias=False since BatchNorm already provides a learnable shift."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_freeze_layers",
+            "title": "Freezing Layers for Transfer Learning",
+            "difficulty": "medium",
+            "description": "Freeze the parameters of the first two layers of a pretrained MLP so only the final classification head is trained.",
+            "info": "Freezing layers sets requires_grad to False on their parameters, excluding them from gradient computation and optimizer updates. This is a core technique in transfer learning where you keep pretrained feature extraction layers fixed and only fine-tune the task-specific head. Freezing reduces training time, lowers memory usage, and prevents catastrophic forgetting of the pretrained features. In PyTorch, you can freeze individual parameters or use the requires_grad_ method on an entire module's parameters.",
+            "code": "import torch.nn as nn\n\n# Pretrained model with 3 layers\nmodel = nn.Sequential(\n    nn.Linear(784, 256),\n    nn.ReLU(),\n    nn.Linear(256, 128),\n    nn.ReLU(),\n    nn.Linear(128, 10)\n)\n\n# Freeze first two linear layers\nfor name, param in model.named_parameters():\n    if '0.' in name or '2.' in name:\n        {{b1}}\n\n# Only pass trainable parameters to optimizer\noptimizer = torch.optim.Adam(\n    {{b2}}\n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "param.requires_grad = ???",
+                    "acceptable": [
+                        "param.requires_grad = False"
+                    ],
+                    "hint": "Set requires_grad to False to freeze the parameter."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "filter(lambda p: p.???, model.parameters())",
+                    "acceptable": [
+                        "filter(lambda p: p.requires_grad, model.parameters())"
+                    ],
+                    "hint": "Filter to only include parameters that require gradients."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_leaky_relu",
+            "title": "MLP with LeakyReLU Activation",
+            "difficulty": "easy",
+            "description": "Build a 2-layer MLP using LeakyReLU with a negative slope of 0.01, which prevents the dying ReLU problem.",
+            "info": "LeakyReLU allows a small non-zero gradient for negative inputs (typically 0.01 * x) instead of clamping them to zero like standard ReLU. This prevents the 'dying ReLU' problem where neurons can get stuck outputting zero for all inputs if their weights produce consistently negative pre-activations. The negative slope is a hyperparameter that controls how much gradient flows for negative values. When using Kaiming initialization with LeakyReLU, you should pass the negative_slope to nn.init.kaiming_normal_ for optimal weight scaling.",
+            "code": "import torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(784, 256),\n    {{b1}},\n    nn.Linear(256, 10)\n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(negative_slope=???)",
+                    "acceptable": [
+                        "nn.LeakyReLU(negative_slope=0.01)",
+                        "nn.LeakyReLU(0.01)"
+                    ],
+                    "hint": "LeakyReLU with a negative slope of 0.01."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_binary_classification",
+            "title": "Output Head for Binary Classification",
+            "difficulty": "medium",
+            "description": "Define an MLP for binary classification where the output is a single logit. Apply sigmoid during inference to get a probability.",
+            "info": "For binary classification, the output layer produces a single logit value rather than two class logits, which is more efficient and numerically stable when paired with nn.BCEWithLogitsLoss. The BCEWithLogitsLoss function applies sigmoid internally and uses the log-sum-exp trick for numerical stability, so the model should output raw logits during training. At inference time, you apply sigmoid manually to convert the logit to a probability in [0, 1]. This single-output design has half the parameters of a two-class output layer and is the standard approach for binary tasks.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass BinaryMLP(nn.Module):\n    def __init__(self, input_dim=128):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(input_dim, 64),\n            nn.ReLU(),\n            {{b1}}\n        )\n\n    def forward(self, x):\n        return self.net(x)\n\nmodel = BinaryMLP()\nloss_fn = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(64, 1)"
+                    ],
+                    "hint": "Single output neuron for binary classification."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???()",
+                    "acceptable": [
+                        "nn.BCEWithLogitsLoss()"
+                    ],
+                    "hint": "Binary cross-entropy loss that accepts raw logits (includes sigmoid internally)."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_regression_output",
+            "title": "Output Head for Regression",
+            "difficulty": "easy",
+            "description": "Define an MLP for regression that outputs a continuous value with no activation on the final layer. Use MSE loss for training.",
+            "info": "For regression tasks, the output layer should not have an activation function, allowing the model to produce unbounded real-valued predictions. The Mean Squared Error (MSELoss) penalizes the squared difference between predictions and targets, making it the standard loss for continuous value regression. If the target values have a known range, you could optionally apply a final activation (e.g., sigmoid for [0,1] targets), but in general, leaving the output unconstrained and letting the model learn the appropriate scale is preferred. The output dimension matches the number of target variables (1 for single-target regression).",
+            "code": "import torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(10, 64),\n    nn.ReLU(),\n    nn.Linear(64, 32),\n    nn.ReLU(),\n    {{b1}}\n)\n\nloss_fn = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(32, 1)"
+                    ],
+                    "hint": "Output a single continuous value (no activation after this)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???()",
+                    "acceptable": [
+                        "nn.MSELoss()"
+                    ],
+                    "hint": "Mean Squared Error loss for regression."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_device_transfer",
+            "title": "Moving Model and Data to GPU",
+            "difficulty": "easy",
+            "description": "Move a model and input data to the GPU for accelerated computation. Check if CUDA is available first.",
+            "info": "PyTorch requires that the model and input data reside on the same device (CPU or GPU) for computation. The .to(device) method transfers a model's parameters and buffers to the specified device, while tensors must also be moved explicitly. Checking torch.cuda.is_available() before attempting GPU transfer ensures the code works gracefully on machines without a GPU. Moving the model to GPU once is sufficient, but every batch of input data must be transferred to the same device at each training step.",
+            "code": "import torch\nimport torch.nn as nn\n\ndevice = {{b1}}\n\nmodel = nn.Linear(784, 10)\nmodel = {{b2}}\n\nx = torch.randn(32, 784)\nx = x.to(device)\noutput = model(x)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.device('cuda' if torch.cuda.???() else 'cpu')",
+                    "acceptable": [
+                        "torch.device('cuda' if torch.cuda.is_available() else 'cpu')"
+                    ],
+                    "hint": "Check if CUDA is available, fall back to CPU."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "model.???(device)",
+                    "acceptable": [
+                        "model.to(device)"
+                    ],
+                    "hint": "Transfer the model to the selected device."
+                }
+            ]
+        },
+        {
+            "id": "mlp_new_weight_decay",
+            "title": "L2 Regularization via Weight Decay",
+            "difficulty": "easy",
+            "description": "Add L2 regularization to an MLP by setting weight_decay in the optimizer, which penalizes large weight values.",
+            "info": "Weight decay adds an L2 penalty term (lambda * ||w||^2) to the loss, discouraging large weight values and reducing overfitting. In PyTorch, weight_decay is a parameter of the optimizer rather than being added explicitly to the loss function. The AdamW optimizer implements decoupled weight decay, which applies weight decay directly to the weights rather than through the gradient, and is generally preferred over Adam with L2 regularization. A typical weight decay value is between 1e-4 and 1e-2, and it should generally not be applied to bias terms.",
+            "code": "import torch\nimport torch.nn as nn\n\nmodel = nn.Sequential(\n    nn.Linear(784, 256),\n    nn.ReLU(),\n    nn.Linear(256, 10)\n)\n\noptimizer = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.optim.???(model.parameters(), lr=1e-3, weight_decay=???)",
+                    "acceptable": [
+                        "torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-2)",
+                        "torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)",
+                        "torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)",
+                        "torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=0.0001)",
+                        "torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)"
+                    ],
+                    "hint": "Use AdamW (or Adam) with a weight_decay parameter for L2 regularization."
+                }
+            ]
         }
     ]
 }

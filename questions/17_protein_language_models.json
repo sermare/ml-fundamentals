@@ -560,6 +560,840 @@
                     "hint": "Check p.requires_grad to identify trainable parameters."
                 }
             ]
+        },
+        {
+            "id": "prot_lm_new_esm3_multimodal_tokenization",
+            "title": "ESM-3 Multi-Track Tokenization",
+            "difficulty": "medium",
+            "description": "Implement the multi-track tokenization scheme used in ESM-3, where sequence, structure, and function are each tokenized into discrete token streams that are combined into a single input.",
+            "info": "ESM-3 (Hayes et al., Science 2024) introduced a generative masked language model that reasons over protein sequence, structure, and function simultaneously. Each modality is independently tokenized: sequence uses standard amino acid tokens, structure is discretized via a VQ-VAE into 4096 structural tokens per residue, and function is encoded from InterPro annotations. These three token tracks are combined into a unified input representation through learned track-specific embeddings summed together. The model is trained with a masked prediction objective across all tracks, enabling it to generate any modality conditioned on any combination of the others. ESM-3 was trained at scales up to 98 billion parameters on 3.15 billion protein sequences. Reference: Hayes et al. (Science 2024).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass MultiTrackEmbedding(nn.Module):\n    \"\"\"ESM-3-style multi-track embedding that combines\n    sequence, structure, and function token streams.\"\"\"\n    def __init__(self, d_model=512, seq_vocab=33,\n                 struct_vocab=4096, func_vocab=256):\n        super().__init__()\n        self.seq_embed = nn.Embedding(seq_vocab, d_model)\n        self.struct_embed = nn.Embedding(struct_vocab, d_model)\n        self.func_embed = nn.Embedding(func_vocab, d_model)\n        self.layer_norm = nn.LayerNorm(d_model)\n\n    def forward(self, seq_tokens, struct_tokens, func_tokens):\n        \"\"\"Combine embeddings from all three tracks.\"\"\"\n        s = self.seq_embed(seq_tokens)\n        st = self.struct_embed(struct_tokens)\n        f = self.func_embed(func_tokens)\n        combined = {{b1}}\n        return self.layer_norm(combined)\n\nmodel = MultiTrackEmbedding()\nseq_tok = torch.randint(0, 33, (2, 50))\nstruct_tok = torch.randint(0, 4096, (2, 50))\nfunc_tok = torch.randint(0, 256, (2, 50))\nout = model(seq_tok, struct_tok, func_tok)\nprint(\"Combined embedding shape:\", out.shape)\nassert out.shape == (2, 50, {{b2}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "combine three embeddings",
+                    "acceptable": ["s + st + f"],
+                    "hint": "Sum the three track embeddings element-wise."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "hidden dimension",
+                    "acceptable": ["512"],
+                    "hint": "The output dimension matches d_model=512."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_esm3_masked_generation",
+            "title": "ESM-3 Iterative Masked Generation",
+            "difficulty": "hard",
+            "description": "Implement the iterative decoding strategy used in ESM-3, where generation proceeds by progressively unmasking tokens from a fully masked sequence over multiple steps.",
+            "info": "ESM-3 (Hayes et al., Science 2024) generates proteins using an iterative unmasking procedure inspired by MaskGIT (Chang et al., CVPR 2022). Starting from a fully masked sequence, at each step the model predicts all masked positions, and a fraction of the most confident predictions are accepted (unmasked) while the rest remain masked. This process repeats for a fixed number of steps T until all positions are unmasked. The scheduling function determines what fraction of tokens to unmask at each step, typically following a cosine or linear schedule. This approach allows the model to capture bidirectional dependencies unlike autoregressive generation. Hayes et al. demonstrated that this strategy can generate functional proteins, including a novel green fluorescent protein (esmGFP). Reference: Hayes et al. (Science 2024); MaskGIT (Chang et al., CVPR 2022).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef iterative_unmask(model, seq_len, num_steps=10, vocab_size=33, mask_id=32):\n    \"\"\"ESM-3-style iterative unmasking generation.\"\"\"\n    # Start fully masked\n    tokens = torch.full((1, seq_len), mask_id, dtype=torch.long)\n    \n    for step in range(num_steps):\n        with torch.no_grad():\n            logits = model(tokens)  # (1, seq_len, vocab_size)\n        \n        # Get probabilities at masked positions\n        mask = (tokens == mask_id).squeeze(0)  # (seq_len,)\n        if not mask.any():\n            break\n        \n        probs = F.softmax(logits[0], dim=-1)  # (seq_len, vocab_size)\n        # Sample from distribution at each position\n        sampled = torch.multinomial(probs.view(-1, vocab_size), 1).squeeze(-1)\n        # Get confidence (max prob) at each masked position\n        confidence = probs.{{b1}}(dim=-1).values\n        confidence[~mask] = -1.0  # ignore already unmasked\n        \n        # Fraction of remaining masks to unmask this step\n        frac = (step + 1) / num_steps\n        n_to_unmask = max(1, int(mask.sum().item() * frac))\n        \n        # Pick top-k most confident masked positions\n        _, top_idx = torch.{{b2}}(confidence, n_to_unmask)\n        \n        # Unmask those positions\n        tokens[0, top_idx] = sampled[top_idx]\n    \n    return tokens\n\n# Dummy model for demonstration\nclass DummyMLM(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.linear = torch.nn.Linear(33, 33)\n    def forward(self, x):\n        one_hot = F.{{b3}}(x, num_classes=33).float()\n        return self.linear(one_hot)\n\nmodel = DummyMLM()\nresult = iterative_unmask(model, seq_len=20, num_steps=5)\nprint(\"Generated tokens:\", result)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "get max probability per position",
+                    "acceptable": ["max"],
+                    "hint": "Use .max(dim=-1) to get the highest probability (confidence) at each position."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "select top-k indices",
+                    "acceptable": ["topk"],
+                    "hint": "Use torch.topk to select the most confident positions to unmask."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "convert to one-hot",
+                    "acceptable": ["one_hot"],
+                    "hint": "Use F.one_hot to convert token indices to one-hot vectors."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_sequence_clustering",
+            "title": "Protein Sequence Clustering with PLM Embeddings",
+            "difficulty": "easy",
+            "description": "Cluster protein sequences by computing mean-pooled PLM embeddings and applying k-means clustering, then evaluate cluster quality with silhouette score.",
+            "info": "Traditional protein sequence clustering tools like CD-HIT (Li & Godzik, Bioinformatics 2006) and MMseqs2 (Steinegger & Soding, Nature Biotechnology 2017) rely on sequence identity thresholds. PLM embeddings offer an alternative that captures functional and structural similarity beyond raw sequence identity. Rives et al. (PNAS 2021) showed that ESM-1b embedding space naturally clusters proteins by structural fold even at low sequence identity (<25%). Clustering in embedding space can uncover remote homology relationships missed by sequence-based methods. The silhouette score measures how similar a point is to its own cluster versus neighboring clusters, ranging from -1 to 1. Higher values indicate better-defined clusters. Reference: ESM-1b (Rives et al., PNAS 2021); MMseqs2 (Steinegger & Soding, Nature Biotechnology 2017).",
+            "code": "import torch\nfrom sklearn.cluster import KMeans\nfrom sklearn.metrics import silhouette_score\nimport numpy as np\n\ndef cluster_proteins(embeddings, n_clusters=5):\n    \"\"\"Cluster proteins using k-means on PLM embeddings.\n    embeddings: (N, embed_dim) numpy array\n    \"\"\"\n    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)\n    labels = kmeans.{{b1}}(embeddings)\n    score = silhouette_score(embeddings, labels)\n    return labels, score, kmeans\n\n# Simulate 100 protein embeddings of dimension 320\nnp.random.seed(42)\nembeddings = np.random.randn(100, 320).astype(np.float32)\n\nlabels, sil_score, km = cluster_proteins(embeddings, n_clusters=5)\nprint(f\"Silhouette score: {sil_score:.4f}\")\nprint(f\"Cluster sizes: {np.{{b2}}(labels)}\")\n\n# Get cluster centroids\ncentroids = km.{{b3}}\nprint(f\"Centroid shape: {centroids.shape}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "fit and return labels",
+                    "acceptable": ["fit_predict"],
+                    "hint": "Use .fit_predict() to fit the model and return cluster labels in one call."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "count elements per cluster",
+                    "acceptable": ["bincount"],
+                    "hint": "Use np.bincount to count how many samples belong to each cluster."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "attribute for cluster centers",
+                    "acceptable": ["cluster_centers_"],
+                    "hint": "The cluster_centers_ attribute holds the centroid coordinates after fitting."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_msa_transformer",
+            "title": "MSA Transformer Tied Row Attention",
+            "difficulty": "hard",
+            "description": "Implement the tied row attention mechanism from the MSA Transformer, where attention weights are shared (tied) across sequences in a multiple sequence alignment.",
+            "info": "The MSA Transformer (Rao et al., ICML 2021) processes multiple sequence alignments as 2D inputs with row (per-sequence) and column (per-position) attention. The key innovation is tied row attention, where the attention weights are computed by averaging queries and keys across all sequences in the MSA before computing attention. This forces the model to learn position-level patterns that are consistent across all sequences in the alignment. Column attention operates across sequences at each position, capturing coevolutionary signals. The MSA Transformer achieved state-of-the-art unsupervised contact prediction, outperforming single-sequence models. It was trained on MSAs derived from UniRef50 clusters. Reference: Rao et al. (ICML 2021).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport math\n\nclass TiedRowAttention(nn.Module):\n    \"\"\"Tied row attention: attention weights shared across MSA rows.\"\"\"\n    def __init__(self, d_model=256, nhead=8):\n        super().__init__()\n        self.nhead = nhead\n        self.d_k = d_model // nhead\n        self.W_q = nn.Linear(d_model, d_model)\n        self.W_k = nn.Linear(d_model, d_model)\n        self.W_v = nn.Linear(d_model, d_model)\n        self.W_o = nn.Linear(d_model, d_model)\n\n    def forward(self, x):\n        \"\"\"x: (batch, num_seqs, seq_len, d_model)\"\"\"\n        B, M, L, D = x.shape\n        # Project Q, K, V\n        Q = self.W_q(x).view(B, M, L, self.nhead, self.d_k)\n        K = self.W_k(x).view(B, M, L, self.nhead, self.d_k)\n        V = self.W_v(x).view(B, M, L, self.nhead, self.d_k)\n        \n        # Tied: average Q and K across MSA rows (dim=1)\n        Q_tied = Q.{{b1}}(dim=1, keepdim=True).expand_as(Q)\n        K_tied = K.mean(dim=1, keepdim=True).expand_as(K)\n        \n        # Reshape for attention: (B*M, nhead, L, d_k)\n        Q_tied = Q_tied.reshape(B*M, L, self.nhead, self.d_k).transpose(1, 2)\n        K_tied = K_tied.reshape(B*M, L, self.nhead, self.d_k).transpose(1, 2)\n        V = V.reshape(B*M, L, self.nhead, self.d_k).transpose(1, 2)\n        \n        # Scaled dot-product attention\n        scores = (Q_tied @ K_tied.transpose(-2, -1)) / math.sqrt(self.d_k)\n        attn = F.{{b2}}(scores, dim=-1)\n        out = (attn @ V).transpose(1, 2).reshape(B, M, L, D)\n        return self.W_o(out)\n\n# Test: batch=1, 8 sequences, length 30, dim 256\nx = torch.randn(1, 8, 30, 256)\nlayer = TiedRowAttention(d_model=256, nhead={{b3}})\nout = layer(x)\nprint(\"Output shape:\", out.shape)  # (1, 8, 30, 256)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "average across MSA rows",
+                    "acceptable": ["mean"],
+                    "hint": "Use .mean() to average queries across all sequences in the MSA."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "normalize attention scores",
+                    "acceptable": ["softmax"],
+                    "hint": "Apply softmax to convert scores to attention weights."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "number of attention heads",
+                    "acceptable": ["8"],
+                    "hint": "Use 8 attention heads to match d_model=256 (256/8=32 per head)."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_contrastive_learning",
+            "title": "Contrastive Learning for Protein Representations",
+            "difficulty": "medium",
+            "description": "Implement an NT-Xent (Normalized Temperature-scaled Cross Entropy) contrastive loss for learning protein representations, where augmented views of the same protein form positive pairs.",
+            "info": "Contrastive learning has been applied to proteins to learn representations that group functionally similar proteins together. Lu et al. (2022, 'Contrastive learning on protein embeddings') showed that applying contrastive objectives on top of PLM embeddings improves protein function prediction. Positive pairs are typically constructed by taking two augmented views of the same protein (e.g., subsequences, masking, or homologous sequences). The NT-Xent loss from SimCLR (Chen et al., ICML 2020) is commonly used, which maximizes agreement between positive pairs while pushing apart negatives within the batch. A temperature parameter controls the sharpness of the similarity distribution. This approach is especially useful for learning representations when labeled data is scarce. Reference: SimCLR (Chen et al., ICML 2020); Lu et al. (Bioinformatics 2022).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef nt_xent_loss(z1, z2, temperature=0.1):\n    \"\"\"NT-Xent contrastive loss for protein embedding pairs.\n    z1, z2: (batch, embed_dim) - two views of the same proteins\n    \"\"\"\n    batch_size = z1.size(0)\n    # Normalize embeddings\n    z1 = F.normalize(z1, dim=-1)\n    z2 = F.normalize(z2, dim=-1)\n    \n    # Concatenate both views\n    z = torch.cat([z1, z2], dim=0)  # (2*batch, dim)\n    \n    # Pairwise cosine similarity\n    sim = z @ z.T / {{b1}}\n    \n    # Mask out self-similarity (diagonal)\n    mask = torch.eye(2 * batch_size, dtype=torch.bool)\n    sim.masked_fill_(mask, {{b2}})\n    \n    # Positive pairs: (i, i+batch) and (i+batch, i)\n    labels = torch.cat([\n        torch.arange(batch_size, 2 * batch_size),\n        torch.arange(0, batch_size)\n    ])\n    \n    loss = F.{{b3}}(sim, labels)\n    return loss\n\n# Test with batch of 16 protein embeddings\nz1 = torch.randn(16, 320)  # view 1\nz2 = torch.randn(16, 320)  # view 2 (augmented)\nloss = nt_xent_loss(z1, z2, temperature=0.1)\nprint(f\"Contrastive loss: {loss.item():.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "scaling factor",
+                    "acceptable": ["temperature"],
+                    "hint": "Divide similarities by the temperature parameter to control distribution sharpness."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "value to mask self-similarity",
+                    "acceptable": ["float('-inf')", "-float('inf')"],
+                    "hint": "Set self-similarity to negative infinity so it becomes zero after softmax."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "loss function",
+                    "acceptable": ["cross_entropy"],
+                    "hint": "Use cross_entropy loss with the positive pair indices as labels."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_protst_text_protein",
+            "title": "ProtST: Protein-Text Dual Encoder",
+            "difficulty": "hard",
+            "description": "Implement a dual-encoder model inspired by ProtST that aligns protein sequence embeddings with natural language function descriptions in a shared embedding space.",
+            "info": "ProtST (Xu et al., ICML 2023) introduced a framework for learning protein representations aligned with biomedical text descriptions. The model uses a protein encoder (based on ESM) and a text encoder (based on PubMedBERT) trained with contrastive and matching objectives. Protein-text pairs are derived from Swiss-Prot entries where each protein has a textual function annotation. The contrastive objective pulls matching protein-text pairs together while pushing non-matching pairs apart in the shared embedding space. ProtST demonstrated that text-supervised protein representations improve zero-shot protein classification and retrieval tasks. The approach bridges protein sequence space and natural language, enabling text-based protein search. Reference: Xu et al. (ICML 2023); ESM-2 (Lin et al., Science 2023).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass ProteinTextDualEncoder(nn.Module):\n    \"\"\"ProtST-style dual encoder for protein-text alignment.\"\"\"\n    def __init__(self, prot_dim=320, text_dim=768, proj_dim=256):\n        super().__init__()\n        self.prot_proj = nn.Sequential(\n            nn.Linear(prot_dim, proj_dim),\n            nn.ReLU(),\n            nn.Linear(proj_dim, proj_dim)\n        )\n        self.text_proj = nn.Sequential(\n            nn.Linear(text_dim, proj_dim),\n            nn.ReLU(),\n            nn.Linear(proj_dim, proj_dim)\n        )\n        self.temperature = nn.Parameter(torch.tensor(0.07))\n\n    def forward(self, prot_emb, text_emb):\n        \"\"\"Compute contrastive loss between protein and text embeddings.\"\"\"\n        # Project to shared space\n        p = F.normalize(self.prot_proj(prot_emb), dim=-1)\n        t = F.normalize(self.text_proj(text_emb), dim=-1)\n        \n        # Similarity matrix\n        logits = (p @ t.T) / self.temperature.{{b1}}()\n        \n        # Symmetric contrastive loss\n        batch_size = p.size(0)\n        labels = torch.{{b2}}(batch_size, device=p.device)\n        loss_p2t = F.cross_entropy(logits, labels)\n        loss_t2p = F.cross_entropy(logits.T, labels)\n        return (loss_p2t + loss_t2p) / {{b3}}\n\nmodel = ProteinTextDualEncoder()\nprot_emb = torch.randn(8, 320)   # 8 protein embeddings\ntext_emb = torch.randn(8, 768)   # 8 text embeddings\nloss = model(prot_emb, text_emb)\nprint(f\"ProtST-style loss: {loss.item():.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "ensure positive temperature",
+                    "acceptable": ["exp"],
+                    "hint": "Use .exp() to ensure the temperature is always positive via log-parameterization."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "create identity labels",
+                    "acceptable": ["arange"],
+                    "hint": "Use torch.arange to create labels [0,1,...,N-1] where each protein matches its paired text."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "number to average two losses",
+                    "acceptable": ["2", "2.0"],
+                    "hint": "Average the two directional losses by dividing by 2."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_instruction_tuned_plm",
+            "title": "Instruction-Tuned Protein Language Model",
+            "difficulty": "medium",
+            "description": "Implement an instruction-following wrapper around a protein LM that formats diverse protein tasks (function prediction, localization, etc.) as text instructions paired with protein sequences.",
+            "info": "InstructProtein (Wang et al., 2024) and Prot2Text (Abdine et al., 2024) adapted instruction-tuning paradigms from NLP to protein language models. These models take natural language instructions alongside protein sequences and generate textual answers about protein properties. The approach unifies multiple protein tasks (function prediction, localization, family classification) under a single generative model conditioned on task-specific instructions. Training data is constructed from Swiss-Prot annotations formatted as instruction-response pairs. This paradigm enables zero-shot generalization to new protein analysis tasks described in natural language. The architecture typically combines a frozen protein encoder with a language model decoder connected via a projection layer. Reference: InstructProtein (Wang et al., 2024); Prot2Text (Abdine et al., 2024).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass InstructProteinModel(nn.Module):\n    \"\"\"Simplified instruction-tuned protein model.\"\"\"\n    def __init__(self, prot_dim=320, text_dim=512, vocab_size=30000):\n        super().__init__()\n        # Projection from protein space to text decoder space\n        self.prot_projector = nn.Linear(prot_dim, text_dim)\n        # Instruction embedding\n        self.text_embed = nn.Embedding(vocab_size, text_dim)\n        # Simple decoder\n        decoder_layer = nn.TransformerDecoderLayer(\n            d_model=text_dim, nhead=8, batch_first=True\n        )\n        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=2)\n        self.lm_head = nn.Linear(text_dim, vocab_size)\n\n    def forward(self, prot_emb, instruction_ids, target_ids=None):\n        # Project protein embeddings to text space\n        prot_features = self.prot_projector(prot_emb)  # (B, L, text_dim)\n        # Embed instruction tokens\n        instr_emb = self.text_embed(instruction_ids)\n        # Concatenate protein features and instruction as memory\n        memory = torch.cat([prot_features, instr_emb], dim={{b1}})\n        # Decode (teacher forcing with target)\n        if target_ids is not None:\n            tgt_emb = self.text_embed(target_ids)\n            out = self.decoder(tgt_emb, memory)\n            return self.lm_head(out)\n        return memory\n\ndef format_instruction(task, sequence):\n    \"\"\"Format a protein task as an instruction string.\"\"\"\n    templates = {\n        \"function\": f\"What is the function of this protein: {sequence}?\",\n        \"localization\": f\"Predict the subcellular localization of: {sequence}\",\n        \"family\": f\"What protein family does this belong to: {sequence}?\"\n    }\n    return templates.get(task, f\"Analyze this protein: {sequence}\")\n\nmodel = InstructProteinModel()\nprot_emb = torch.randn(2, 10, {{b2}})  # batch=2, 10 residues\ninstr_ids = torch.randint(0, 30000, (2, 15))\ntarget_ids = torch.randint(0, 30000, (2, 20))\nlogits = model(prot_emb, instr_ids, target_ids)\nprint(\"Output logits shape:\", logits.shape)\n\n# Format example\ninstr = format_instruction(\"function\", \"MKTLLILAVV\")\nprint(\"Instruction:\", {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "concatenation dimension (sequence)",
+                    "acceptable": ["1"],
+                    "hint": "Concatenate along dim=1 (sequence length) to combine protein and instruction tokens."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "protein embedding dimension",
+                    "acceptable": ["320"],
+                    "hint": "Match the prot_dim=320 parameter used in the model constructor."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "instruction variable",
+                    "acceptable": ["instr"],
+                    "hint": "Print the formatted instruction string stored in the 'instr' variable."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_alignment_scoring",
+            "title": "Protein Sequence Alignment Scoring with LMs",
+            "difficulty": "medium",
+            "description": "Use a protein language model to score pairwise sequence alignments by summing per-position log-likelihoods, providing an alternative to substitution matrix-based scoring (BLOSUM).",
+            "info": "Protein language models can replace traditional substitution matrices (BLOSUM, PAM) for alignment scoring. Sgarbossa et al. (NAR 2023) showed that ESM-based scoring functions improve remote homology detection in pairwise alignments. The idea is to score each aligned position by the log-probability the LM assigns to the observed amino acid given its context, rather than using a fixed substitution score. Positions where the LM assigns high probability correspond to conserved or structurally important residues. Gap penalties can also be learned from the model's insertion probabilities. This approach captures position-specific and context-dependent substitution preferences that static matrices cannot. Reference: Sgarbossa et al. (NAR 2023); ESM-2 (Lin et al., Science 2023).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef lm_alignment_score(log_probs, seq1_ids, seq2_ids,\n                       alignment, gap_penalty=-2.0):\n    \"\"\"Score a pairwise alignment using LM log-probabilities.\n    log_probs: (seq_len, vocab_size) from masked LM\n    alignment: list of tuples (i, j) or (i, -1) for gaps\n    \"\"\"\n    score = 0.0\n    for pos1, pos2 in alignment:\n        if pos1 == -1 or pos2 == -1:\n            score += gap_penalty\n        else:\n            # LM score: log P(aa at pos) from context\n            score += log_probs[pos1, seq2_ids[pos2]].item()\n    return score\n\ndef compute_lm_log_probs(logits):\n    \"\"\"Convert raw logits to log probabilities.\"\"\"\n    return F.{{b1}}(logits, dim=-1)\n\n# Simulated: 30 positions, vocab_size=33\nlogits = torch.randn(30, 33)\nlog_probs = compute_lm_log_probs(logits)\n\n# Simple alignment: positions match 1:1 for first 10\nalignment = [(i, i) for i in range(10)] + [(-1, 10)]  # one gap\nseq1_ids = torch.randint(4, 24, (30,))\nseq2_ids = torch.randint(4, 24, (30,))\n\nscore = lm_alignment_score(log_probs, seq1_ids, seq2_ids, alignment)\nprint(f\"LM alignment score: {score:.4f}\")\n\n# Compare: BLOSUM-like fixed score\nblosum_score = sum([{{b2}} for _ in range(10)]) + (-2.0)\nprint(f\"Fixed substitution score: {blosum_score:.4f}\")\n\n# The LM score is context-{{b3}}\nprint(\"LM scoring is context-dependent unlike BLOSUM\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "log probability function",
+                    "acceptable": ["log_softmax"],
+                    "hint": "Use F.log_softmax to convert logits to log probabilities."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "a fixed match score value",
+                    "acceptable": ["1", "1.0", "2", "2.0"],
+                    "hint": "A fixed positive score (e.g., 1 or 2) for each matched position in a simple substitution scheme."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "key advantage of LM scoring",
+                    "acceptable": ["dependent", "sensitive", "aware"],
+                    "hint": "LM scoring is context-dependent, meaning scores change based on surrounding residues."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_evolutionary_coupling",
+            "title": "Evolutionary Coupling Analysis from PLM Attention",
+            "difficulty": "hard",
+            "description": "Extract evolutionary couplings (coevolution signals) from a protein language model by analyzing the attention weight patterns across layers and heads, using APC correction.",
+            "info": "Evolutionary couplings between residue positions arise when mutations at one position are compensated by mutations at another to maintain protein fitness. Traditional methods like Direct Coupling Analysis (DCA) and EVcouplings (Marks et al., PLoS ONE 2011) infer these from MSA covariance statistics. Rao et al. (NeurIPS 2020) showed that transformer attention heads in protein LMs capture coevolutionary signals without explicit MSA input. The model implicitly learns coupling patterns from the training corpus of millions of evolutionary sequences. Combining attention maps from multiple layers and heads using a learned linear combination outperforms using any single head. APC (Average Product Correction) removes background coupling noise. Reference: Marks et al. (PLoS ONE 2011); Rao et al. (NeurIPS 2020).",
+            "code": "import torch\nimport torch.nn as nn\n\ndef extract_couplings(attentions, layer_weights=None):\n    \"\"\"Extract evolutionary couplings from multi-layer attention.\n    attentions: list of (num_heads, L, L) tensors per layer\n    layer_weights: (num_layers, num_heads) learned combination weights\n    \"\"\"\n    num_layers = len(attentions)\n    num_heads = attentions[0].shape[0]\n    L = attentions[0].shape[1]\n    \n    if layer_weights is None:\n        layer_weights = torch.ones(num_layers, num_heads)\n    \n    coupling_map = torch.zeros(L, L)\n    for l, attn in enumerate(attentions):\n        for h in range(num_heads):\n            w = layer_weights[l, h]\n            # Symmetrize each head's attention\n            sym = (attn[h] + attn[h].T) / 2\n            coupling_map += w * sym\n    \n    # Apply APC correction\n    row_mean = coupling_map.mean(dim={{b1}}, keepdim=True)\n    col_mean = coupling_map.mean(dim=0, keepdim=True)\n    global_mean = coupling_map.mean()\n    corrected = coupling_map - (row_mean * col_mean) / global_mean\n    \n    # Zero out diagonal (self-contacts not meaningful)\n    corrected.fill_diagonal_({{b2}})\n    return corrected\n\n# Simulate 6 layers, 12 heads, sequence length 40\nattentions = [torch.rand(12, 40, 40) for _ in range(6)]\ncouplings = extract_couplings(attentions)\n\n# Top predicted couplings\nflat_idx = torch.{{b3}}(couplings)\ntop_k = 5\nfor i in range(top_k):\n    row = flat_idx[i] // 40\n    col = flat_idx[i] % 40\n    print(f\"Coupling {row.item()}-{col.item()}: {couplings[row, col]:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "dimension for row mean",
+                    "acceptable": ["1", "-1"],
+                    "hint": "Compute the mean along dim=1 (columns) to get the row mean."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "value for self-contacts",
+                    "acceptable": ["0", "0.0"],
+                    "hint": "Set diagonal to 0 since self-couplings are not meaningful."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "sort descending and get indices",
+                    "acceptable": ["argsort(couplings.flatten(), descending=True)", "argsort(couplings.view(-1), descending=True)"],
+                    "hint": "Use torch.argsort with descending=True to rank couplings from strongest to weakest."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_protein_family_classifier",
+            "title": "Protein Family Classification with PLM Embeddings",
+            "difficulty": "easy",
+            "description": "Build a multi-class classifier that assigns proteins to Pfam families using frozen ESM-2 embeddings and a simple MLP head.",
+            "info": "Protein family databases like Pfam (Mistry et al., NAR 2021) organize proteins into evolutionary families based on sequence and structural similarity. Traditional family assignment uses profile HMMs (HMMER), but PLM embeddings offer a fast alternative. Bileschi et al. (Nature Biotechnology 2022, ProtCNN/ProtENN) showed that neural networks can classify proteins into 17,929 Pfam families with high accuracy. Using frozen ESM-2 embeddings with a simple MLP head achieves comparable results with minimal training. The <cls> token from ESM-2 serves as a compact whole-sequence representation suitable for family-level classification. This approach is orders of magnitude faster than HMM-based searches at inference time. Reference: Pfam (Mistry et al., NAR 2021); Bileschi et al. (Nature Biotechnology 2022).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass PfamClassifier(nn.Module):\n    \"\"\"Classify proteins into Pfam families from PLM embeddings.\"\"\"\n    def __init__(self, embed_dim=320, num_families=1000, dropout=0.3):\n        super().__init__()\n        self.classifier = nn.Sequential(\n            nn.Linear(embed_dim, 512),\n            nn.ReLU(),\n            nn.{{b1}}(dropout),\n            nn.Linear(512, 256),\n            nn.ReLU(),\n            nn.Dropout(dropout),\n            nn.Linear(256, num_families)\n        )\n\n    def forward(self, cls_embedding):\n        \"\"\"cls_embedding: (batch, embed_dim) from ESM-2 <cls> token.\"\"\"\n        return self.classifier(cls_embedding)\n\nmodel = PfamClassifier(embed_dim=320, num_families=1000)\ncls_emb = torch.randn(16, 320)  # batch of 16\nlogits = model(cls_emb)\npredictions = torch.{{b2}}(logits, dim=-1)\nprint(\"Predictions shape:\", predictions.shape)\n\n# Top-5 accuracy computation\ntargets = torch.randint(0, 1000, (16,))\ntop5 = torch.topk(logits, k=5, dim=-1).indices\ncorrect = (top5 == targets.{{b3}}(-1, 1)).any(dim=-1).float().mean()\nprint(f\"Top-5 accuracy: {correct.item():.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "regularization layer",
+                    "acceptable": ["Dropout"],
+                    "hint": "Use nn.Dropout for regularization between hidden layers."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "get predicted class",
+                    "acceptable": ["argmax"],
+                    "hint": "Use torch.argmax to get the predicted class index."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "reshape for broadcasting",
+                    "acceptable": ["unsqueeze", "view"],
+                    "hint": "Use .unsqueeze(-1, 1) or .view(-1, 1) to reshape targets for comparison with top-5."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_domain_detection",
+            "title": "Protein Domain Detection with Token-Level Predictions",
+            "difficulty": "medium",
+            "description": "Implement a token-level domain boundary detection model that labels each residue as belonging to a specific domain or a linker region, using PLM per-residue embeddings.",
+            "info": "Protein domains are independently folding structural units, and detecting domain boundaries is essential for understanding multidomain proteins. Traditional tools like Pfam (Mistry et al., NAR 2021) and InterPro (Blum et al., NAR 2021) use profile HMMs for domain annotation. Recent work has shown that PLM per-residue embeddings encode domain boundary information. The task is formulated as a sequence labeling (BIO tagging) problem where each residue is labeled as Beginning, Inside, or Outside of a domain. Elnaggar et al. (IEEE TPAMI 2022) showed that ProtTrans embeddings combined with a CRF layer can accurately predict domain boundaries. This approach generalizes better to novel domain architectures than HMM-based methods. Reference: InterPro (Blum et al., NAR 2021); ProtTrans (Elnaggar et al., IEEE TPAMI 2022).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DomainDetector(nn.Module):\n    \"\"\"Detect protein domains using BIO tagging on PLM embeddings.\"\"\"\n    def __init__(self, embed_dim=320, hidden_dim=128,\n                 num_domain_types=50):\n        super().__init__()\n        # Total tags: B-domain, I-domain for each type + O (linker)\n        self.num_tags = num_domain_types * 2 + 1\n        self.bilstm = nn.LSTM(\n            embed_dim, hidden_dim, num_layers=1,\n            bidirectional={{b1}}, batch_first=True\n        )\n        self.classifier = nn.Linear(hidden_dim * 2, self.num_tags)\n\n    def forward(self, embeddings):\n        \"\"\"embeddings: (batch, seq_len, embed_dim)\"\"\"\n        lstm_out, _ = self.bilstm(embeddings)\n        logits = self.classifier(lstm_out)\n        return logits\n\n    def decode(self, logits):\n        \"\"\"Greedy decode: get most likely tag per residue.\"\"\"\n        return torch.argmax(logits, dim={{b2}})\n\nmodel = DomainDetector()\nembeddings = torch.randn(4, 200, 320)  # batch=4, 200 residues\nlogits = model(embeddings)\ntags = model.decode(logits)\nprint(\"Tag shape:\", tags.shape)  # (4, 200)\nprint(\"Num unique tags:\", tags.{{b3}}().numel())",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "bidirectional flag",
+                    "acceptable": ["True"],
+                    "hint": "Set bidirectional=True to use a BiLSTM that reads the sequence in both directions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "dimension for argmax",
+                    "acceptable": ["-1", "2"],
+                    "hint": "Take argmax along the last dimension (tag dimension) to get predicted tags."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "get unique values",
+                    "acceptable": ["unique()"],
+                    "hint": "Use .unique() to get the set of distinct predicted tags."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_signal_peptide",
+            "title": "Signal Peptide Prediction with PLM",
+            "difficulty": "easy",
+            "description": "Build a signal peptide predictor that classifies the N-terminal region of a protein as having a signal peptide or not, and predicts the cleavage site position.",
+            "info": "Signal peptides are short N-terminal sequences (typically 15-30 residues) that direct proteins to the secretory pathway. SignalP 6.0 (Teufel et al., Nature Biotechnology 2022) used protein language model embeddings to achieve state-of-the-art signal peptide prediction across all domains of life. The model predicts per-residue labels indicating the n-region, h-region, c-region of the signal peptide and the cleavage site. Combining ESM-2 or ProtTrans embeddings with a conditional random field (CRF) decoder captures the sequential nature of signal peptide regions. The cleavage site typically occurs after the pattern Ala-X-Ala. This is a critical bioinformatics task for protein secretion studies and recombinant protein production. Reference: SignalP 6.0 (Teufel et al., Nature Biotechnology 2022); ESM-2 (Lin et al., Science 2023).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SignalPeptidePredictor(nn.Module):\n    \"\"\"Predict signal peptide presence and cleavage site.\"\"\"\n    def __init__(self, embed_dim=320, max_sp_len=70):\n        super().__init__()\n        # Binary: has signal peptide or not\n        self.sp_classifier = nn.Linear(embed_dim, 2)\n        # Per-residue: n-region, h-region, c-region, mature\n        self.region_classifier = nn.Linear(embed_dim, 4)\n\n    def forward(self, embeddings):\n        \"\"\"embeddings: (batch, seq_len, embed_dim)\"\"\"\n        # Sequence-level: use mean of first 70 residues\n        n_terminal = embeddings[:, :70, :].{{b1}}(dim=1)\n        sp_logits = self.sp_classifier(n_terminal)  # (batch, 2)\n        # Residue-level region prediction\n        region_logits = self.region_classifier(embeddings)\n        return sp_logits, region_logits\n\n    def predict_cleavage_site(self, region_logits):\n        \"\"\"Find cleavage site: last position predicted as c-region.\"\"\"\n        # Region labels: 0=n-region, 1=h-region, 2=c-region, 3=mature\n        predictions = torch.argmax(region_logits, dim=-1)  # (batch, L)\n        # Cleavage site = first position where prediction switches to mature (3)\n        is_mature = (predictions == {{b2}})\n        # Find first mature position per sequence\n        batch_size = predictions.size(0)\n        sites = []\n        for i in range(batch_size):\n            mature_pos = is_mature[i].nonzero(as_tuple=True)[0]\n            site = mature_pos[0].item() if len(mature_pos) > 0 else -1\n            sites.append(site)\n        return sites\n\nmodel = SignalPeptidePredictor()\nemb = torch.randn(2, 100, 320)\nsp_logits, region_logits = model(emb)\nhas_sp = torch.argmax(sp_logits, dim={{b3}})\nprint(\"Has signal peptide:\", has_sp.tolist())\nsites = model.predict_cleavage_site(region_logits)\nprint(\"Cleavage sites:\", sites)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "pool over residues",
+                    "acceptable": ["mean"],
+                    "hint": "Use .mean(dim=1) to average over the sequence length dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "label for mature region",
+                    "acceptable": ["3"],
+                    "hint": "The mature protein region is labeled as 3 (after n=0, h=1, c=2)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "dimension for class prediction",
+                    "acceptable": ["-1", "1"],
+                    "hint": "Take argmax along the last dimension to get binary prediction."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_subcellular_localization",
+            "title": "Subcellular Localization Prediction",
+            "difficulty": "medium",
+            "description": "Build a multi-class classifier for predicting protein subcellular localization (e.g., nucleus, cytoplasm, membrane, mitochondria) from PLM embeddings with class-weighted loss to handle imbalanced data.",
+            "info": "Subcellular localization prediction assigns proteins to cellular compartments where they function. DeepLoc 2.0 (Thumuluri et al., NAR 2022) used protein language model embeddings to predict localization across 10 compartments, achieving state-of-the-art accuracy. The task is challenging due to severe class imbalance (most proteins are cytoplasmic) and multi-label cases (some proteins localize to multiple compartments). ProtTrans (Elnaggar et al., IEEE TPAMI 2022) showed that ProtT5 embeddings provide strong features for localization prediction. The <cls> token or mean-pooled representation captures global sequence properties relevant to targeting signals. Class-weighted cross-entropy loss helps address the imbalanced label distribution. Reference: DeepLoc 2.0 (Thumuluri et al., NAR 2022); ProtTrans (Elnaggar et al., IEEE TPAMI 2022).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nLOCATIONS = [\n    \"Nucleus\", \"Cytoplasm\", \"Membrane\", \"Mitochondria\",\n    \"ER\", \"Golgi\", \"Lysosome\", \"Peroxisome\",\n    \"Extracellular\", \"Plastid\"\n]\n\nclass LocalizationPredictor(nn.Module):\n    def __init__(self, embed_dim=320, num_classes=10):\n        super().__init__()\n        self.head = nn.Sequential(\n            nn.Linear(embed_dim, 256),\n            nn.ReLU(),\n            nn.Dropout(0.3),\n            nn.Linear(256, num_classes)\n        )\n\n    def forward(self, pooled_embedding):\n        return self.head(pooled_embedding)\n\n# Compute class weights from training label frequencies\ndef compute_class_weights(labels, num_classes):\n    \"\"\"Inverse frequency weighting for imbalanced classes.\"\"\"\n    counts = torch.bincount(labels, minlength=num_classes).float()\n    weights = 1.0 / (counts + 1e-6)\n    return weights / weights.{{b1}}()\n\n# Simulate imbalanced dataset\ntorch.manual_seed(42)\nlabels = torch.cat([\n    torch.zeros(500, dtype=torch.long),   # Nucleus (overrepresented)\n    torch.ones(100, dtype=torch.long),     # Cytoplasm\n    torch.full((50,), 2, dtype=torch.long) # Membrane (underrepresented)\n])\nweights = compute_class_weights(labels, num_classes=10)\nprint(\"Class weights:\", weights[:3])\n\nmodel = LocalizationPredictor()\nembeddings = torch.randn(32, 320)\nlogits = model(embeddings)\ntargets = torch.randint(0, 10, (32,))\n\nloss = F.cross_entropy(logits, targets, weight={{b2}})\nprint(f\"Weighted loss: {loss.item():.4f}\")\n\npredicted = logits.argmax(dim=-1)\naccuracy = (predicted == targets).{{b3}}().item()\nprint(f\"Accuracy: {accuracy:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "normalize weights",
+                    "acceptable": ["sum"],
+                    "hint": "Divide by the sum to normalize weights so they sum to 1."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "class weight tensor",
+                    "acceptable": ["weights"],
+                    "hint": "Pass the computed class weights to cross_entropy for imbalanced handling."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "convert bool to float and average",
+                    "acceptable": ["float().mean"],
+                    "hint": "Convert boolean comparisons to float and take the mean for accuracy."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_ptm_prediction",
+            "title": "Post-Translational Modification Prediction",
+            "difficulty": "medium",
+            "description": "Build a per-residue predictor for post-translational modifications (phosphorylation, glycosylation, ubiquitination) using PLM embeddings with a multi-label binary classification head.",
+            "info": "Post-translational modifications (PTMs) regulate protein function, and predicting modification sites from sequence is an active area. MusiteDeep (Wang et al., Briefings in Bioinformatics 2020) used deep learning for PTM site prediction across 13 modification types. Recent approaches integrate PLM embeddings for improved accuracy: the local sequence context captured by ESM-2 embeddings is highly informative for PTM sites. The task is per-residue multi-label classification since a single residue can carry multiple modifications. For phosphorylation, only S, T, and Y residues are candidate sites; for glycosylation, N (in N-X-S/T motifs) and S/T are candidates. A sigmoid activation with binary cross-entropy loss handles the multi-label nature. Reference: MusiteDeep (Wang et al., Briefings in Bioinformatics 2020); ESM-2 (Lin et al., Science 2023).",
+            "code": "import torch\nimport torch.nn as nn\n\nPTM_TYPES = [\"Phosphorylation\", \"Glycosylation\", \"Ubiquitination\",\n             \"Acetylation\", \"Methylation\", \"SUMOylation\"]\n\nclass PTMPredictor(nn.Module):\n    \"\"\"Per-residue multi-label PTM site prediction.\"\"\"\n    def __init__(self, embed_dim=320, num_ptm_types=6, window=7):\n        super().__init__()\n        # 1D convolution for local context\n        self.conv = nn.Conv1d(\n            embed_dim, 128, kernel_size=window,\n            padding=window // 2\n        )\n        self.head = nn.Sequential(\n            nn.ReLU(),\n            nn.Linear(128, num_ptm_types)\n        )\n\n    def forward(self, embeddings):\n        \"\"\"embeddings: (batch, seq_len, embed_dim)\"\"\"\n        # Conv expects (batch, channels, length)\n        x = embeddings.{{b1}}(1, 2)\n        x = self.conv(x).transpose(1, 2)  # back to (batch, L, 128)\n        logits = self.head(x)  # (batch, L, num_ptm_types)\n        return logits\n\n    def predict(self, logits, threshold=0.5):\n        \"\"\"Multi-label prediction using sigmoid threshold.\"\"\"\n        probs = torch.{{b2}}(logits)\n        return (probs > threshold).long()\n\nmodel = PTMPredictor()\nemb = torch.randn(4, 100, 320)\nlogits = model(emb)\npredictions = model.predict(logits)\nprint(\"Prediction shape:\", predictions.shape)  # (4, 100, 6)\n\n# Multi-label BCE loss\ntargets = torch.zeros(4, 100, 6)\ntargets[0, 10, 0] = 1  # phosphorylation at position 10\nloss = nn.functional.{{b3}}(\n    logits, targets\n)\nprint(f\"BCE loss: {loss.item():.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "swap dimensions for Conv1d",
+                    "acceptable": ["transpose"],
+                    "hint": "Use .transpose(1, 2) to convert from (B, L, C) to (B, C, L) for Conv1d."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "activation for multi-label",
+                    "acceptable": ["sigmoid"],
+                    "hint": "Use sigmoid to get independent probabilities for each PTM type (multi-label)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "multi-label loss function",
+                    "acceptable": ["binary_cross_entropy_with_logits"],
+                    "hint": "Use binary_cross_entropy_with_logits for multi-label classification from raw logits."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_multi_species_plm",
+            "title": "Multi-Species Protein LM with Taxonomy Conditioning",
+            "difficulty": "hard",
+            "description": "Implement a protein language model that conditions on species taxonomy information through learned taxonomy embeddings added to the sequence representation, enabling species-aware predictions.",
+            "info": "Protein language models trained on multi-species data must account for evolutionary divergence between organisms. ProGen2 (Nijkamp et al., Cell Systems 2023) trained models on proteins from diverse taxa and showed improved generation when conditioned on taxonomic information. Species-specific biases in amino acid usage (codon bias), protein length distributions, and functional repertoires mean that taxonomy-aware models can better capture organism-specific sequence patterns. The NCBI taxonomy tree provides hierarchical classification (kingdom, phylum, class, order, family, genus, species) that can be encoded as embeddings at multiple levels. Adding taxonomy embeddings to the sequence representation enables the model to learn species-specific protein distributions. Reference: ProGen2 (Nijkamp et al., Cell Systems 2023); UniProt Consortium (NAR 2023).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass TaxonomyAwarePLM(nn.Module):\n    \"\"\"Protein LM with taxonomy conditioning.\"\"\"\n    def __init__(self, vocab_size=33, d_model=256, nhead=8,\n                 num_layers=4, num_species=10000):\n        super().__init__()\n        self.aa_embed = nn.Embedding(vocab_size, d_model)\n        self.tax_embed = nn.Embedding(num_species, d_model)\n        self.pos_embed = nn.Embedding(1024, d_model)\n        \n        encoder_layer = nn.TransformerEncoderLayer(\n            d_model=d_model, nhead=nhead, batch_first=True\n        )\n        self.encoder = nn.TransformerEncoder(\n            encoder_layer, num_layers=num_layers\n        )\n        self.lm_head = nn.Linear(d_model, vocab_size)\n\n    def forward(self, token_ids, species_id):\n        \"\"\"token_ids: (B, L), species_id: (B,)\"\"\"\n        seq_len = token_ids.size(1)\n        positions = torch.arange(seq_len, device=token_ids.device)\n        \n        # Combine sequence, position, and taxonomy embeddings\n        x = self.aa_embed(token_ids) + self.pos_embed(positions)\n        # Broadcast species embedding across all positions\n        tax = self.tax_embed(species_id).{{b1}}(1)\n        x = x + tax\n        \n        encoded = self.encoder(x)\n        logits = self.lm_head(encoded)\n        return logits\n\nmodel = TaxonomyAwarePLM()\ntokens = torch.randint(0, 33, (4, 50))\nspecies = torch.randint(0, 10000, (4,))\n\nlogits = model(tokens, species)\nprint(\"Logits shape:\", logits.shape)  # (4, 50, 33)\n\n# Compare predictions for same sequence, different species\nseq = torch.randint(0, 33, (1, 30))\nhuman = torch.tensor([{{b2}}])\nyeast = torch.tensor([42])\nlogits_h = model(seq, human)\nlogits_y = model(seq, yeast)\ndiff = (logits_h - logits_y).{{b3}}().mean().item()\nprint(f\"Mean absolute difference between species: {diff:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "add sequence dimension",
+                    "acceptable": ["unsqueeze"],
+                    "hint": "Use .unsqueeze(1) to add a sequence length dimension for broadcasting."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "any species id for human",
+                    "acceptable": ["0", "1", "9606"],
+                    "hint": "Use any integer species ID (e.g., 0 or 9606 for human NCBI taxon)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "absolute value",
+                    "acceptable": ["abs"],
+                    "hint": "Use .abs() to compute the absolute difference."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_denovo_design",
+            "title": "De Novo Protein Sequence Design with PLM Scoring",
+            "difficulty": "hard",
+            "description": "Implement a Monte Carlo-based protein sequence design method that uses a PLM's pseudo-likelihood as the optimization objective to design sequences predicted to fold into a target structure.",
+            "info": "Protein language models provide a learned fitness landscape that can guide de novo sequence design. Hie et al. (Nature Biotechnology 2024) used PLM likelihood scores to design functional proteins through directed evolution in silico. The pseudo-likelihood of a sequence under a masked LM sums the log-probabilities of each residue given all others, providing a differentiable fitness score. Metropolis-Hastings sampling with PLM scoring allows exploration of sequence space while maintaining high predicted fitness. Ferruz et al. (Nature Communications 2022) showed that ProtGPT2-generated sequences adopt natural-like structures. The acceptance criterion in MCMC ensures detailed balance: mutations increasing PLM likelihood are always accepted, while decreasing mutations are accepted with probability proportional to exp(-delta/T). Reference: Hie et al. (Nature Biotechnology 2024); Ferruz et al. (Nature Communications 2022).",
+            "code": "import torch\nimport torch.nn.functional as F\nimport random\n\ndef pseudo_log_likelihood(model, tokenizer, sequence):\n    \"\"\"Compute pseudo-log-likelihood by masking each position.\"\"\"\n    inputs = tokenizer(sequence, return_tensors=\"pt\")\n    token_ids = inputs[\"input_ids\"][0]\n    pll = 0.0\n    for i in range(1, len(token_ids) - 1):  # skip <cls> and <eos>\n        masked = token_ids.clone().unsqueeze(0)\n        masked[0, i] = tokenizer.mask_token_id\n        with torch.no_grad():\n            logits = model(masked).logits[0, i]\n        log_probs = F.log_softmax(logits, dim=-1)\n        pll += log_probs[token_ids[i]].item()\n    return pll\n\ndef mcmc_design(model, tokenizer, init_seq, n_steps=100,\n                temperature=1.0, vocab=\"ACDEFGHIKLMNPQRSTVWY\"):\n    \"\"\"MCMC protein design using PLM pseudo-likelihood.\"\"\"\n    current_seq = list(init_seq)\n    current_pll = pseudo_log_likelihood(\n        model, tokenizer, \"\".join(current_seq)\n    )\n    best_seq = current_seq[:]\n    best_pll = current_pll\n\n    for step in range(n_steps):\n        # Propose: mutate one random position\n        pos = random.randint(0, len(current_seq) - 1)\n        new_aa = random.choice(vocab)\n        proposed = current_seq[:]\n        proposed[pos] = new_aa\n        proposed_pll = pseudo_log_likelihood(\n            model, tokenizer, \"\".join(proposed)\n        )\n        # Metropolis criterion\n        delta = proposed_pll - current_pll\n        if delta > 0 or random.random() < torch.{{b1}}(\n            torch.tensor(delta / temperature)\n        ).item():\n            current_seq = proposed\n            current_pll = proposed_pll\n        if current_pll > {{b2}}:\n            best_seq = current_seq[:]\n            best_pll = current_pll\n\n    return \"\".join(best_seq), best_pll\n\n# Demo with dummy values\nprint(\"MCMC design uses pseudo-log-likelihood as fitness\")\nprint(\"Acceptance probability: exp(delta_PLL / T) for delta < {{b3}}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "exponential for acceptance probability",
+                    "acceptable": ["exp"],
+                    "hint": "Use torch.exp to compute the Metropolis acceptance probability."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "compare against best",
+                    "acceptable": ["best_pll"],
+                    "hint": "Update best if current pseudo-log-likelihood exceeds best_pll."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "when is acceptance probabilistic",
+                    "acceptable": ["0", "0.0"],
+                    "hint": "When delta < 0 (fitness decreases), acceptance is probabilistic."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_inverse_folding",
+            "title": "Inverse Folding: Sequence Design from Structure",
+            "difficulty": "hard",
+            "description": "Implement a simplified inverse folding model that takes protein backbone coordinates and predicts a sequence likely to fold into that structure, using a graph neural network over residue neighbors.",
+            "info": "Inverse folding (also called fixed-backbone design) predicts amino acid sequences that fold into a given 3D structure. ESM-IF1 (Hsu et al., ICML 2022) used a GVP-Transformer architecture conditioned on backbone coordinates to achieve state-of-the-art sequence recovery rates (~51% on CATH). ProteinMPNN (Dauparas et al., Science 2022) used a message-passing neural network approach and demonstrated that designed sequences express and fold experimentally. The key insight is encoding the local geometric environment of each residue (distances and orientations to neighbors) as features for an autoregressive sequence decoder. LM-Design (Zheng et al., ICML 2023) further improved inverse folding by integrating ESM-2 as a sequence prior. The model conditions on Ca-Ca distances and backbone dihedral angles. Reference: ESM-IF1 (Hsu et al., ICML 2022); ProteinMPNN (Dauparas et al., Science 2022).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass SimpleInverseFolding(nn.Module):\n    \"\"\"Simplified inverse folding from Ca coordinates.\"\"\"\n    def __init__(self, d_model=128, vocab_size=20, k_neighbors=30):\n        super().__init__()\n        self.k = k_neighbors\n        # Encode pairwise distances and direction\n        self.edge_encoder = nn.Sequential(\n            nn.Linear(4, 64),  # dist + 3D unit vector\n            nn.ReLU(),\n            nn.Linear(64, d_model)\n        )\n        self.node_update = nn.Sequential(\n            nn.Linear(d_model * 2, d_model),\n            nn.ReLU(),\n            nn.Linear(d_model, d_model)\n        )\n        self.decoder = nn.Linear(d_model, vocab_size)\n\n    def forward(self, coords):\n        \"\"\"coords: (batch, L, 3) Ca coordinates.\"\"\"\n        B, L, _ = coords.shape\n        # Compute pairwise distances\n        diff = coords.unsqueeze(2) - coords.unsqueeze(1)  # (B, L, L, 3)\n        dist = torch.norm(diff, dim=-1, keepdim=True)  # (B, L, L, 1)\n        direction = diff / (dist + 1e-8)  # unit vectors\n        edge_feat = torch.cat([dist, direction], dim=-1)  # (B, L, L, 4)\n\n        # k-nearest neighbors\n        _, knn_idx = torch.topk(\n            dist.squeeze(-1), self.k, dim=-1, largest={{b1}}\n        )\n\n        # Gather neighbor edge features\n        knn_idx_exp = knn_idx.unsqueeze(-1).expand(-1, -1, -1, 4)\n        knn_edges = torch.gather(edge_feat, 2, knn_idx_exp)\n\n        # Encode edges and aggregate\n        encoded = self.edge_encoder(knn_edges)  # (B, L, k, d)\n        aggregated = encoded.{{b2}}(dim=2)  # (B, L, d)\n\n        # Node features (init from aggregated neighbors)\n        node_feat = torch.cat([aggregated, aggregated], dim=-1)\n        node_feat = self.node_update(node_feat)\n\n        logits = self.decoder(node_feat)  # (B, L, 20)\n        return logits\n\nmodel = SimpleInverseFolding()\ncoords = torch.randn(2, 50, 3) * 10  # fake Ca coords\nlogits = model(coords)\ndesigned_seq = torch.{{b3}}(logits, dim=-1)\nprint(\"Designed sequence shape:\", designed_seq.shape)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "select nearest (not farthest)",
+                    "acceptable": ["False"],
+                    "hint": "Set largest=False in topk to select the k nearest (smallest distance) neighbors."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "aggregate neighbor messages",
+                    "acceptable": ["mean", "sum"],
+                    "hint": "Use .mean(dim=2) or .sum(dim=2) to aggregate messages from k neighbors."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "get most likely amino acid",
+                    "acceptable": ["argmax"],
+                    "hint": "Use torch.argmax to select the most probable amino acid at each position."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_umap_embedding_viz",
+            "title": "UMAP Visualization of Protein Embedding Space",
+            "difficulty": "easy",
+            "description": "Apply UMAP dimensionality reduction to protein language model embeddings and visualize the 2D embedding space colored by protein families, demonstrating how PLMs cluster proteins by function.",
+            "info": "Visualizing protein LM embedding spaces with UMAP (McInnes et al., arXiv 2018) or t-SNE reveals that models learn biologically meaningful organization. Rives et al. (PNAS 2021) showed that ESM-1b embeddings cluster proteins by structural fold families (SCOP/CATH), even when sequence identity is below 20%. UMAP preserves more global structure than t-SNE, making it preferred for comparing distant protein families. The key hyperparameters are n_neighbors (local vs global structure) and min_dist (cluster tightness). Embeddings from deeper layers tend to show more functionally relevant clustering than shallow layers. This analysis is essential for validating that PLMs capture biological relationships and for exploring the learned protein space. Reference: ESM-1b (Rives et al., PNAS 2021); UMAP (McInnes et al., arXiv 2018).",
+            "code": "import numpy as np\nfrom sklearn.preprocessing import StandardScaler\n\ntry:\n    from umap import UMAP\nexcept ImportError:\n    print(\"pip install umap-learn\")\n    # Fallback to t-SNE\n    from sklearn.manifold import TSNE\n\ndef reduce_embeddings(embeddings, method=\"umap\",\n                      n_neighbors=15, min_dist=0.1):\n    \"\"\"Reduce PLM embeddings to 2D for visualization.\n    embeddings: (N, embed_dim) numpy array\n    \"\"\"\n    # Standardize embeddings first\n    scaler = StandardScaler()\n    scaled = scaler.{{b1}}(embeddings)\n    \n    if method == \"umap\":\n        reducer = UMAP(\n            n_components=2,\n            n_neighbors=n_neighbors,\n            min_dist=min_dist,\n            random_state=42\n        )\n    else:\n        reducer = TSNE(\n            n_components=2,\n            perplexity=30,\n            random_state=42\n        )\n    \n    coords_2d = reducer.{{b2}}(scaled)\n    return coords_2d\n\n# Simulate 200 protein embeddings from 4 families\nnp.random.seed(42)\nembeds = np.vstack([\n    np.random.randn(50, 320) + np.array([2]*320),\n    np.random.randn(50, 320) + np.array([-2]*320),\n    np.random.randn(50, 320) + np.array([0]*320),\n    np.random.randn(50, 320) + np.array([1]*320)\n])\nlabels = np.repeat([0, 1, 2, 3], 50)\n\ncoords = reduce_embeddings(embeds, method=\"umap\")\nprint(\"2D coordinates shape:\", coords.shape)\nprint(\"Coordinate range X:\", coords[:, 0].min():.2f, \n      \"to\", coords[:, {{b3}}].max():.2f)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "fit and transform data",
+                    "acceptable": ["fit_transform"],
+                    "hint": "Use .fit_transform() to fit the scaler and transform the data in one step."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "reduce dimensions",
+                    "acceptable": ["fit_transform"],
+                    "hint": "Use .fit_transform() to fit the reducer and transform the data."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "column index for Y coordinate",
+                    "acceptable": ["1"],
+                    "hint": "Column index 1 corresponds to the Y coordinate in the 2D projection."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_tsne_layer_analysis",
+            "title": "Layer-wise t-SNE Analysis of PLM Representations",
+            "difficulty": "easy",
+            "description": "Extract embeddings from multiple layers of a protein LM and compare t-SNE visualizations across layers to show how representations evolve from sequence-level to structure-level features.",
+            "info": "Different layers of protein transformers capture different levels of biological information. Vig et al. (ICLR 2021 workshop) showed that early layers capture local sequence patterns (secondary structure), middle layers encode longer-range contacts, and later layers specialize in global structural features. t-SNE (van der Maaten & Hinton, JMLR 2008) provides a 2D visualization that preserves local neighborhood structure. Comparing t-SNE plots across layers reveals a progressive refinement of protein representations. ESM-2 (Lin et al., Science 2023) outputs hidden states from all layers when output_hidden_states=True, enabling layer-wise analysis. The Hugging Face Transformers library stores these in outputs.hidden_states as a tuple of tensors. Reference: Vig et al. (ICLR 2021 workshop); van der Maaten & Hinton (JMLR 2008).",
+            "code": "import torch\nimport numpy as np\nfrom sklearn.manifold import TSNE\n\ndef extract_all_layers(model, input_ids):\n    \"\"\"Extract hidden states from all layers of a PLM.\"\"\"\n    with torch.no_grad():\n        outputs = model(\n            input_ids=input_ids,\n            output_hidden_states={{b1}}\n        )\n    # Returns tuple of (num_layers+1,) tensors of shape (B, L, D)\n    return outputs.hidden_states\n\ndef compare_layers_tsne(hidden_states, layer_indices, labels):\n    \"\"\"Run t-SNE on mean-pooled embeddings from selected layers.\"\"\"\n    results = {}\n    for layer_idx in layer_indices:\n        # Mean pool across sequence length\n        pooled = hidden_states[layer_idx].mean(dim=1).numpy()\n        tsne = TSNE(n_components=2, perplexity=30, random_state=42)\n        coords = tsne.fit_transform(pooled)\n        results[layer_idx] = coords\n    return results\n\n# Simulate hidden states for 6 layers + embedding layer\nnum_layers = 7  # embedding + 6 transformer layers\nhidden_states = tuple(\n    torch.randn(50, 30, 320) for _ in range(num_layers)\n)\nlabels = np.repeat([0, 1, 2, 3, 4], 10)\n\n# Compare first, middle, and last layers\nlayer_results = compare_layers_tsne(\n    hidden_states,\n    layer_indices=[0, 3, {{b2}}],\n    labels=labels\n)\nfor layer, coords in layer_results.items():\n    print(f\"Layer {layer}: shape={coords.{{b3}}}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "enable hidden state output",
+                    "acceptable": ["True"],
+                    "hint": "Set output_hidden_states=True to get representations from all layers."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "last layer index",
+                    "acceptable": ["6", "-1"],
+                    "hint": "Use 6 (or -1) to select the last transformer layer from 7 total layers."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "get array shape",
+                    "acceptable": ["shape"],
+                    "hint": "Use .shape to print the dimensions of the t-SNE coordinates."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_representation_learning_pooling",
+            "title": "Protein Representation Pooling Strategies",
+            "difficulty": "easy",
+            "description": "Compare different pooling strategies (CLS token, mean pooling, max pooling, attention-weighted pooling) for converting per-residue PLM embeddings into fixed-size protein representations.",
+            "info": "Converting variable-length per-residue PLM outputs to fixed-size protein representations is critical for sequence-level tasks. The simplest approaches are CLS token pooling (used in ESM-2) and mean pooling over residue embeddings. Reimers & Gurevych (EMNLP 2019, Sentence-BERT) showed that mean pooling generally outperforms CLS pooling in NLP, and similar findings hold for proteins. Attention-weighted pooling learns position-specific weights, allowing the model to focus on functionally important residues. Max pooling captures the strongest signal at each feature dimension. ProtTrans (Elnaggar et al., IEEE TPAMI 2022) compared these strategies and found that mean pooling performs robustly across tasks. The choice of pooling can significantly impact downstream task performance. Reference: ProtTrans (Elnaggar et al., IEEE TPAMI 2022); Sentence-BERT (Reimers & Gurevych, EMNLP 2019).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\ndef cls_pooling(hidden_states):\n    \"\"\"Use the [CLS] token (position 0) as sequence representation.\"\"\"\n    return hidden_states[:, 0, :]\n\ndef mean_pooling(hidden_states, attention_mask):\n    \"\"\"Average over non-padded residues.\"\"\"\n    mask = attention_mask.unsqueeze(-1).float()\n    return (hidden_states * mask).sum(dim=1) / mask.{{b1}}(dim=1)\n\ndef max_pooling(hidden_states, attention_mask):\n    \"\"\"Take max over sequence for each feature dimension.\"\"\"\n    mask = attention_mask.unsqueeze(-1).float()\n    hidden_states = hidden_states.masked_fill(mask == 0, -1e9)\n    return hidden_states.max(dim={{b2}}).values\n\nclass AttentionPooling(nn.Module):\n    \"\"\"Learned attention-weighted pooling.\"\"\"\n    def __init__(self, hidden_size=320):\n        super().__init__()\n        self.attention = nn.Linear(hidden_size, 1)\n\n    def forward(self, hidden_states, attention_mask):\n        scores = self.attention(hidden_states).squeeze(-1)\n        scores = scores.masked_fill(attention_mask == 0, -1e9)\n        weights = F.softmax(scores, dim=-1).unsqueeze(-1)\n        return (hidden_states * weights).sum(dim=1)\n\n# Compare all strategies\nhidden = torch.randn(4, 50, 320)  # batch=4, len=50\nmask = torch.ones(4, 50, dtype=torch.long)\nmask[:, 40:] = 0  # last 10 positions are padding\n\ncls_out = cls_pooling(hidden)\nmean_out = mean_pooling(hidden, mask)\nmax_out = max_pooling(hidden, mask)\nattn_pool = AttentionPooling()\nattn_out = attn_pool(hidden, mask)\n\nfor name, out in [(\"CLS\", cls_out), (\"Mean\", mean_out),\n                  (\"Max\", max_out), (\"Attn\", attn_out)]:\n    print(f\"{name} pooling shape: {out.{{b3}}}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "aggregate mask for mean",
+                    "acceptable": ["sum"],
+                    "hint": "Sum the mask along dim=1 to get the count of non-padded positions for averaging."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "sequence dimension for max",
+                    "acceptable": ["1"],
+                    "hint": "Take the max along dim=1 (sequence length) for each feature dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "print tensor shape",
+                    "acceptable": ["shape"],
+                    "hint": "Use .shape to display the output tensor dimensions."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_coevolution_mutual_info",
+            "title": "Coevolution Signals via Mutual Information from PLMs",
+            "difficulty": "medium",
+            "description": "Compute mutual information between residue position pairs from protein LM logits, capturing coevolutionary dependencies that indicate structural or functional constraints.",
+            "info": "Coevolution analysis identifies pairs of positions in a protein that have co-varied during evolution, often indicating structural contacts or functional coupling. Traditional mutual information (MI) from MSA column frequencies (Martin et al., Bioinformatics 2005) suffers from phylogenetic bias and limited sequence diversity. PLMs implicitly capture coevolution through their attention patterns and conditional probability distributions. By computing P(aa_i, aa_j | context) from model outputs, one can derive MI scores that reflect learned evolutionary constraints. Averaging log P(x_j | mask_i = a) over all possible amino acids a gives marginal distributions for MI computation. APC correction (Dunn et al., Bioinformatics 2008) removes systematic biases from MI matrices. Reference: Dunn et al. (Bioinformatics 2008); Rao et al. (NeurIPS 2020).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef compute_positional_mi(logits_matrix, eps=1e-10):\n    \"\"\"Compute mutual information between position pairs.\n    logits_matrix: (L, L, vocab_size) - logits at pos j when pos i is masked\n    Returns: (L, L) MI matrix\n    \"\"\"\n    L, _, V = logits_matrix.shape\n    # Convert to probabilities\n    probs = F.softmax(logits_matrix, dim=-1)  # P(aa_j | mask_i)\n    \n    # Marginal probability at each position: average over all masking contexts\n    marginal = probs.mean(dim=0)  # (L, V) - P(aa_j) averaged\n    \n    mi_matrix = torch.zeros(L, L)\n    for i in range(L):\n        for j in range(L):\n            if i == j:\n                continue\n            p_joint = probs[i, j]  # P(aa_j | mask_i) as proxy for joint\n            p_marginal = marginal[j]\n            # MI = sum_aa p(aa) * log(p(aa|context) / p(aa))\n            mi = (p_joint * torch.{{b1}}(\n                p_joint / (p_marginal + eps) + eps\n            )).sum()\n            mi_matrix[i, j] = mi\n    \n    return mi_matrix\n\n# Simulate: 20 positions, vocab size 20\nlogits = torch.randn(20, 20, 20)\nmi = compute_positional_mi(logits)\n\n# Symmetrize\nmi_sym = (mi + mi.{{b2}}) / 2\nprint(\"MI matrix shape:\", mi_sym.shape)\nprint(\"Max MI:\", mi_sym.max().item())\n\n# Top coevolving pairs\nmi_flat = mi_sym.triu(diagonal=1).flatten()\ntop_idx = mi_flat.argsort(descending={{b3}})[:5]\nfor idx in top_idx:\n    r = idx.item() // 20\n    c = idx.item() % 20\n    print(f\"  Pair ({r}, {c}): MI = {mi_sym[r, c]:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "natural logarithm",
+                    "acceptable": ["log"],
+                    "hint": "Use torch.log to compute the natural logarithm for the MI calculation."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "transpose for symmetrization",
+                    "acceptable": ["T", "t()", "transpose(0, 1)"],
+                    "hint": "Use .T or .t() to transpose the MI matrix for symmetrization."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "sort order for top pairs",
+                    "acceptable": ["True"],
+                    "hint": "Set descending=True to sort from highest MI (strongest coevolution) first."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_esm3_structure_tokenizer",
+            "title": "ESM-3 Structure Tokenizer with VQ-VAE",
+            "difficulty": "hard",
+            "description": "Implement a simplified VQ-VAE (Vector Quantized Variational Autoencoder) structure tokenizer that discretizes per-residue structural features into a finite codebook, as used in ESM-3.",
+            "info": "ESM-3 (Hayes et al., Science 2024) tokenizes protein 3D structure using a VQ-VAE that maps local structural environments to discrete tokens from a codebook of 4096 entries. The encoder takes local backbone geometry (coordinates, angles) as input and maps each residue to the nearest codebook vector. The decoder reconstructs structure from the discrete tokens. The straight-through estimator enables gradient flow through the discrete bottleneck during training. The commitment loss encourages encoder outputs to stay close to codebook vectors. This discretization enables ESM-3 to treat structure as a token sequence parallel to amino acid tokens, unifying sequence and structure generation. The codebook is learned end-to-end with the encoder and decoder. Reference: Hayes et al. (Science 2024); VQ-VAE (van den Oord et al., NeurIPS 2017).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass StructureTokenizer(nn.Module):\n    \"\"\"VQ-VAE for discretizing protein structure.\"\"\"\n    def __init__(self, input_dim=9, hidden_dim=128,\n                 codebook_size=4096, code_dim=64):\n        super().__init__()\n        self.encoder = nn.Sequential(\n            nn.Linear(input_dim, hidden_dim),\n            nn.ReLU(),\n            nn.Linear(hidden_dim, code_dim)\n        )\n        # Codebook: learnable embedding vectors\n        self.codebook = nn.Embedding(codebook_size, code_dim)\n        self.decoder = nn.Sequential(\n            nn.Linear(code_dim, hidden_dim),\n            nn.ReLU(),\n            nn.Linear(hidden_dim, input_dim)\n        )\n\n    def quantize(self, z):\n        \"\"\"Find nearest codebook vector for each residue.\"\"\"\n        # z: (batch, L, code_dim)\n        # Compute distances to all codebook entries\n        flat_z = z.reshape(-1, z.size(-1))  # (B*L, code_dim)\n        codebook_vectors = self.codebook.weight  # (K, code_dim)\n        \n        distances = torch.cdist(flat_z, codebook_vectors)\n        indices = distances.{{b1}}(dim=-1)  # nearest codebook entry\n        \n        quantized = self.codebook(indices).view_as(z)\n        return quantized, indices.view(z.shape[:-1])\n\n    def forward(self, structure_features):\n        \"\"\"structure_features: (batch, L, input_dim)\"\"\"\n        z = self.encoder(structure_features)\n        quantized, token_ids = self.quantize(z)\n        \n        # Straight-through estimator: copy gradients from quantized to z\n        quantized_st = z + (quantized - z).{{b2}}\n        \n        reconstructed = self.decoder(quantized_st)\n        \n        # Losses\n        recon_loss = F.mse_loss(reconstructed, structure_features)\n        commit_loss = F.mse_loss(z, quantized.detach())\n        \n        return reconstructed, token_ids, recon_loss + 0.25 * commit_loss\n\nmodel = StructureTokenizer()\n# Simulate: batch=2, 50 residues, 9 features (3 coords + 6 angles)\nfeatures = torch.randn(2, 50, 9)\nrecon, tokens, loss = model(features)\nprint(\"Structure tokens shape:\", tokens.shape)\nprint(f\"Token range: [{tokens.min().item()}, {tokens.{{b3}}.item()}]\")\nprint(f\"Total loss: {loss.item():.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "find nearest neighbor index",
+                    "acceptable": ["argmin"],
+                    "hint": "Use .argmin(dim=-1) to find the index of the nearest codebook vector."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "stop gradient for straight-through",
+                    "acceptable": ["detach()"],
+                    "hint": "Use .detach() to stop gradients through the quantization step (straight-through estimator)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "get maximum token value",
+                    "acceptable": ["max()"],
+                    "hint": "Use .max() to get the highest token index in the output."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_protein_representation_probing",
+            "title": "Probing PLM Representations for Biological Properties",
+            "difficulty": "medium",
+            "description": "Implement linear probing experiments that evaluate what biological properties (secondary structure, solvent accessibility, disorder) are encoded in each layer of a protein LM.",
+            "info": "Linear probing is a standard technique for understanding what information is encoded in neural network representations. Rao et al. (NeurIPS 2019, 'Evaluating Protein Transfer Learning with TAPE') established protein-specific benchmarks and showed that different layers of protein LMs encode different properties. Rives et al. (PNAS 2021) found that secondary structure is best predicted from middle layers of ESM-1b, while contact prediction benefits from later layers. Linear probes use a single linear layer (no nonlinearity) to ensure that performance reflects information already encoded in the representation, not learned by the probe. Per-residue probes evaluate token-level properties (SS, disorder), while sequence-level probes use pooled representations. Low probe accuracy indicates the property is not linearly accessible in that layer. Reference: TAPE (Rao et al., NeurIPS 2019); ESM-1b (Rives et al., PNAS 2021).",
+            "code": "import torch\nimport torch.nn as nn\nfrom sklearn.metrics import accuracy_score\nimport numpy as np\n\nclass LinearProbe(nn.Module):\n    \"\"\"Single linear layer probe for evaluating representations.\"\"\"\n    def __init__(self, input_dim, num_classes):\n        super().__init__()\n        self.linear = nn.{{b1}}(input_dim, num_classes)\n\n    def forward(self, x):\n        return self.linear(x)\n\ndef probe_layer(embeddings, labels, num_classes, epochs=50, lr=1e-2):\n    \"\"\"Train a linear probe on frozen embeddings.\n    embeddings: (N, dim) or (N, L, dim) for token-level\n    labels: (N,) or (N, L) for token-level\n    \"\"\"\n    is_token_level = embeddings.dim() == 3\n    if is_token_level:\n        N, L, D = embeddings.shape\n        embeddings = embeddings.reshape(-1, D)\n        labels = labels.reshape(-1)\n\n    probe = LinearProbe(embeddings.shape[-1], num_classes)\n    optimizer = torch.optim.Adam(probe.parameters(), lr=lr)\n    loss_fn = nn.CrossEntropyLoss()\n\n    for epoch in range(epochs):\n        logits = probe(embeddings)\n        loss = loss_fn(logits, labels)\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.{{b2}}\n\n    with torch.no_grad():\n        preds = probe(embeddings).argmax(dim=-1)\n    acc = accuracy_score(labels.numpy(), preds.numpy())\n    return acc\n\n# Simulate probing across layers\nnp.random.seed(42)\nresults = {}\nfor layer in range(7):  # 0=embedding, 1-6=transformer layers\n    # Simulate embeddings (in practice, extract from model)\n    emb = torch.randn(100, 50, 320)  # 100 proteins, 50 residues\n    labels = torch.randint(0, 3, (100, 50))  # 3-state SS labels\n    acc = probe_layer(emb, labels, num_classes=3, epochs=10)\n    results[layer] = acc\n\nfor layer, acc in results.items():\n    bar = \"#\" * int(acc * 50)\n    print(f\"Layer {layer}: {acc:.3f} {{{b3}}}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "single linear layer class",
+                    "acceptable": ["Linear"],
+                    "hint": "Use nn.Linear for the single linear layer probe (no hidden layers)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "update probe weights",
+                    "acceptable": ["step()"],
+                    "hint": "Call optimizer.step() to update the probe parameters."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "progress bar variable",
+                    "acceptable": ["bar"],
+                    "hint": "Use the 'bar' variable to display a simple text progress bar."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_esm3_function_tokens",
+            "title": "ESM-3 Function Tokenization from InterPro",
+            "difficulty": "medium",
+            "description": "Implement a function tokenization scheme inspired by ESM-3 that converts InterPro functional annotations into per-residue function tokens using binary keyword encoding.",
+            "info": "ESM-3 (Hayes et al., Science 2024) tokenizes protein function by encoding InterPro annotations (Blum et al., NAR 2021) as discrete tokens at each residue position. InterPro entries (domains, families, sites) that overlap a given residue are collected, and their identifiers are encoded as a set of binary features hashed to a fixed-size vocabulary. This per-residue function tokenization enables ESM-3 to condition on partial functional annotations during generation. The function track uses 8 tokens per position from a vocabulary of 260,000+ entries derived from InterPro keywords. Residues without annotations receive a special 'no-annotation' token. This approach allows the model to jointly reason over sequence, structure, and function during generation. Reference: Hayes et al. (Science 2024); InterPro (Blum et al., NAR 2021).",
+            "code": "import torch\nimport torch.nn as nn\nimport hashlib\n\nclass FunctionTokenizer:\n    \"\"\"Convert InterPro annotations to per-residue function tokens.\"\"\"\n    def __init__(self, vocab_size=8192, tokens_per_residue=8):\n        self.vocab_size = vocab_size\n        self.tokens_per_residue = tokens_per_residue\n        self.no_annotation_id = 0\n\n    def hash_annotation(self, interpro_id):\n        \"\"\"Hash an InterPro ID to a token index.\"\"\"\n        h = hashlib.md5(interpro_id.encode()).hexdigest()\n        return int(h, 16) % (self.vocab_size - 1) + 1  # reserve 0\n\n    def tokenize(self, seq_len, annotations):\n        \"\"\"annotations: dict mapping (start, end) -> list of InterPro IDs\"\"\"\n        tokens = torch.full(\n            (seq_len, self.tokens_per_residue),\n            self.no_annotation_id, dtype=torch.long\n        )\n        for (start, end), interpro_ids in annotations.items():\n            hashed = [self.hash_annotation(ipr) for ipr in interpro_ids]\n            for pos in range(start, min(end, seq_len)):\n                n = min(len(hashed), self.tokens_per_residue)\n                tokens[pos, :n] = torch.tensor(hashed[:n])\n        return tokens\n\nclass FunctionEmbedding(nn.Module):\n    def __init__(self, vocab_size=8192, tokens_per_pos=8, d_model=256):\n        super().__init__()\n        self.embed = nn.Embedding(vocab_size, d_model)\n\n    def forward(self, func_tokens):\n        \"\"\"func_tokens: (batch, L, tokens_per_pos)\"\"\"\n        embedded = self.embed(func_tokens)  # (B, L, T, d_model)\n        return embedded.{{b1}}(dim=2)  # aggregate tokens per position\n\ntokenizer = FunctionTokenizer()\nannotations = {\n    (5, 25): [\"IPR000719\", \"IPR008271\"],  # Protein kinase domain\n    (30, 45): [\"IPR002290\"]  # SH2 domain\n}\ntokens = tokenizer.tokenize(seq_len=50, annotations=annotations)\nprint(\"Function tokens shape:\", tokens.shape)\nprint(\"Annotated positions:\", (tokens != {{b2}}).any(dim=-1).sum().item())\n\nfunc_emb = FunctionEmbedding()\nbatch_tokens = tokens.{{b3}}(0)  # add batch dimension\nout = func_emb(batch_tokens)\nprint(\"Function embedding shape:\", out.shape)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "aggregate multiple tokens per position",
+                    "acceptable": ["mean", "sum"],
+                    "hint": "Use .mean(dim=2) or .sum(dim=2) to aggregate the multiple function token embeddings per position."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "no-annotation token id",
+                    "acceptable": ["0"],
+                    "hint": "The no_annotation_id is 0, so unannotated positions have all-zero token ids."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "add batch dimension",
+                    "acceptable": ["unsqueeze"],
+                    "hint": "Use .unsqueeze(0) to add a batch dimension at position 0."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_plm_attention_contact_precision",
+            "title": "Contact Precision from PLM Attention Maps",
+            "difficulty": "medium",
+            "description": "Evaluate the quality of PLM-derived contact predictions by computing precision at L/5 and L/2 for long-range contacts (sequence separation >= 24), following the standard structural bioinformatics evaluation protocol.",
+            "info": "Contact prediction precision at various thresholds (L/5, L/2, L) is the standard metric for evaluating structure prediction methods. Long-range contacts (sequence separation >= 24 residues) are most informative for 3D structure. Rao et al. (NeurIPS 2020) evaluated attention-based contact prediction from protein LMs and showed that top-L/5 long-range precision exceeds 50% for many proteins. The MSA Transformer (Rao et al., ICML 2021) improved this to >65% precision by leveraging evolutionary information from alignments. Contacts are defined as residue pairs with C-beta distance < 8 Angstroms. Precision is computed by ranking all predicted contacts by score and checking what fraction of the top-K predictions are true contacts. This metric is robust to the sparsity of contact maps. Reference: Rao et al. (NeurIPS 2020); Rao et al. (ICML 2021).",
+            "code": "import torch\n\ndef contact_precision(pred_scores, true_contacts,\n                      min_separation=24, fractions=[5, 2]):\n    \"\"\"Compute contact prediction precision at L/k.\n    pred_scores: (L, L) predicted contact scores\n    true_contacts: (L, L) binary ground-truth contacts\n    \"\"\"\n    L = pred_scores.shape[0]\n    results = {}\n\n    # Create separation mask: only consider long-range\n    sep = torch.arange(L).unsqueeze(0) - torch.arange(L).unsqueeze(1)\n    long_range_mask = sep.abs() >= min_separation\n    # Upper triangle only (avoid counting pairs twice)\n    upper_mask = torch.triu(torch.ones(L, L), diagonal=1).bool()\n    valid_mask = long_range_mask & upper_mask\n\n    # Get scores and labels for valid pairs\n    scores = pred_scores[valid_mask]\n    labels = true_contacts[valid_mask].float()\n\n    # Sort by score descending\n    sorted_idx = scores.argsort(descending={{b1}})\n    sorted_labels = labels[sorted_idx]\n\n    for k in fractions:\n        n_top = L // k\n        top_labels = sorted_labels[:n_top]\n        precision = top_labels.{{b2}}().item()\n        results[f\"L/{k}\"] = precision\n\n    return results\n\n# Simulate: 80-residue protein\nL = 80\npred_scores = torch.rand(L, L)\npred_scores = (pred_scores + pred_scores.T) / 2  # symmetrize\n\n# Simulate sparse contacts (about 3% of long-range pairs)\ntrue_contacts = (torch.rand(L, L) < 0.03).long()\ntrue_contacts = true_contacts | true_contacts.T  # symmetrize\ntrue_contacts.fill_diagonal_({{b3}})\n\nresults = contact_precision(pred_scores, true_contacts)\nfor metric, val in results.items():\n    print(f\"Precision at {metric}: {val:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "sort order for best predictions first",
+                    "acceptable": ["True"],
+                    "hint": "Set descending=True to rank highest-scoring (most confident) predictions first."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "compute fraction of true contacts",
+                    "acceptable": ["mean"],
+                    "hint": "Use .mean() on the binary labels to compute precision (fraction of true contacts)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "diagonal value for contacts",
+                    "acceptable": ["0"],
+                    "hint": "Set diagonal to 0 since a residue cannot be in contact with itself."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_protein_sequence_diffusion",
+            "title": "Discrete Diffusion for Protein Sequence Generation",
+            "difficulty": "hard",
+            "description": "Implement a simplified discrete diffusion model for protein sequence generation, where the forward process corrupts amino acid tokens with noise and the reverse process denoises them using a trained neural network.",
+            "info": "Discrete diffusion models adapt the diffusion framework to categorical data like protein sequences. EvoDiff (Alamdari et al., Nature Biotechnology 2023) used discrete diffusion with order-agnostic autoregressive generation for unconditional and conditional protein design. The forward process progressively replaces amino acids with random tokens according to a noise schedule, and the model learns to reverse this corruption. Unlike masked LMs that only predict a fixed fraction of positions, diffusion models learn to denoise at all noise levels. D3PM (Austin et al., NeurIPS 2021) provided the theoretical framework for discrete diffusion with absorbing, uniform, and discretized Gaussian transition matrices. EvoDiff demonstrated that generated sequences fold into diverse and novel structures. The model conditions on the noise level through a timestep embedding. Reference: EvoDiff (Alamdari et al., Nature Biotechnology 2023); D3PM (Austin et al., NeurIPS 2021).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass DiscreteDiffusion(nn.Module):\n    \"\"\"Simplified discrete diffusion for protein sequences.\"\"\"\n    def __init__(self, vocab_size=20, d_model=256, T=100):\n        super().__init__()\n        self.vocab_size = vocab_size\n        self.T = T\n        self.aa_embed = nn.Embedding(vocab_size, d_model)\n        self.time_embed = nn.Embedding(T, d_model)\n        encoder_layer = nn.TransformerEncoderLayer(\n            d_model=d_model, nhead=8, batch_first=True\n        )\n        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=4)\n        self.head = nn.Linear(d_model, vocab_size)\n\n    def forward_diffusion(self, x0, t):\n        \"\"\"Add noise: replace fraction of tokens with random AAs.\n        Noise fraction increases with timestep t.\n        \"\"\"\n        noise_frac = t.float() / self.T  # (B,)\n        mask = torch.rand_like(x0.float()) < noise_frac.unsqueeze(1)\n        noise = torch.randint(0, self.vocab_size, x0.shape)\n        xt = torch.where(mask, noise, x0)\n        return xt\n\n    def forward(self, x0, t):\n        \"\"\"Predict clean sequence from noisy input.\"\"\"\n        xt = self.forward_diffusion(x0, t)\n        emb = self.aa_embed(xt) + self.time_embed(t).{{b1}}(1)\n        encoded = self.encoder(emb)\n        logits = self.head(encoded)\n        return logits, x0  # return targets for loss\n\n    def sample(self, seq_len, batch_size=1):\n        \"\"\"Generate sequences by iterative denoising.\"\"\"\n        # Start from pure noise\n        x = torch.randint(0, self.vocab_size, (batch_size, seq_len))\n        for t_val in reversed(range(self.T)):\n            t = torch.full((batch_size,), t_val, dtype=torch.long)\n            emb = self.aa_embed(x) + self.time_embed(t).unsqueeze(1)\n            encoded = self.encoder(emb)\n            logits = self.head(encoded)\n            x = logits.{{b2}}(dim=-1)\n        return x\n\nmodel = DiscreteDiffusion(vocab_size=20, T=100)\nx0 = torch.randint(0, 20, (4, 50))  # batch=4, len=50\nt = torch.randint(0, {{b3}}, (4,))\nlogits, targets = model(x0, t)\nloss = F.cross_entropy(logits.view(-1, 20), targets.view(-1))\nprint(f\"Diffusion loss: {loss.item():.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "broadcast time embedding",
+                    "acceptable": ["unsqueeze"],
+                    "hint": "Use .unsqueeze(1) to add a sequence dimension for broadcasting the time embedding."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "get predicted tokens",
+                    "acceptable": ["argmax"],
+                    "hint": "Use .argmax(dim=-1) to get the most likely amino acid at each position."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "max timestep",
+                    "acceptable": ["100"],
+                    "hint": "Sample timesteps from 0 to T=100."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_esm3_multimodal_masking",
+            "title": "ESM-3 Multi-Track Masked Training Objective",
+            "difficulty": "medium",
+            "description": "Implement the multi-track masking strategy from ESM-3 where sequence, structure, and function tracks are independently masked at different rates, and the model is trained to predict masked tokens in all tracks simultaneously.",
+            "info": "ESM-3 (Hayes et al., Science 2024) trains with a generalized masked language modeling objective across sequence, structure, and function tracks simultaneously. Each track is independently masked with a noise schedule sampled per-example, allowing different masking rates for different modalities. The loss is a weighted sum of cross-entropy losses over all tracks, with track-specific loss weights balancing their contributions. This enables the model to learn cross-modal dependencies: predicting structure tokens from sequence context, function tokens from structure, etc. The independent masking rates are sampled from a cosine schedule to expose the model to various conditioning scenarios during training. At generation time, one or more tracks can be fully masked while others provide conditioning. Reference: Hayes et al. (Science 2024).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport math\n\ndef sample_mask_rate():\n    \"\"\"Sample masking rate from cosine schedule.\"\"\"\n    u = torch.rand(1).item()\n    return math.cos(u * math.pi / 2)\n\ndef mask_track(tokens, mask_token_id, vocab_size):\n    \"\"\"Independently mask a single track.\"\"\"\n    mask_rate = sample_mask_rate()\n    mask = torch.rand(tokens.shape) < mask_rate\n    labels = tokens.clone()\n    labels[~mask] = {{b1}}\n    masked_tokens = tokens.clone()\n    masked_tokens[mask] = mask_token_id\n    return masked_tokens, labels\n\ndef multi_track_loss(seq_logits, struct_logits, func_logits,\n                     seq_labels, struct_labels, func_labels,\n                     weights=(1.0, 1.0, 0.5)):\n    \"\"\"Compute weighted sum of per-track MLM losses.\"\"\"\n    seq_loss = F.cross_entropy(\n        seq_logits.view(-1, seq_logits.size(-1)),\n        seq_labels.view(-1), ignore_index=-100\n    )\n    struct_loss = F.cross_entropy(\n        struct_logits.view(-1, struct_logits.size(-1)),\n        struct_labels.view(-1), ignore_index=-100\n    )\n    func_loss = F.cross_entropy(\n        func_logits.view(-1, func_logits.size(-1)),\n        func_labels.view(-1), ignore_index=-100\n    )\n    total = weights[0]*seq_loss + weights[1]*struct_loss + weights[2]*func_loss\n    return total / {{b2}}(weights)\n\n# Test\nB, L = 4, 50\nseq_tok = torch.randint(0, 33, (B, L))\nstruct_tok = torch.randint(0, 4096, (B, L))\nfunc_tok = torch.randint(0, 256, (B, L))\n\nseq_m, seq_l = mask_track(seq_tok, mask_token_id=32, vocab_size=33)\nstruct_m, struct_l = mask_track(struct_tok, mask_token_id=4095, vocab_size=4096)\nfunc_m, func_l = mask_track(func_tok, mask_token_id=255, vocab_size=256)\n\nprint(f\"Seq masked: {(seq_l != -100).sum().item()} / {B*L}\")\nprint(f\"Struct masked: {(struct_l != {{b3}}).sum().item()} / {B*L}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "ignore index for unmasked positions",
+                    "acceptable": ["-100"],
+                    "hint": "Set unmasked positions to -100 so they are ignored in cross-entropy loss."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "normalize by total weight",
+                    "acceptable": ["sum"],
+                    "hint": "Divide by sum(weights) to normalize the total loss."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "ignore index value",
+                    "acceptable": ["-100"],
+                    "hint": "Compare against -100 to count how many positions have valid (masked) labels."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_sequence_generation_evaluation",
+            "title": "Evaluating Generated Protein Sequences",
+            "difficulty": "easy",
+            "description": "Implement evaluation metrics for generated protein sequences including amino acid composition comparison, sequence identity to natural proteins, and diversity within the generated set.",
+            "info": "Evaluating the quality of protein sequences generated by language models requires multiple complementary metrics. Ferruz et al. (Nature Communications 2022) evaluated ProtGPT2 by comparing amino acid composition, predicted secondary structure content, and pLDDT scores of generated vs natural sequences. Sequence identity to the nearest natural protein (via BLAST) measures novelty: high identity suggests memorization while very low identity may indicate unrealistic sequences. Intra-set diversity, measured by average pairwise identity within generated sequences, ensures the model is not mode-collapsed. Frechet Inception Distance (FID) adapted for proteins compares embedding distributions of generated and natural sets. The amino acid composition of natural proteins follows a characteristic distribution (e.g., Leu ~9.5%, Ala ~8.3%). Reference: ProtGPT2 (Ferruz et al., Nature Communications 2022); EvoDiff (Alamdari et al., Nature Biotechnology 2023).",
+            "code": "import torch\nimport numpy as np\nfrom collections import Counter\n\nSTANDARD_AAS = \"ACDEFGHIKLMNPQRSTVWY\"\n\n# Natural AA frequencies (approximate, from UniProt)\nNATURAL_FREQ = {\n    'A': 0.083, 'C': 0.014, 'D': 0.054, 'E': 0.064, 'F': 0.039,\n    'G': 0.071, 'H': 0.023, 'I': 0.057, 'K': 0.057, 'L': 0.095,\n    'M': 0.024, 'N': 0.042, 'P': 0.049, 'Q': 0.039, 'R': 0.055,\n    'S': 0.068, 'T': 0.056, 'V': 0.067, 'W': 0.013, 'Y': 0.030\n}\n\ndef aa_composition(sequence):\n    \"\"\"Compute amino acid frequencies in a sequence.\"\"\"\n    counts = Counter(sequence)\n    total = len(sequence)\n    return {aa: counts.get(aa, 0) / total for aa in STANDARD_AAS}\n\ndef composition_divergence(generated_seqs):\n    \"\"\"KL divergence of generated AA composition vs natural.\"\"\"\n    all_aas = \"\".join(generated_seqs)\n    gen_freq = aa_composition(all_aas)\n    kl = 0.0\n    for aa in STANDARD_AAS:\n        p = gen_freq.get(aa, 1e-10)\n        q = NATURAL_FREQ.get(aa, 1e-10)\n        kl += p * np.{{b1}}(p / q)\n    return kl\n\ndef pairwise_identity(seq1, seq2):\n    \"\"\"Compute fraction of identical residues.\"\"\"\n    min_len = min(len(seq1), len(seq2))\n    matches = sum(a == b for a, b in zip(seq1[:min_len], seq2[:min_len]))\n    return matches / min_len\n\ndef intra_set_diversity(sequences):\n    \"\"\"Average pairwise identity within a set of sequences.\"\"\"\n    n = len(sequences)\n    identities = []\n    for i in range(n):\n        for j in range(i + 1, n):\n            identities.append(pairwise_identity(sequences[i], sequences[j]))\n    return 1.0 - np.{{b2}}(identities)  # diversity = 1 - mean identity\n\n# Generate fake sequences for testing\nnp.random.seed(42)\ngenerated = [\n    \"\".join(np.random.choice(list(STANDARD_AAS), size=80))\n    for _ in range({{b3}})  \n]\n\nkl = composition_divergence(generated)\ndiversity = intra_set_diversity(generated[:20])  # subset for speed\nprint(f\"KL divergence from natural: {kl:.4f}\")\nprint(f\"Intra-set diversity: {diversity:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "natural logarithm function",
+                    "acceptable": ["log"],
+                    "hint": "Use np.log for the natural logarithm in KL divergence computation."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "average pairwise identity",
+                    "acceptable": ["mean"],
+                    "hint": "Use np.mean to compute the average pairwise identity."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "number of sequences to generate",
+                    "acceptable": ["50", "100"],
+                    "hint": "Generate a reasonable number of sequences for evaluation (e.g., 50 or 100)."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_plm_embedding_retrieval",
+            "title": "Fast Protein Retrieval with PLM Embeddings and FAISS",
+            "difficulty": "medium",
+            "description": "Build a fast protein retrieval system using pre-computed PLM embeddings indexed with approximate nearest neighbor search, enabling millisecond-scale protein similarity search.",
+            "info": "Protein database search traditionally relies on BLAST or HMMER, which scale linearly with database size. PLM embeddings enable approximate nearest neighbor (ANN) search using tools like FAISS (Johnson et al., IEEE Big Data 2019) for sub-linear time retrieval. By pre-computing ESM-2 embeddings for all database proteins and building an IVF or HNSW index, one can retrieve similar proteins in milliseconds even from millions of entries. Heinzinger et al. (BMC Bioinformatics 2019) demonstrated that ProtBERT embeddings enable protein searches that capture functional similarity beyond sequence identity. The retrieval quality depends on the embedding model quality and the ANN index configuration (number of clusters, probe depth). This approach trades some precision for dramatic speedup compared to alignment-based methods. Reference: FAISS (Johnson et al., IEEE Big Data 2019); Heinzinger et al. (BMC Bioinformatics 2019).",
+            "code": "import torch\nimport numpy as np\n\ntry:\n    import faiss\n    HAS_FAISS = True\nexcept ImportError:\n    HAS_FAISS = False\n    print(\"pip install faiss-cpu\")\n\nclass ProteinRetriever:\n    \"\"\"Fast protein retrieval using PLM embeddings + FAISS.\"\"\"\n    def __init__(self, embed_dim=320, n_clusters=100):\n        self.embed_dim = embed_dim\n        if HAS_FAISS:\n            quantizer = faiss.IndexFlatL2(embed_dim)\n            self.index = faiss.IndexIVFFlat(\n                quantizer, embed_dim, n_clusters\n            )\n        self.protein_ids = []\n\n    def build_index(self, embeddings, protein_ids):\n        \"\"\"Build search index from pre-computed embeddings.\n        embeddings: (N, embed_dim) numpy array, float32\n        \"\"\"\n        self.protein_ids = protein_ids\n        if HAS_FAISS:\n            self.index.train(embeddings)\n            self.index.{{b1}}(embeddings)\n\n    def search(self, query_embedding, k=10):\n        \"\"\"Find k nearest proteins to query.\n        query_embedding: (1, embed_dim) numpy array\n        \"\"\"\n        if HAS_FAISS:\n            distances, indices = self.index.search(query_embedding, k)\n            results = [\n                (self.protein_ids[idx], dist)\n                for idx, dist in zip(indices[0], distances[0])\n            ]\n            return results\n        return []\n\n# Demo with numpy (works without FAISS)\nnp.random.seed(42)\nN = 10000  # database size\nembed_dim = 320\ndb_embeddings = np.random.randn(N, embed_dim).astype(np.{{b2}})\nprotein_ids = [f\"P{i:05d}\" for i in range(N)]\n\n# Simple brute-force search (fallback)\nquery = np.random.randn(1, embed_dim).astype(np.float32)\ndists = np.linalg.norm(db_embeddings - query, axis=1)\ntop_k_idx = np.{{b3}}(dists)[:5]\nprint(\"Top 5 nearest proteins (brute force):\")\nfor idx in top_k_idx:\n    print(f\"  {protein_ids[idx]}: distance={dists[idx]:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "add vectors to index",
+                    "acceptable": ["add"],
+                    "hint": "Use .add() to insert the embedding vectors into the FAISS index."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "float type for FAISS",
+                    "acceptable": ["float32"],
+                    "hint": "FAISS requires float32 numpy arrays for indexing and search."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "sort distances ascending",
+                    "acceptable": ["argsort"],
+                    "hint": "Use np.argsort to get indices sorted by distance (ascending = nearest first)."
+                }
+            ]
+        },
+        {
+            "id": "prot_lm_new_multi_task_protein_head",
+            "title": "Multi-Task Protein Property Prediction",
+            "difficulty": "medium",
+            "description": "Implement a multi-task learning head that simultaneously predicts secondary structure (per-residue), subcellular localization (per-sequence), and solvent accessibility (per-residue) from shared PLM embeddings.",
+            "info": "Multi-task learning (MTL) jointly trains a model on related tasks, leveraging shared representations to improve generalization. For protein property prediction, tasks like secondary structure, solvent accessibility, and disorder share the same underlying PLM features. Elnaggar et al. (IEEE TPAMI 2022) showed in ProtTrans that multi-task training on per-residue and per-sequence tasks can improve performance on individual tasks through positive transfer. The shared backbone (frozen PLM) produces embeddings consumed by task-specific heads: token-level heads for per-residue tasks and pooling + classification heads for per-sequence tasks. Loss balancing across tasks is critical, with approaches ranging from simple weighted sum to uncertainty-based weighting (Kendall et al., CVPR 2018). Hard parameter sharing (shared backbone, separate heads) is the most common MTL architecture. Reference: ProtTrans (Elnaggar et al., IEEE TPAMI 2022); Kendall et al. (CVPR 2018).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass MultiTaskProteinHead(nn.Module):\n    \"\"\"Multi-task head for simultaneous protein property prediction.\"\"\"\n    def __init__(self, embed_dim=320, ss_classes=3,\n                 loc_classes=10, sa_classes=2):\n        super().__init__()\n        # Per-residue: secondary structure (H, E, C)\n        self.ss_head = nn.Linear(embed_dim, ss_classes)\n        # Per-sequence: subcellular localization\n        self.loc_head = nn.Sequential(\n            nn.Linear(embed_dim, 128),\n            nn.ReLU(),\n            nn.Linear(128, loc_classes)\n        )\n        # Per-residue: solvent accessibility (buried/exposed)\n        self.sa_head = nn.Linear(embed_dim, sa_classes)\n        # Learnable loss weights (log-variance parameterization)\n        self.log_vars = nn.Parameter(torch.zeros(3))\n\n    def forward(self, embeddings, attention_mask=None):\n        \"\"\"embeddings: (batch, seq_len, embed_dim)\"\"\"\n        ss_logits = self.ss_head(embeddings)  # (B, L, 3)\n        sa_logits = self.sa_head(embeddings)  # (B, L, 2)\n        # Mean pool for sequence-level task\n        if attention_mask is not None:\n            mask = attention_mask.unsqueeze(-1).float()\n            pooled = (embeddings * mask).sum(1) / mask.sum(1)\n        else:\n            pooled = embeddings.{{b1}}(dim=1)\n        loc_logits = self.loc_head(pooled)  # (B, 10)\n        return ss_logits, loc_logits, sa_logits\n\n    def compute_loss(self, ss_logits, loc_logits, sa_logits,\n                     ss_labels, loc_labels, sa_labels):\n        \"\"\"Uncertainty-weighted multi-task loss.\"\"\"\n        ss_loss = F.cross_entropy(\n            ss_logits.view(-1, 3), ss_labels.view(-1)\n        )\n        loc_loss = F.cross_entropy(loc_logits, loc_labels)\n        sa_loss = F.cross_entropy(\n            sa_logits.view(-1, 2), sa_labels.view(-1)\n        )\n        losses = torch.stack([ss_loss, loc_loss, sa_loss])\n        # Uncertainty weighting: L_total = sum(exp(-s_i)*L_i + s_i)\n        precisions = torch.{{b2}}(-self.log_vars)\n        total = (precisions * losses + self.log_vars).sum()\n        return total, {\"ss\": ss_loss.item(),\n                       \"loc\": loc_loss.item(), \"sa\": sa_loss.item()}\n\nmodel = MultiTaskProteinHead()\nemb = torch.randn(8, 50, 320)\nss_out, loc_out, sa_out = model(emb)\n\nss_labels = torch.randint(0, 3, (8, 50))\nloc_labels = torch.randint(0, {{b3}}, (8,))\nsa_labels = torch.randint(0, 2, (8, 50))\n\ntotal_loss, losses = model.compute_loss(\n    ss_out, loc_out, sa_out, ss_labels, loc_labels, sa_labels\n)\nprint(f\"Total loss: {total_loss.item():.4f}\")\nfor task, val in losses.items():\n    print(f\"  {task}: {val:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "pool over sequence length",
+                    "acceptable": ["mean"],
+                    "hint": "Use .mean(dim=1) to average pool embeddings across the sequence dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "compute precision from log-variance",
+                    "acceptable": ["exp"],
+                    "hint": "Use torch.exp(-log_vars) to compute precision (inverse variance) from log-variance."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "number of localization classes",
+                    "acceptable": ["10"],
+                    "hint": "There are 10 subcellular localization classes as defined in loc_classes."
+                }
+            ]
         }
     ]
 }

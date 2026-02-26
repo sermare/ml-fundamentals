@@ -87,6 +87,669 @@
                     "hint": "Flatten all spatial dims while keeping batch dim."
                 }
             ]
+        },
+        {
+            "id": "cnn_new_1x1_conv",
+            "title": "1x1 Convolution for Channel Reduction",
+            "difficulty": "easy",
+            "description": "Define a 1x1 convolution that reduces 512 channels down to 64 channels. This is commonly used in bottleneck architectures to reduce computational cost.",
+            "info": "A 1x1 convolution, also called a pointwise convolution or network-in-network layer, applies a kernel of spatial size 1x1 across all input channels. It acts as a learned linear combination of channels at each spatial location, enabling channel-wise dimensionality reduction or expansion without altering spatial dimensions. This technique was popularized by GoogLeNet/Inception and is central to bottleneck blocks in ResNet. Using a 1x1 conv to reduce 512 channels to 64 before a costly 3x3 conv dramatically cuts parameters and FLOPs.",
+            "code": "import torch.nn as nn\n\nbottleneck_reduce = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(?, ?, ?)",
+                    "acceptable": [
+                        "nn.Conv2d(512, 64, 1)",
+                        "nn.Conv2d(512, 64, kernel_size=1)"
+                    ],
+                    "hint": "nn.Conv2d with kernel_size=1 to go from 512 to 64 channels."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_global_avg_pool",
+            "title": "Global Average Pooling",
+            "difficulty": "easy",
+            "description": "Apply global average pooling to reduce a feature map of shape (batch, channels, H, W) to (batch, channels, 1, 1). This replaces the fully connected layer at the end of many modern CNNs.",
+            "info": "Global Average Pooling (GAP) computes the spatial average of each feature map channel, collapsing H x W dimensions into a single value per channel. Introduced in the Network-in-Network paper, GAP acts as a structural regularizer that reduces overfitting by eliminating most of the parameters that a traditional fully connected classifier would require. It also makes the network agnostic to input spatial resolution at inference time. In PyTorch, nn.AdaptiveAvgPool2d((1,1)) achieves this regardless of the input spatial size.",
+            "code": "import torch.nn as nn\n\ngap = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???((?  ?))",
+                    "acceptable": [
+                        "nn.AdaptiveAvgPool2d((1, 1))",
+                        "nn.AdaptiveAvgPool2d(1)",
+                        "nn.AdaptiveAvgPool2d((1,1))"
+                    ],
+                    "hint": "nn.AdaptiveAvgPool2d with output size (1,1)."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_depthwise_sep",
+            "title": "Depthwise Separable Convolution",
+            "difficulty": "medium",
+            "description": "Implement a depthwise separable convolution that processes 64 input channels and produces 128 output channels with a 3x3 kernel. First, define the depthwise conv (groups=in_channels), then the pointwise 1x1 conv.",
+            "info": "Depthwise separable convolutions factorize a standard convolution into two steps: a depthwise convolution that applies a single filter per input channel (groups=in_channels), and a pointwise 1x1 convolution that mixes channel information. This factorization, popularized by MobileNet, reduces computational cost from O(K^2 * C_in * C_out) to O(K^2 * C_in + C_in * C_out), often achieving an 8-9x reduction for 3x3 kernels. In PyTorch, the depthwise step uses nn.Conv2d with groups equal to the number of input channels, ensuring each channel is convolved independently. The pointwise step then projects to the desired output channels.",
+            "code": "import torch.nn as nn\n\n# Depthwise conv: each of the 64 channels is convolved independently\ndepthwise = {{b1}}\n# Pointwise conv: mix channels from 64 -> 128\npointwise = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?, padding=?, groups=?)",
+                    "acceptable": [
+                        "nn.Conv2d(64, 64, 3, padding=1, groups=64)",
+                        "nn.Conv2d(64, 64, kernel_size=3, padding=1, groups=64)"
+                    ],
+                    "hint": "Depthwise: in_channels=out_channels=64, kernel_size=3, groups=64."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Conv2d(?, ?, ?)",
+                    "acceptable": [
+                        "nn.Conv2d(64, 128, 1)",
+                        "nn.Conv2d(64, 128, kernel_size=1)"
+                    ],
+                    "hint": "Pointwise: 1x1 conv from 64 to 128 channels."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_dilated_conv",
+            "title": "Dilated (Atrous) Convolution",
+            "difficulty": "medium",
+            "description": "Define a dilated convolution with 256 input channels, 256 output channels, 3x3 kernel, dilation=2, and appropriate padding to keep spatial dimensions the same.",
+            "info": "Dilated (atrous) convolutions insert gaps between kernel elements, effectively enlarging the receptive field without increasing the number of parameters or reducing spatial resolution. A 3x3 kernel with dilation=2 has an effective receptive field of 5x5, and with dilation=4 it reaches 9x9, all using only 9 weights. This is widely used in semantic segmentation networks like DeepLab, where maintaining spatial resolution while capturing large context is critical. The padding needed for 'same' output with a dilated conv is dilation * (kernel_size - 1) / 2, so for dilation=2 and kernel_size=3 the padding is 2.",
+            "code": "import torch.nn as nn\n\ndilated_conv = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?, dilation=?, padding=?)",
+                    "acceptable": [
+                        "nn.Conv2d(256, 256, 3, dilation=2, padding=2)",
+                        "nn.Conv2d(256, 256, kernel_size=3, dilation=2, padding=2)"
+                    ],
+                    "hint": "dilation=2 with a 3x3 kernel requires padding=2 for same spatial size."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_transposed_conv",
+            "title": "Transposed Convolution for Upsampling",
+            "difficulty": "medium",
+            "description": "Define a transposed convolution (deconvolution) that upsamples spatial dimensions by 2x. Input: 256 channels, output: 128 channels, kernel_size=4, stride=2, padding=1.",
+            "info": "Transposed convolutions (sometimes called deconvolutions or fractionally-strided convolutions) are learnable upsampling layers used in decoder networks, GANs, and segmentation architectures like U-Net. Unlike bilinear interpolation, the upsampling kernel weights are learned during training. A ConvTranspose2d with stride=2 doubles the spatial dimensions, and the kernel_size and padding must be chosen carefully to avoid checkerboard artifacts. The output size formula is O = (H - 1) * S - 2P + K, so with H=16, stride=2, padding=1, kernel=4 the output is 32.",
+            "code": "import torch.nn as nn\n\nupsample = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(?, ?, ?, stride=?, padding=?)",
+                    "acceptable": [
+                        "nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1)",
+                        "nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1)"
+                    ],
+                    "hint": "nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1) doubles spatial dims."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_group_conv",
+            "title": "Group Convolution",
+            "difficulty": "medium",
+            "description": "Define a group convolution that splits 128 input channels into 4 groups, each processed by its own set of filters, producing 128 output channels with a 3x3 kernel and padding=1.",
+            "info": "Group convolutions partition both the input and output channels into disjoint groups, with each group being convolved independently. Originally introduced in AlexNet to split computation across two GPUs, group convolutions were later shown to improve efficiency and regularization in architectures like ResNeXt. With groups=4, a 128-channel input is split into 4 groups of 32 channels each, and each group produces 32 output channels, reducing parameters by a factor of 4 compared to a standard convolution. The key constraint is that both in_channels and out_channels must be divisible by the number of groups.",
+            "code": "import torch.nn as nn\n\ngroup_conv = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?, padding=?, groups=?)",
+                    "acceptable": [
+                        "nn.Conv2d(128, 128, 3, padding=1, groups=4)",
+                        "nn.Conv2d(128, 128, kernel_size=3, padding=1, groups=4)"
+                    ],
+                    "hint": "nn.Conv2d with groups=4 splits 128 channels into 4 independent groups."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_resnet_basic_block",
+            "title": "ResNet Basic Block with Skip Connection",
+            "difficulty": "hard",
+            "description": "Implement the forward method of a ResNet basic block. The block has two 3x3 convolutions with batch norm and ReLU, plus a skip (identity) connection. The final output adds the input to the block output before the last ReLU.",
+            "info": "The residual (skip) connection is the core innovation of ResNet: instead of learning a direct mapping H(x), the network learns a residual F(x) = H(x) - x, making it easier to learn identity-like mappings in deep networks. This simple addition operation solves the degradation problem, enabling training of networks with hundreds or thousands of layers. The basic block applies conv->BN->ReLU->conv->BN, then adds the original input before a final ReLU. Batch normalization after each convolution stabilizes training by normalizing intermediate activations.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass BasicBlock(nn.Module):\n    def __init__(self, channels):\n        super().__init__()\n        self.conv1 = nn.Conv2d(channels, channels, 3, padding=1)\n        self.bn1 = nn.BatchNorm2d(channels)\n        self.conv2 = nn.Conv2d(channels, channels, 3, padding=1)\n        self.bn2 = nn.BatchNorm2d(channels)\n\n    def forward(self, x):\n        identity = x\n        out = F.relu(self.bn1(self.conv1(x)))\n        out = self.bn2(self.conv2(out))\n        out = {{b1}}\n        return F.relu(out)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? + ???",
+                    "acceptable": [
+                        "out + identity",
+                        "identity + out"
+                    ],
+                    "hint": "Add the skip connection (identity) to the block output before the final ReLU."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_bottleneck_block",
+            "title": "ResNet Bottleneck Block",
+            "difficulty": "hard",
+            "description": "Define the three convolution layers of a ResNet bottleneck block. The block reduces 256 channels to 64 with a 1x1 conv, applies a 3x3 conv at 64 channels, then expands back to 256 with another 1x1 conv.",
+            "info": "The bottleneck block in ResNet-50/101/152 uses a 1x1 -> 3x3 -> 1x1 convolution pattern to reduce computational cost while maintaining representational power. The first 1x1 conv compresses channels (e.g., 256 to 64), the 3x3 conv processes the reduced representation, and the final 1x1 conv restores the original channel count. This is cheaper than using two 3x3 convolutions at 256 channels: the bottleneck uses roughly 70K parameters versus 1.2M for the non-bottleneck equivalent. Each convolution is followed by batch normalization and ReLU (except the last conv, which gets ReLU after the skip addition).",
+            "code": "import torch.nn as nn\n\n# Bottleneck: 256 -> 64 -> 64 -> 256\nconv1x1_reduce = {{b1}}\nconv3x3 = {{b2}}\nconv1x1_expand = {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?)",
+                    "acceptable": [
+                        "nn.Conv2d(256, 64, 1)",
+                        "nn.Conv2d(256, 64, kernel_size=1)"
+                    ],
+                    "hint": "1x1 conv from 256 to 64 channels."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Conv2d(?, ?, ?, padding=?)",
+                    "acceptable": [
+                        "nn.Conv2d(64, 64, 3, padding=1)",
+                        "nn.Conv2d(64, 64, kernel_size=3, padding=1)"
+                    ],
+                    "hint": "3x3 conv at 64 channels with same padding."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "nn.Conv2d(?, ?, ?)",
+                    "acceptable": [
+                        "nn.Conv2d(64, 256, 1)",
+                        "nn.Conv2d(64, 256, kernel_size=1)"
+                    ],
+                    "hint": "1x1 conv from 64 back to 256 channels."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_batchnorm_cnn",
+            "title": "Batch Normalization in a CNN",
+            "difficulty": "easy",
+            "description": "Add a BatchNorm2d layer after a Conv2d with 64 output channels. BatchNorm2d normalizes across the batch and spatial dimensions for each channel.",
+            "info": "Batch Normalization normalizes activations by subtracting the mean and dividing by the standard deviation computed over the mini-batch and spatial dimensions for each channel independently. In CNNs, BatchNorm2d takes the number of channels as its argument because it learns per-channel scale (gamma) and shift (beta) parameters. It stabilizes training, allows higher learning rates, and acts as a mild regularizer. During inference, running statistics (accumulated during training) are used instead of batch statistics, so the model behavior is deterministic.",
+            "code": "import torch.nn as nn\n\nconv = nn.Conv2d(3, 64, 3, padding=1)\nbn = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(??)",
+                    "acceptable": [
+                        "nn.BatchNorm2d(64)"
+                    ],
+                    "hint": "nn.BatchNorm2d takes the number of channels (64) as its argument."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_receptive_field",
+            "title": "Receptive Field Calculation",
+            "difficulty": "medium",
+            "description": "Write a function that computes the receptive field size after stacking N convolutional layers, each with the same kernel_size and stride=1, dilation=1, starting from receptive_field=1.",
+            "info": "The receptive field is the region in the input image that influences a particular output neuron. For a single conv layer with kernel_size K and stride 1, the receptive field grows by (K-1) pixels. After stacking N such layers, the total receptive field is 1 + N * (K - 1). For example, three 3x3 layers have a receptive field of 7x7, equivalent to a single 7x7 layer but with fewer parameters and more non-linearity. Understanding receptive fields is critical for designing architectures that capture sufficient context for the task at hand.",
+            "code": "def receptive_field(num_layers, kernel_size):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 + ??? * (??? - 1)",
+                    "acceptable": [
+                        "1 + num_layers * (kernel_size - 1)"
+                    ],
+                    "hint": "Each layer adds (kernel_size - 1) to the receptive field."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_padding_reflect",
+            "title": "Reflection Padding",
+            "difficulty": "easy",
+            "description": "Apply 1-pixel reflection padding to all sides of a feature map before a 3x3 convolution. Reflection padding avoids zero-value border artifacts.",
+            "info": "Reflection padding mirrors the input values at the borders rather than filling with zeros, which can reduce boundary artifacts in tasks like image generation and style transfer. In PyTorch, nn.ReflectionPad2d(1) adds 1 pixel of reflected values on all four sides. This is an alternative to the default zero padding in nn.Conv2d and is preferred when zero borders would introduce visible artifacts. The padding is applied as a separate module before a convolution with padding=0, ensuring the spatial dimensions are preserved.",
+            "code": "import torch.nn as nn\n\npad = {{b1}}\nconv = nn.Conv2d(64, 64, 3, padding=0)  # no padding in conv itself",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(??)",
+                    "acceptable": [
+                        "nn.ReflectionPad2d(1)"
+                    ],
+                    "hint": "nn.ReflectionPad2d(1) adds 1-pixel reflection padding on all sides."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_adaptive_pool",
+            "title": "Adaptive Average Pooling",
+            "difficulty": "easy",
+            "description": "Use adaptive average pooling to resize any spatial input to exactly 7x7, regardless of the original spatial dimensions. This is used in networks like VGG when input sizes may vary.",
+            "info": "Adaptive pooling layers in PyTorch automatically compute the required kernel size and stride to produce the desired output spatial dimensions, regardless of the input size. nn.AdaptiveAvgPool2d((7,7)) will take any (B, C, H, W) tensor and output (B, C, 7, 7). This eliminates the need to manually compute pooling parameters or restrict input image sizes. It is commonly used before fully connected layers in classification networks to handle variable input resolutions at test time.",
+            "code": "import torch.nn as nn\n\npool = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???((?  ?))",
+                    "acceptable": [
+                        "nn.AdaptiveAvgPool2d((7, 7))",
+                        "nn.AdaptiveAvgPool2d((7,7))",
+                        "nn.AdaptiveAvgPool2d(7)"
+                    ],
+                    "hint": "nn.AdaptiveAvgPool2d with output_size=(7,7)."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_densenet_concat",
+            "title": "DenseNet-style Concatenation",
+            "difficulty": "medium",
+            "description": "In a DenseNet block, each layer receives the concatenation of all previous layers' outputs along the channel dimension. Given feature maps x0 (input) and outputs out1, out2 from two dense layers, form the input to the third layer by concatenating all three.",
+            "info": "DenseNet connects every layer to every subsequent layer via channel-wise concatenation, creating dense connectivity patterns that encourage feature reuse and improve gradient flow. Unlike ResNet's additive skip connections, DenseNet concatenates features, so the channel count grows with each layer by a fixed growth rate. For example, if x0 has 64 channels and each layer outputs 32 channels (growth rate k=32), the input to layer 3 is [x0, out1, out2] with 64+32+32=128 channels. This design significantly reduces parameters while maintaining performance, since earlier features are directly accessible.",
+            "code": "import torch\n\n# x0: initial features, out1/out2: outputs of dense layers 1 and 2\ninput_to_layer3 = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???([ ?, ?, ? ], dim=?)",
+                    "acceptable": [
+                        "torch.cat([x0, out1, out2], dim=1)",
+                        "torch.cat((x0, out1, out2), dim=1)"
+                    ],
+                    "hint": "torch.cat along dim=1 (channel dimension) to concatenate all previous features."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_inception_parallel",
+            "title": "Inception Module Parallel Branches",
+            "difficulty": "hard",
+            "description": "Implement a simplified Inception module with three parallel branches from 256 input channels: (1) a 1x1 conv to 64 channels, (2) a 1x1 reduce to 96 then 3x3 conv to 128 channels (padding=1), and (3) a 3x3 max pool (padding=1) then 1x1 conv to 32 channels. Concatenate all branch outputs along the channel dimension.",
+            "info": "The Inception module, introduced in GoogLeNet, processes input through multiple parallel branches with different kernel sizes and then concatenates the results. This multi-scale approach captures features at different receptive field sizes simultaneously. The 1x1 bottleneck convolutions before larger kernels reduce computational cost dramatically. All branches must produce the same spatial dimensions for concatenation to work, which is achieved through appropriate padding. The final output channels are the sum of all branch outputs (64 + 128 + 32 = 224 in this case).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass SimpleInception(nn.Module):\n    def __init__(self):\n        super().__init__()\n        # Branch 1: 1x1\n        self.branch1 = nn.Conv2d(256, 64, 1)\n        # Branch 2: 1x1 reduce -> 3x3\n        self.branch2_reduce = nn.Conv2d(256, 96, 1)\n        self.branch2_conv = nn.Conv2d(96, 128, 3, padding=1)\n        # Branch 3: pool -> 1x1\n        self.branch3_pool = nn.MaxPool2d(3, stride=1, padding=1)\n        self.branch3_conv = nn.Conv2d(256, 32, 1)\n\n    def forward(self, x):\n        b1 = self.branch1(x)\n        b2 = self.branch2_conv(F.relu(self.branch2_reduce(x)))\n        b3 = self.branch3_conv(self.branch3_pool(x))\n        return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???([?, ?, ?], dim=?)",
+                    "acceptable": [
+                        "torch.cat([b1, b2, b3], dim=1)",
+                        "torch.cat((b1, b2, b3), dim=1)",
+                        "torch.cat([b1, b2, b3], 1)",
+                        "torch.cat((b1, b2, b3), 1)"
+                    ],
+                    "hint": "Concatenate all branch outputs along the channel dimension (dim=1)."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_se_block",
+            "title": "Squeeze-and-Excitation Block",
+            "difficulty": "hard",
+            "description": "Implement the forward pass of a Squeeze-and-Excitation (SE) block. First squeeze with global average pooling, then excite with FC->ReLU->FC->Sigmoid, and finally scale the original input channels by the learned weights.",
+            "info": "Squeeze-and-Excitation (SE) blocks adaptively recalibrate channel-wise feature responses by explicitly modeling inter-channel dependencies. The 'squeeze' step aggregates spatial information via global average pooling, producing a channel descriptor. The 'excitation' step learns channel-wise attention weights through a small bottleneck MLP (two fully connected layers with ReLU and Sigmoid). The output is the original feature map multiplied element-wise by these attention weights. SE blocks add minimal parameters (roughly 2*C^2/r where r is the reduction ratio) and can be inserted into any existing architecture for consistent accuracy gains.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SEBlock(nn.Module):\n    def __init__(self, channels, reduction=16):\n        super().__init__()\n        self.squeeze = nn.AdaptiveAvgPool2d(1)\n        self.fc1 = nn.Linear(channels, channels // reduction)\n        self.fc2 = nn.Linear(channels // reduction, channels)\n\n    def forward(self, x):\n        b, c, _, _ = x.size()\n        # Squeeze\n        w = self.squeeze(x).view(b, c)\n        # Excitation\n        w = torch.relu(self.fc1(w))\n        w = torch.sigmoid(self.fc2(w)).view(b, c, 1, 1)\n        # Scale\n        return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x ??? w",
+                    "acceptable": [
+                        "x * w"
+                    ],
+                    "hint": "Multiply the original input x by the channel attention weights w (element-wise broadcast)."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_transfer_freeze",
+            "title": "Freeze Pretrained Backbone for Transfer Learning",
+            "difficulty": "medium",
+            "description": "Load a pretrained ResNet18 and freeze all its parameters (requires_grad=False) so that only a new classification head can be trained. Replace the final fc layer to classify 5 classes.",
+            "info": "Transfer learning leverages features learned on large datasets (e.g., ImageNet) for new tasks with limited data. Freezing the pretrained backbone prevents those weights from being updated during fine-tuning, which preserves the learned representations and prevents catastrophic forgetting. In PyTorch, setting param.requires_grad = False for each parameter excludes it from gradient computation, speeding up training and reducing memory usage. Only the newly added classification head (nn.Linear) will have requires_grad=True by default, so the optimizer will only update those weights.",
+            "code": "import torch.nn as nn\nimport torchvision.models as models\n\nmodel = models.resnet18(pretrained=True)\n\n# Freeze all parameters\nfor param in model.parameters():\n    {{b1}}\n\n# Replace classifier head for 5 classes\nmodel.fc = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "param.??? = ???",
+                    "acceptable": [
+                        "param.requires_grad = False"
+                    ],
+                    "hint": "Set requires_grad to False to freeze parameters."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???(?, ?)",
+                    "acceptable": [
+                        "nn.Linear(512, 5)",
+                        "nn.Linear(model.fc.in_features, 5)"
+                    ],
+                    "hint": "ResNet18's fc layer has 512 input features; replace with nn.Linear(512, 5)."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_data_aug",
+            "title": "Data Augmentation Transforms for CNNs",
+            "difficulty": "easy",
+            "description": "Define a training data augmentation pipeline using torchvision transforms: random horizontal flip, random crop to 32x32 with 4 pixels padding, convert to tensor, and normalize with mean=(0.5,0.5,0.5), std=(0.5,0.5,0.5).",
+            "info": "Data augmentation artificially increases the effective training set size by applying random transformations to input images, improving generalization and reducing overfitting. RandomHorizontalFlip mirrors images left-to-right with 50% probability, while RandomCrop with padding adds border pixels then randomly crops, simulating slight translations. These are standard augmentations for CIFAR-style datasets. The transforms are composed into a sequential pipeline using transforms.Compose, and ToTensor converts PIL images to float tensors with values in [0,1] before Normalize rescales them.",
+            "code": "from torchvision import transforms\n\ntrain_transform = transforms.Compose([\n    {{b1}},\n    {{b2}},\n    transforms.ToTensor(),\n    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))\n])",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "transforms.???()",
+                    "acceptable": [
+                        "transforms.RandomHorizontalFlip()",
+                        "transforms.RandomHorizontalFlip(p=0.5)"
+                    ],
+                    "hint": "transforms.RandomHorizontalFlip() flips images horizontally with p=0.5."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "transforms.???(?, padding=?)",
+                    "acceptable": [
+                        "transforms.RandomCrop(32, padding=4)"
+                    ],
+                    "hint": "transforms.RandomCrop(32, padding=4) pads then crops to 32x32."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_feature_map_hook",
+            "title": "Extract Feature Maps with Forward Hook",
+            "difficulty": "hard",
+            "description": "Register a forward hook on the 'layer4' of a ResNet model to capture its output feature maps during a forward pass. Store the output in a dictionary called 'activations'.",
+            "info": "Forward hooks in PyTorch allow you to intercept and store intermediate activations without modifying the model's source code, which is essential for feature visualization, debugging, and interpretability methods like GradCAM. A hook is a callable registered on a specific module that receives the module, its input, and its output during the forward pass. The hook function can store, modify, or log the output. Using register_forward_hook returns a handle that can later be used to remove the hook. This pattern is the standard approach for extracting feature maps from pretrained models.",
+            "code": "import torchvision.models as models\n\nmodel = models.resnet18(pretrained=True)\nmodel.eval()\n\nactivations = {}\n\ndef hook_fn(module, input, output):\n    activations['layer4'] = output\n\nhandle = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "model.layer4.???(???)",
+                    "acceptable": [
+                        "model.layer4.register_forward_hook(hook_fn)"
+                    ],
+                    "hint": "Use register_forward_hook(hook_fn) on model.layer4."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_gradcam_weights",
+            "title": "GradCAM: Compute Channel Weights",
+            "difficulty": "hard",
+            "description": "Given gradients of shape (1, C, H, W) from the target class with respect to feature maps, compute the GradCAM channel weights by global average pooling the gradients over the spatial dimensions.",
+            "info": "Gradient-weighted Class Activation Mapping (GradCAM) produces visual explanations for CNN predictions by weighting feature map channels according to their importance for a target class. The channel importance weights are computed by global average pooling the gradients of the target class score with respect to the feature map activations. In PyTorch, this means averaging over the spatial dimensions (H, W) using .mean(dim=[2, 3]). These weights are then used to compute a weighted combination of the feature maps, followed by a ReLU to keep only positive contributions to the class prediction.",
+            "code": "import torch\n\n# gradients: shape (1, C, H, W) - gradients of class score w.r.t. feature maps\n# Compute per-channel weights by averaging over spatial dims\nweights = {{b1}}  # shape: (1, C)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "gradients.mean(dim=???)",
+                    "acceptable": [
+                        "gradients.mean(dim=[2, 3])",
+                        "gradients.mean(dim=(2, 3))",
+                        "gradients.mean(dim=[2,3])",
+                        "gradients.mean(dim=(2,3))"
+                    ],
+                    "hint": "Average over spatial dimensions H (dim=2) and W (dim=3)."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_cam_heatmap",
+            "title": "Class Activation Map Computation",
+            "difficulty": "medium",
+            "description": "Given GradCAM weights of shape (1, C) and feature maps of shape (1, C, H, W), compute the heatmap as the weighted sum over channels followed by ReLU. Use einsum or broadcasting.",
+            "info": "The GradCAM heatmap is a weighted linear combination of feature map channels, where the weights represent each channel's importance for the target class. This produces a 2D spatial map highlighting the regions most relevant to the prediction. Applying ReLU to the heatmap retains only the features that have a positive influence on the class score, filtering out negative contributions. The resulting heatmap is typically resized to the original image dimensions and overlaid as a color map for visualization.",
+            "code": "import torch\nimport torch.nn.functional as F\n\n# weights: (1, C), feature_maps: (1, C, H, W)\nheatmap = {{b1}}\nheatmap = F.relu(heatmap)  # keep only positive influences",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.einsum('...', ???, ???)",
+                    "acceptable": [
+                        "torch.einsum('bc,bchw->bhw', weights, feature_maps)",
+                        "(weights.unsqueeze(-1).unsqueeze(-1) * feature_maps).sum(dim=1)",
+                        "(weights[:, :, None, None] * feature_maps).sum(dim=1)"
+                    ],
+                    "hint": "Weighted sum: multiply weights (1,C) by feature_maps (1,C,H,W) and sum over C."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_fpn_lateral",
+            "title": "Feature Pyramid Network Lateral Connection",
+            "difficulty": "hard",
+            "description": "In an FPN, define a lateral 1x1 convolution that converts a backbone feature map with 512 channels to the FPN's uniform 256 channels, then define an upsampling step to double the spatial resolution using bilinear interpolation.",
+            "info": "Feature Pyramid Networks (FPNs) build a multi-scale feature pyramid by combining high-resolution low-level features with semantically rich high-level features through a top-down pathway with lateral connections. Each lateral connection is a 1x1 convolution that maps backbone features to a uniform channel dimension (e.g., 256). The top-down pathway upsamples coarser features by 2x and adds them element-wise to the laterally connected features. This produces strong features at all scales, which is critical for detecting objects of varying sizes in tasks like object detection.",
+            "code": "import torch.nn as nn\nimport torch.nn.functional as F\n\nlateral_conv = {{b1}}\n\n# In forward: upsample coarse features to match finer spatial dims\n# coarse_feat has shape (B, 256, H, W), target is (B, 256, 2H, 2W)\nupsampled = {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?)",
+                    "acceptable": [
+                        "nn.Conv2d(512, 256, 1)",
+                        "nn.Conv2d(512, 256, kernel_size=1)"
+                    ],
+                    "hint": "1x1 conv to project 512 backbone channels to 256 FPN channels."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.interpolate(coarse_feat, ???, mode='bilinear', ???)",
+                    "acceptable": [
+                        "F.interpolate(coarse_feat, scale_factor=2, mode='bilinear', align_corners=False)",
+                        "F.interpolate(coarse_feat, scale_factor=2, mode='bilinear', align_corners=True)"
+                    ],
+                    "hint": "F.interpolate with scale_factor=2 and mode='bilinear'."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_deformable_conv_concept",
+            "title": "Deformable Convolution Concept",
+            "difficulty": "medium",
+            "description": "In a deformable convolution, we learn offsets for each sampling position. Given a standard 3x3 conv with 64 input channels, define the offset convolution that predicts 2D offsets for each of the 9 sampling positions (2 * 3 * 3 = 18 output channels).",
+            "info": "Deformable convolutions augment standard convolutions by learning input-dependent spatial offsets for each sampling location in the kernel. For a 3x3 kernel with 9 positions, we need 2 offsets (x and y) per position, giving 18 offset values per spatial location. A separate conv layer with the same kernel size predicts these offsets from the input feature map. The actual convolution then samples at the offset positions using bilinear interpolation, allowing the network to adaptively adjust its receptive field to the geometric structure of objects.",
+            "code": "import torch.nn as nn\n\n# Offset prediction for 3x3 deformable conv\noffset_conv = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?, padding=?)",
+                    "acceptable": [
+                        "nn.Conv2d(64, 18, 3, padding=1)",
+                        "nn.Conv2d(64, 18, kernel_size=3, padding=1)"
+                    ],
+                    "hint": "18 output channels = 2 offsets * 9 kernel positions. Same kernel_size and padding as the main conv."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_strided_downsample",
+            "title": "Strided Convolution for Downsampling",
+            "difficulty": "easy",
+            "description": "Define a 3x3 convolution with stride=2 and padding=1 that downsamples spatial dimensions by half while increasing channels from 64 to 128. This is preferred over pooling in many modern architectures.",
+            "info": "Strided convolutions are an alternative to pooling for spatial downsampling, combining feature extraction and resolution reduction into a single learnable operation. Unlike max pooling which discards information based on a fixed rule, strided convolutions learn how to downsample. A stride=2 convolution halves the spatial dimensions: a 32x32 input becomes 16x16. This approach is used in architectures like ResNet (for skip connections that change dimensions) and all-convolutional networks. The padding=1 ensures the output size is exactly input_size/2.",
+            "code": "import torch.nn as nn\n\ndownsample = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?, stride=?, padding=?)",
+                    "acceptable": [
+                        "nn.Conv2d(64, 128, 3, stride=2, padding=1)",
+                        "nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)"
+                    ],
+                    "hint": "nn.Conv2d(64, 128, 3, stride=2, padding=1) halves spatial dims."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_conv_param_count",
+            "title": "Convolutional Layer Parameter Count",
+            "difficulty": "medium",
+            "description": "Write a function that computes the total number of trainable parameters in a Conv2d layer given in_channels, out_channels, kernel_size, and whether bias is used.",
+            "info": "Understanding parameter counts is essential for architecture design and computational budgeting. A Conv2d layer has out_channels filters, each of size (in_channels x kernel_size x kernel_size), plus an optional bias vector of length out_channels. The total is out_channels * in_channels * K * K + (out_channels if bias else 0). For example, a Conv2d(3, 64, 3) has 64 * 3 * 3 * 3 + 64 = 1,792 parameters. Comparing parameter counts across architectures reveals the efficiency gains from techniques like depthwise separable convolutions and bottleneck blocks.",
+            "code": "def conv_param_count(in_ch, out_ch, kernel_size, bias=True):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "out_ch * in_ch * ??? * ??? + (??? if bias else 0)",
+                    "acceptable": [
+                        "out_ch * in_ch * kernel_size * kernel_size + (out_ch if bias else 0)"
+                    ],
+                    "hint": "Weight params = out_ch * in_ch * K * K. Bias params = out_ch if bias is True."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_dropout2d",
+            "title": "Spatial Dropout for CNNs",
+            "difficulty": "easy",
+            "description": "Apply spatial dropout (Dropout2d) with p=0.25 to a feature map. Dropout2d drops entire channels rather than individual pixels, which is more effective for convolutional feature maps.",
+            "info": "Standard dropout randomly zeroes individual elements, but adjacent pixels in feature maps are strongly correlated, reducing dropout's effectiveness. Dropout2d (spatial dropout) addresses this by dropping entire feature map channels at once, forcing the network to not rely on any single channel. This is the recommended dropout variant for convolutional layers. In PyTorch, nn.Dropout2d(p=0.25) zeros out 25% of channels during training and is a no-op during evaluation. It should be applied after activation functions.",
+            "code": "import torch.nn as nn\n\nspatial_dropout = {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(p=?)",
+                    "acceptable": [
+                        "nn.Dropout2d(p=0.25)",
+                        "nn.Dropout2d(0.25)"
+                    ],
+                    "hint": "nn.Dropout2d(p=0.25) drops 25% of entire feature map channels."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_finetune_last_layers",
+            "title": "Fine-Tuning: Unfreeze Last Few Layers",
+            "difficulty": "medium",
+            "description": "Given a frozen pretrained ResNet18, unfreeze only layer4 and the fc head for fine-tuning. Set requires_grad=True for parameters in these two modules.",
+            "info": "Fine-tuning specific layers is a common transfer learning strategy that balances between using pretrained features and adapting to a new task. Early layers learn generic features (edges, textures) that transfer well, while later layers learn task-specific features that may need adaptation. Unfreezing only the last few layers allows the model to adapt high-level representations while preserving robust low-level features. This is especially effective when the target dataset is small, as it reduces the number of trainable parameters and mitigates overfitting compared to full fine-tuning.",
+            "code": "import torchvision.models as models\n\nmodel = models.resnet18(pretrained=True)\nfor param in model.parameters():\n    param.requires_grad = False\n\n# Unfreeze layer4 and fc\nfor param in {{b1}}:\n    param.requires_grad = True\nfor param in {{b2}}:\n    param.requires_grad = True",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "model.???.parameters()",
+                    "acceptable": [
+                        "model.layer4.parameters()"
+                    ],
+                    "hint": "model.layer4.parameters() iterates over layer4's parameters."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "model.???.parameters()",
+                    "acceptable": [
+                        "model.fc.parameters()"
+                    ],
+                    "hint": "model.fc.parameters() iterates over the classification head's parameters."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_resnet_downsample_skip",
+            "title": "ResNet Skip Connection with Downsampling",
+            "difficulty": "hard",
+            "description": "When the spatial dimensions or channel count change between a ResNet block's input and output, the skip connection needs a projection shortcut. Define a 1x1 convolution with stride=2 followed by batch norm to match 64 input channels to 128 output channels at half spatial resolution.",
+            "info": "In ResNet, when a residual block changes spatial dimensions (via stride=2) or channel count, the identity shortcut cannot be used directly because the tensor shapes do not match for addition. The solution is a projection shortcut: a 1x1 convolution with the appropriate stride and channel mapping, followed by batch normalization. This 1x1 conv with stride=2 simultaneously halves the spatial dimensions and projects channels from 64 to 128. Without this projection, the skip connection would cause a shape mismatch error during the element-wise addition.",
+            "code": "import torch.nn as nn\n\ndownsample = nn.Sequential(\n    {{b1}},\n    {{b2}}\n)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?, stride=?)",
+                    "acceptable": [
+                        "nn.Conv2d(64, 128, 1, stride=2)",
+                        "nn.Conv2d(64, 128, kernel_size=1, stride=2)"
+                    ],
+                    "hint": "1x1 conv from 64 to 128 channels with stride=2."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???(???)",
+                    "acceptable": [
+                        "nn.BatchNorm2d(128)"
+                    ],
+                    "hint": "BatchNorm2d matching the 128 output channels."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_dilated_receptive_field",
+            "title": "Receptive Field with Dilated Convolutions",
+            "difficulty": "medium",
+            "description": "Compute the effective receptive field size for a single convolutional layer with kernel_size K and dilation D. The effective kernel size is K + (K-1)*(D-1). For K=3 and D=4, what is the effective kernel size?",
+            "info": "Dilated convolutions expand the receptive field by inserting (dilation-1) zeros between kernel elements, creating an effective kernel size of K + (K-1)*(D-1) without adding parameters. For a 3x3 kernel with dilation=4, the effective size is 3 + 2*3 = 9, covering a 9x9 region with only 9 weights. Stacking dilated convolutions with exponentially increasing dilation rates (1, 2, 4, 8) provides exponential receptive field growth, which is the key idea behind WaveNet and dilated residual networks. This is far more parameter-efficient than using large kernels directly.",
+            "code": "def effective_kernel_size(K, D):\n    return {{b1}}\n\n# Example: K=3, D=4\nresult = effective_kernel_size(3, 4)  # should be 9",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "K + (K - 1) * (??? - 1)",
+                    "acceptable": [
+                        "K + (K - 1) * (D - 1)"
+                    ],
+                    "hint": "Effective kernel = K + (K-1)*(D-1). Dilation D inserts (D-1) gaps."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_eval_mode_batchnorm",
+            "title": "Train vs Eval Mode for BatchNorm",
+            "difficulty": "easy",
+            "description": "Set a CNN model to evaluation mode so that BatchNorm layers use running statistics instead of batch statistics and Dropout is disabled. This is required before inference.",
+            "info": "Calling model.eval() switches all modules to evaluation mode, which critically affects BatchNorm and Dropout behavior. BatchNorm in training mode computes mean and variance from the current batch, but in eval mode it uses the running mean and running variance accumulated during training, ensuring deterministic and stable predictions. Dropout is active during training but becomes a no-op in eval mode. Forgetting to call model.eval() before inference is a common bug that leads to inconsistent predictions, especially with small batch sizes where batch statistics are noisy.",
+            "code": "import torch\nimport torchvision.models as models\n\nmodel = models.resnet18(pretrained=True)\n\n# Switch to evaluation mode for inference\n{{b1}}\n\n# Also disable gradient computation for efficiency\nwith {{b2}}:\n    output = model(torch.randn(1, 3, 224, 224))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "model.???()",
+                    "acceptable": [
+                        "model.eval()"
+                    ],
+                    "hint": "model.eval() sets all layers to evaluation mode."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???()",
+                    "acceptable": [
+                        "torch.no_grad()",
+                        "torch.inference_mode()"
+                    ],
+                    "hint": "torch.no_grad() disables gradient tracking for faster inference."
+                }
+            ]
+        },
+        {
+            "id": "cnn_new_depthwise_mobilenet",
+            "title": "MobileNet Inverted Residual Block",
+            "difficulty": "hard",
+            "description": "Define the three layers of a MobileNetV2 inverted residual block: (1) 1x1 expansion from 16 to 96 channels (expansion factor 6), (2) 3x3 depthwise conv at 96 channels with stride=1 and padding=1, (3) 1x1 projection back to 16 channels.",
+            "info": "The MobileNetV2 inverted residual block reverses the bottleneck pattern: it first expands channels with a 1x1 conv, applies a cheap depthwise 3x3 conv on the expanded representation, then projects back to a narrow output with another 1x1 conv. This 'inverted' design is more memory-efficient because the heavy depthwise conv operates on the wide intermediate tensor but uses very few parameters per channel. The expansion factor (typically 6) controls the width of the intermediate representation. A skip connection is used when stride=1 and input/output channels match.",
+            "code": "import torch.nn as nn\n\n# Inverted residual: 16 -> 96 -> 96 -> 16\nexpand = {{b1}}\ndepthwise = {{b2}}\nproject = {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(?, ?, ?)",
+                    "acceptable": [
+                        "nn.Conv2d(16, 96, 1)",
+                        "nn.Conv2d(16, 96, kernel_size=1)"
+                    ],
+                    "hint": "1x1 conv expanding from 16 to 96 channels."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Conv2d(?, ?, ?, padding=?, groups=?)",
+                    "acceptable": [
+                        "nn.Conv2d(96, 96, 3, padding=1, groups=96)",
+                        "nn.Conv2d(96, 96, kernel_size=3, padding=1, groups=96)"
+                    ],
+                    "hint": "3x3 depthwise conv: groups=96, in=out=96, padding=1."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "nn.Conv2d(?, ?, ?)",
+                    "acceptable": [
+                        "nn.Conv2d(96, 16, 1)",
+                        "nn.Conv2d(96, 16, kernel_size=1)"
+                    ],
+                    "hint": "1x1 conv projecting from 96 back to 16 channels."
+                }
+            ]
         }
     ]
 }

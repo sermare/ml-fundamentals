@@ -542,6 +542,846 @@
                     "hint": "Standard MSE loss between predicted and true noise, same as normal DDPM training."
                 }
             ]
+        },
+        {
+            "id": "diff_adv_new_consistency_model",
+            "title": "Consistency Model Direct Mapping",
+            "difficulty": "medium",
+            "description": "Implement the core consistency function that maps any noisy sample x_t directly to the clean data x_0 in a single step, as proposed in Consistency Models (Song et al., 2023).",
+            "info": "Consistency Models (Song et al., 2023) learn a function f(x_t, t) that maps any point along the probability flow ODE trajectory directly to the trajectory's origin x_0. The key consistency property is that f(x_t, t) = f(x_t', t') for any two points on the same trajectory. At the boundary condition t=epsilon (near zero), the model should output x_t itself (identity). This is enforced by parameterizing f(x, t) = c_skip(t) * x + c_out(t) * F_theta(x, t), where c_skip(epsilon)=1 and c_out(epsilon)=0. This allows single-step generation, making sampling orders of magnitude faster than iterative diffusion.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass ConsistencyModel(nn.Module):\n    def __init__(self, net, sigma_min=0.002, sigma_data=0.5):\n        super().__init__()\n        self.net = net  # backbone network F_theta\n        self.sigma_min = sigma_min\n        self.sigma_data = sigma_data\n    \n    def c_skip(self, sigma):\n        \"\"\"Skip connection coefficient: approaches 1 as sigma -> sigma_min.\"\"\"\n        return {{diff_adv_new_cm_b1}}\n    \n    def c_out(self, sigma):\n        \"\"\"Output coefficient: approaches 0 as sigma -> sigma_min.\"\"\"\n        return {{diff_adv_new_cm_b2}}\n    \n    def forward(self, x, sigma):\n        \"\"\"Consistency function: maps (x_t, sigma) -> x_0 estimate.\"\"\"\n        c_skip = self.c_skip(sigma)\n        c_out = self.c_out(sigma)\n        F_x = self.net(x, sigma)\n        return {{diff_adv_new_cm_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_cm_b1",
+                    "placeholder": "self.sigma_data ** 2 / (??? + self.sigma_data ** 2)",
+                    "acceptable": ["self.sigma_data ** 2 / (sigma ** 2 + self.sigma_data ** 2)"],
+                    "hint": "c_skip(sigma) = sigma_data^2 / (sigma^2 + sigma_data^2). This equals 1 when sigma is very small."
+                },
+                {
+                    "id": "diff_adv_new_cm_b2",
+                    "placeholder": "sigma * self.sigma_data / torch.sqrt(???)",
+                    "acceptable": ["sigma * self.sigma_data / torch.sqrt(sigma ** 2 + self.sigma_data ** 2)", "sigma * self.sigma_data / (sigma ** 2 + self.sigma_data ** 2).sqrt()"],
+                    "hint": "c_out(sigma) = sigma * sigma_data / sqrt(sigma^2 + sigma_data^2). This equals 0 when sigma is very small."
+                },
+                {
+                    "id": "diff_adv_new_cm_b3",
+                    "placeholder": "c_skip * ??? + c_out * ???",
+                    "acceptable": ["c_skip * x + c_out * F_x"],
+                    "hint": "The output is c_skip * x + c_out * F_theta(x, sigma), enforcing the boundary condition at sigma_min."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_consistency_distillation_loss",
+            "title": "Consistency Distillation Loss",
+            "difficulty": "hard",
+            "description": "Implement the consistency distillation loss that trains a consistency model from a pre-trained diffusion model by enforcing consistent predictions along the ODE trajectory.",
+            "info": "Consistency distillation trains a student consistency model f_theta from a teacher diffusion model. For adjacent timesteps t_{n+1} and t_n, the teacher ODE solver produces x_hat from x at t_{n+1}, and the loss enforces f_theta(x, t_{n+1}) = f_theta_ema(x_hat, t_n). The target network uses EMA parameters (stop-gradient) to stabilize training, similar to momentum-based methods in self-supervised learning. The distance metric d() is typically the Pseudo-Huber loss or LPIPS for images. This distillation approach leverages a pre-trained diffusion model to avoid the difficulty of training consistency models from scratch.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef consistency_distillation_loss(model, model_ema, x_0, noise, t_n, t_n1, alpha_bar, ode_solver_fn):\n    \"\"\"Consistency distillation loss.\n    Args:\n        model: student consistency model f_theta\n        model_ema: EMA target consistency model f_theta_ema (no grad)\n        x_0: clean data\n        noise: sampled noise\n        t_n, t_n1: adjacent timestep indices (t_n < t_n1)\n        alpha_bar: noise schedule\n        ode_solver_fn: one step of the teacher ODE solver\n    \"\"\"\n    # Create noisy sample at t_{n+1}\n    x_tn1 = q_sample(x_0, t_n1, alpha_bar, noise)\n    \n    # Use teacher ODE solver to estimate x at t_n\n    with torch.no_grad():\n        x_hat_tn = {{diff_adv_new_cd_b1}}\n    \n    # Student prediction at t_{n+1}\n    pred_student = {{diff_adv_new_cd_b2}}\n    \n    # Target prediction at t_n (stop gradient via EMA model)\n    with torch.no_grad():\n        pred_target = {{diff_adv_new_cd_b3}}\n    \n    # Pseudo-Huber loss as distance metric\n    c = 0.00054 * (x_0.shape[-1] * x_0.shape[-2]) ** 0.5\n    loss = torch.sqrt((pred_student - pred_target) ** 2 + c ** 2) - c\n    return loss.mean()",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_cd_b1",
+                    "placeholder": "ode_solver_fn(x_tn1, t_n1, ???)",
+                    "acceptable": ["ode_solver_fn(x_tn1, t_n1, t_n)"],
+                    "hint": "Use the ODE solver to step from t_{n+1} back to t_n, producing the estimated x at t_n."
+                },
+                {
+                    "id": "diff_adv_new_cd_b2",
+                    "placeholder": "model(x_tn1, ???)",
+                    "acceptable": ["model(x_tn1, t_n1)"],
+                    "hint": "The student model predicts from the noisy sample x at timestep t_{n+1}."
+                },
+                {
+                    "id": "diff_adv_new_cd_b3",
+                    "placeholder": "model_ema(x_hat_tn, ???)",
+                    "acceptable": ["model_ema(x_hat_tn, t_n)"],
+                    "hint": "The EMA target model predicts from the ODE-solved sample at timestep t_n."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_vp_sde_forward",
+            "title": "VP-SDE Forward Process (Variance Preserving SDE)",
+            "difficulty": "hard",
+            "description": "Implement the forward noising process of the Variance Preserving SDE (VP-SDE), which generalizes the DDPM forward process to continuous time.",
+            "info": "The VP-SDE (Song et al., 2020 'Score-Based Generative Modeling through Stochastic Differential Equations') is the continuous-time generalization of DDPM. The forward SDE is dx = -0.5 * beta(t) * x dt + sqrt(beta(t)) dw, where beta(t) is a continuous noise schedule. The transition kernel is q(x_t | x_0) = N(x_t; x_0 * exp(-0.5 * integral_0^t beta(s) ds), I - I * exp(-integral_0^t beta(s) ds)). For a linear schedule beta(t) = beta_min + t*(beta_max - beta_min), the integral has a closed form. This SDE framework unifies DDPM, SMLD, and other diffusion variants.",
+            "code": "import torch\n\ndef vp_sde_marginal_params(t, beta_min=0.1, beta_max=20.0):\n    \"\"\"Compute mean coefficient and std for VP-SDE at continuous time t in [0, 1].\n    Args:\n        t: continuous time in [0, 1], shape (B,) or scalar\n        beta_min, beta_max: linear schedule endpoints\n    Returns:\n        mean_coeff: coefficient for x_0 in the mean\n        std: standard deviation of the noise\n    \"\"\"\n    # Integral of beta(s) from 0 to t for linear schedule\n    log_mean_coeff = {{diff_adv_new_vpsde_b1}}\n    mean_coeff = torch.exp(log_mean_coeff)\n    std = {{diff_adv_new_vpsde_b2}}\n    return mean_coeff, std\n\ndef vp_sde_sample(x_0, t, beta_min=0.1, beta_max=20.0):\n    \"\"\"Sample x_t from the VP-SDE forward process.\"\"\"\n    mean_coeff, std = vp_sde_marginal_params(t, beta_min, beta_max)\n    noise = torch.randn_like(x_0)\n    # Reshape for broadcasting\n    mean_coeff = mean_coeff.view(-1, *([1] * (x_0.dim() - 1)))\n    std = std.view(-1, *([1] * (x_0.dim() - 1)))\n    return {{diff_adv_new_vpsde_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_vpsde_b1",
+                    "placeholder": "-0.25 * t ** 2 * ??? - 0.5 * t * ???",
+                    "acceptable": ["-0.25 * t ** 2 * (beta_max - beta_min) - 0.5 * t * beta_min"],
+                    "hint": "The integral of beta(s)/2 from 0 to t with linear schedule is 0.5*(beta_min*t + 0.5*(beta_max-beta_min)*t^2). The negative gives the log mean coefficient."
+                },
+                {
+                    "id": "diff_adv_new_vpsde_b2",
+                    "placeholder": "torch.sqrt(1.0 - ???)",
+                    "acceptable": ["torch.sqrt(1.0 - mean_coeff ** 2)", "torch.sqrt(1.0 - torch.exp(2.0 * log_mean_coeff))", "(1.0 - mean_coeff ** 2).sqrt()"],
+                    "hint": "The variance is 1 - exp(2 * log_mean_coeff) = 1 - mean_coeff^2. Take its square root for std."
+                },
+                {
+                    "id": "diff_adv_new_vpsde_b3",
+                    "placeholder": "mean_coeff * ??? + std * ???",
+                    "acceptable": ["mean_coeff * x_0 + std * noise"],
+                    "hint": "Reparameterization trick: x_t = mean_coeff * x_0 + std * noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_ve_sde_forward",
+            "title": "VE-SDE Forward Process (Variance Exploding SDE)",
+            "difficulty": "medium",
+            "description": "Implement the forward process of the Variance Exploding SDE (VE-SDE), which generalizes the NCSN/SMLD noise perturbation to continuous time.",
+            "info": "The VE-SDE (Song et al., 2020) is defined as dx = sqrt(d[sigma^2(t)]/dt) dw, which simply adds noise without scaling the signal. The transition kernel is q(x_t | x_0) = N(x_t; x_0, sigma(t)^2 * I), meaning the mean is always x_0 and the variance grows over time. A common sigma schedule is geometric: sigma(t) = sigma_min * (sigma_max/sigma_min)^t for t in [0,1]. Unlike VP-SDE, the signal is not attenuated, only the noise increases. This makes VE-SDE simpler conceptually but the variance 'explodes' to very large values.",
+            "code": "import torch\n\ndef ve_sde_sigma_schedule(t, sigma_min=0.01, sigma_max=50.0):\n    \"\"\"Geometric sigma schedule for VE-SDE.\n    sigma(t) = sigma_min * (sigma_max / sigma_min)^t\n    \"\"\"\n    return {{diff_adv_new_vesde_b1}}\n\ndef ve_sde_sample(x_0, t, sigma_min=0.01, sigma_max=50.0):\n    \"\"\"Sample x_t from VE-SDE: q(x_t|x_0) = N(x_0, sigma(t)^2 I).\"\"\"\n    sigma = ve_sde_sigma_schedule(t, sigma_min, sigma_max)\n    noise = torch.randn_like(x_0)\n    sigma = sigma.view(-1, *([1] * (x_0.dim() - 1)))\n    return {{diff_adv_new_vesde_b2}}\n\ndef ve_sde_score_exact(x_t, x_0, sigma):\n    \"\"\"Exact score for VE-SDE (for training): nabla_x log q(x_t | x_0).\"\"\"\n    return {{diff_adv_new_vesde_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_vesde_b1",
+                    "placeholder": "sigma_min * (sigma_max / sigma_min) ** ???",
+                    "acceptable": ["sigma_min * (sigma_max / sigma_min) ** t"],
+                    "hint": "The geometric schedule interpolates exponentially: sigma_min * (sigma_max/sigma_min)^t."
+                },
+                {
+                    "id": "diff_adv_new_vesde_b2",
+                    "placeholder": "x_0 + ??? * noise",
+                    "acceptable": ["x_0 + sigma * noise"],
+                    "hint": "In VE-SDE, the mean is x_0 (no signal attenuation). Just add sigma-scaled noise."
+                },
+                {
+                    "id": "diff_adv_new_vesde_b3",
+                    "placeholder": "-(x_t - x_0) / ???",
+                    "acceptable": ["-(x_t - x_0) / sigma ** 2", "-(x_t - x_0) / (sigma ** 2)"],
+                    "hint": "For a Gaussian q(x_t|x_0) = N(x_0, sigma^2 I), the score is -(x_t - x_0) / sigma^2."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_probability_flow_ode",
+            "title": "Probability Flow ODE Step",
+            "difficulty": "hard",
+            "description": "Implement a single Euler step of the probability flow ODE, which enables deterministic sampling from the SDE framework without stochasticity.",
+            "info": "For every diffusion SDE, there exists a corresponding deterministic ODE (the probability flow ODE) that has the same marginal distributions at each time t. For the VP-SDE, the probability flow ODE is dx/dt = -0.5 * beta(t) * [x + score(x,t)]. This ODE can be solved with standard ODE solvers (Euler, Heun, RK45, etc.) to generate samples deterministically. The probability flow ODE is central to DDIM, exact likelihood computation via the change-of-variables formula, and consistency models. Deterministic sampling also enables meaningful interpolation in latent space.",
+            "code": "import torch\n\ndef probability_flow_ode_step(x, t, dt, score_fn, beta_fn):\n    \"\"\"Single Euler step of the VP-SDE probability flow ODE.\n    dx/dt = -0.5 * beta(t) * [x + score(x, t)]\n    Args:\n        x: current state\n        t: current time (scalar)\n        dt: time step (negative for reverse/generation)\n        score_fn: score model score(x, t)\n        beta_fn: function returning beta(t)\n    Returns:\n        x_next: state at t + dt\n    \"\"\"\n    beta_t = beta_fn(t)\n    score = score_fn(x, t)\n    # Drift of the probability flow ODE\n    drift = {{diff_adv_new_pfode_b1}}\n    # Euler step\n    x_next = {{diff_adv_new_pfode_b2}}\n    return x_next\n\ndef ode_sample_loop(score_fn, beta_fn, shape, device, N=1000, t_start=1.0, t_end=0.001):\n    \"\"\"Full ODE sampling from t_start (noisy) to t_end (clean).\"\"\"\n    x = torch.randn(shape, device=device)\n    dt = {{diff_adv_new_pfode_b3}}\n    t = t_start\n    for _ in range(N):\n        x = probability_flow_ode_step(x, t, dt, score_fn, beta_fn)\n        t = t + dt\n    return x",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_pfode_b1",
+                    "placeholder": "-0.5 * beta_t * (??? + ???)",
+                    "acceptable": ["-0.5 * beta_t * (x + score)"],
+                    "hint": "The probability flow ODE drift is -0.5 * beta(t) * (x + score(x, t))."
+                },
+                {
+                    "id": "diff_adv_new_pfode_b2",
+                    "placeholder": "x + ??? * dt",
+                    "acceptable": ["x + drift * dt"],
+                    "hint": "Euler integration: x_{next} = x + drift * dt."
+                },
+                {
+                    "id": "diff_adv_new_pfode_b3",
+                    "placeholder": "(t_end - t_start) / ???",
+                    "acceptable": ["(t_end - t_start) / N"],
+                    "hint": "Divide the time interval [t_start, t_end] into N equal steps. dt will be negative since t_end < t_start."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_predictor_corrector",
+            "title": "Predictor-Corrector Sampler",
+            "difficulty": "hard",
+            "description": "Implement the predictor-corrector sampling scheme that alternates between a reverse-SDE predictor step and a Langevin corrector step for improved sample quality.",
+            "info": "The predictor-corrector (PC) sampler (Song et al., 2020) combines two complementary operations at each timestep. The predictor step takes a numerical step of the reverse-time SDE (e.g., Euler-Maruyama), moving from noise level t to t-dt. The corrector step then applies Langevin MCMC at the current noise level to refine the sample toward the correct marginal distribution. This two-phase approach reduces discretization errors from the predictor by correcting them with score-based MCMC. Multiple corrector steps can be applied per predictor step for higher quality at the cost of more compute.",
+            "code": "import torch\n\ndef predictor_step_reverse_sde(x, t, dt, score_fn, beta_fn):\n    \"\"\"Euler-Maruyama step of the reverse-time VP-SDE.\n    dx = [-0.5*beta(t)*x - beta(t)*score(x,t)] dt + sqrt(beta(t)) dw_bar\n    \"\"\"\n    beta_t = beta_fn(t)\n    score = score_fn(x, t)\n    drift = {{diff_adv_new_pc_b1}}\n    diffusion = torch.sqrt(torch.tensor(beta_t))\n    z = torch.randn_like(x)\n    x_next = x + drift * dt + diffusion * torch.sqrt(torch.abs(torch.tensor(dt))) * z\n    return x_next\n\ndef corrector_step_langevin(x, t, score_fn, snr=0.16):\n    \"\"\"Langevin MCMC corrector step at noise level t.\"\"\"\n    score = score_fn(x, t)\n    noise = torch.randn_like(x)\n    grad_norm = torch.mean(score ** 2)\n    noise_norm = torch.mean(noise ** 2)\n    step_size = {{diff_adv_new_pc_b2}}\n    x_next = {{diff_adv_new_pc_b3}}\n    return x_next",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_pc_b1",
+                    "placeholder": "-0.5 * beta_t * x - ??? * score",
+                    "acceptable": ["-0.5 * beta_t * x - beta_t * score"],
+                    "hint": "The reverse-SDE drift is -0.5*beta(t)*x - beta(t)*score(x,t). The score term has coefficient beta(t)."
+                },
+                {
+                    "id": "diff_adv_new_pc_b2",
+                    "placeholder": "2 * snr * noise_norm / ???",
+                    "acceptable": ["2 * snr * noise_norm / grad_norm"],
+                    "hint": "The step size is 2 * snr * ||noise||^2 / ||score||^2, calibrating the step to the score magnitude."
+                },
+                {
+                    "id": "diff_adv_new_pc_b3",
+                    "placeholder": "x + step_size * score + torch.sqrt(??? * step_size) * noise",
+                    "acceptable": ["x + step_size * score + torch.sqrt(2 * step_size) * noise", "x + step_size * score + (2 * step_size).sqrt() * noise"],
+                    "hint": "Langevin update: x + step_size * score + sqrt(2 * step_size) * noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_dpm_solver_step",
+            "title": "DPM-Solver First-Order Step",
+            "difficulty": "hard",
+            "description": "Implement a single first-order step of DPM-Solver, a fast ODE solver specialized for diffusion models that operates in the log-SNR (lambda) space.",
+            "info": "DPM-Solver (Lu et al., 2022) is a high-order ODE solver designed specifically for the diffusion probability flow ODE. It reparameterizes the ODE in terms of lambda_t = log(alpha_t / sigma_t), the log signal-to-noise ratio. The first-order DPM-Solver computes x_t = (sigma_t / sigma_s) * x_s + alpha_t * (1 - exp(-(lambda_t - lambda_s))) * x0_pred_s, where x0_pred_s is the x_0 estimate at time s. This parameterization reduces approximation error compared to naive Euler steps. DPM-Solver achieves high-quality samples in 10-20 steps, compared to 50-1000 for DDPM.",
+            "code": "import torch\n\ndef dpm_solver_first_order_step(x_s, s, t, model, alpha, sigma):\n    \"\"\"First-order DPM-Solver step from time s to time t.\n    Args:\n        x_s: sample at time s\n        s, t: source and target time indices\n        model: noise prediction model\n        alpha: signal coefficients schedule\n        sigma: noise coefficients schedule\n    Returns:\n        x_t: estimated sample at time t\n    \"\"\"\n    # Compute log-SNR values\n    lambda_s = torch.log(alpha[s] / sigma[s])\n    lambda_t = torch.log(alpha[t] / sigma[t])\n    h = lambda_t - lambda_s  # step size in log-SNR space\n    \n    # Predict x_0 from noise prediction\n    eps_s = model(x_s, s)\n    x0_pred = {{diff_adv_new_dpm_b1}}\n    \n    # DPM-Solver-1 update\n    coeff_x = {{diff_adv_new_dpm_b2}}\n    coeff_x0 = alpha[t] * (1.0 - torch.exp({{diff_adv_new_dpm_b3}}))\n    x_t = coeff_x * x_s + coeff_x0 * x0_pred\n    return x_t",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_dpm_b1",
+                    "placeholder": "(x_s - sigma[s] * eps_s) / ???",
+                    "acceptable": ["(x_s - sigma[s] * eps_s) / alpha[s]"],
+                    "hint": "Predict x_0: x0 = (x_s - sigma_s * eps_pred) / alpha_s, from the forward process formula."
+                },
+                {
+                    "id": "diff_adv_new_dpm_b2",
+                    "placeholder": "sigma[t] / ???",
+                    "acceptable": ["sigma[t] / sigma[s]"],
+                    "hint": "The coefficient for x_s is sigma_t / sigma_s, the ratio of noise levels."
+                },
+                {
+                    "id": "diff_adv_new_dpm_b3",
+                    "placeholder": "-h",
+                    "acceptable": ["-h"],
+                    "hint": "The exponential term uses -h where h = lambda_t - lambda_s is the log-SNR step."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_dpm_solver_pp_multistep",
+            "title": "DPM-Solver++ Second-Order Multistep",
+            "difficulty": "hard",
+            "description": "Implement the second-order multistep variant of DPM-Solver++, which uses the data-prediction formulation and two previous estimates for higher accuracy.",
+            "info": "DPM-Solver++ (Lu et al., 2022b) improves upon DPM-Solver by working in the data-prediction (x_0-prediction) space rather than the noise-prediction space, which is more stable for guided sampling. The second-order multistep version uses the current and one previous x_0 estimate to perform a second-order Taylor expansion. The update is: x_t = (sigma_t/sigma_s)*x_s + alpha_t*(1-e^{-h})*D_0 + 0.5*alpha_t*(1-e^{-h})*(r/(1+r))*D_1, where D_0 and D_1 are the first and second-order data-prediction differences. This achieves excellent quality in just 15-20 steps.",
+            "code": "import torch\n\ndef dpm_solver_pp_2m_step(x_s, s, t, model, alpha, sigma, x0_prev=None, s_prev=None):\n    \"\"\"DPM-Solver++(2M) second-order multistep update.\n    Args:\n        x_s: sample at time s\n        s, t: source and target time indices\n        model: noise prediction model\n        alpha, sigma: schedules\n        x0_prev: previous x_0 prediction (for second order)\n        s_prev: previous timestep (for computing r)\n    \"\"\"\n    lambda_s = torch.log(alpha[s] / sigma[s])\n    lambda_t = torch.log(alpha[t] / sigma[t])\n    h = lambda_t - lambda_s\n    \n    # Current x_0 prediction\n    eps = model(x_s, s)\n    x0_cur = (x_s - sigma[s] * eps) / alpha[s]\n    \n    if x0_prev is None:\n        # First-order fallback\n        x_t = (sigma[t] / sigma[s]) * x_s + alpha[t] * (1 - torch.exp(-h)) * x0_cur\n    else:\n        lambda_prev = torch.log(alpha[s_prev] / sigma[s_prev])\n        r = {{diff_adv_new_dpmpp_b1}}\n        D0 = x0_cur\n        D1 = {{diff_adv_new_dpmpp_b2}}\n        x_t = (sigma[t] / sigma[s]) * x_s + alpha[t] * (1 - torch.exp(-h)) * D0 + {{diff_adv_new_dpmpp_b3}}\n    \n    return x_t, x0_cur",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_dpmpp_b1",
+                    "placeholder": "(lambda_s - ???) / h",
+                    "acceptable": ["(lambda_s - lambda_prev) / h"],
+                    "hint": "The ratio r = (lambda_s - lambda_{s-1}) / h controls the weighting of the second-order correction."
+                },
+                {
+                    "id": "diff_adv_new_dpmpp_b2",
+                    "placeholder": "(1.0 / (2.0 * r)) * (x0_cur - ???)",
+                    "acceptable": ["(1.0 / (2.0 * r)) * (x0_cur - x0_prev)"],
+                    "hint": "D1 is the finite difference of x_0 predictions: (x0_cur - x0_prev) / (2*r)."
+                },
+                {
+                    "id": "diff_adv_new_dpmpp_b3",
+                    "placeholder": "0.5 * alpha[t] * (1 - torch.exp(-h)) * ??? * D1",
+                    "acceptable": ["0.5 * alpha[t] * (1 - torch.exp(-h)) * (2.0 * r) * D1"],
+                    "hint": "The second-order correction is 0.5 * alpha_t * (1 - e^{-h}) * 2r * D1."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_denoising_score_matching",
+            "title": "Denoising Score Matching Loss",
+            "difficulty": "easy",
+            "description": "Implement the denoising score matching (DSM) objective that trains a score network by matching the score of a noise-perturbed distribution.",
+            "info": "Denoising score matching (Vincent, 2011) is a practical way to train score networks without computing the intractable score of the data distribution. Instead of matching nabla_x log p(x), we match nabla_x log q(x_tilde | x) where x_tilde = x + sigma*noise. For a Gaussian perturbation kernel, the target score is simply -(x_tilde - x) / sigma^2 = -noise / sigma. The DSM objective is E[||s_theta(x_tilde, sigma) + noise/sigma||^2]. This is equivalent to the DDPM noise prediction loss up to a scaling factor, connecting classical score matching to modern diffusion models.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef denoising_score_matching_loss(score_model, x, sigma):\n    \"\"\"Denoising score matching loss.\n    Args:\n        score_model: score network s_theta(x_tilde, sigma)\n        x: clean data, shape (B, ...)\n        sigma: noise level (scalar or per-sample)\n    Returns:\n        loss: scalar DSM loss\n    \"\"\"\n    noise = torch.randn_like(x)\n    x_tilde = {{diff_adv_new_dsm_b1}}\n    \n    # Target score of the perturbation kernel\n    target_score = {{diff_adv_new_dsm_b2}}\n    \n    # Predicted score\n    pred_score = score_model(x_tilde, sigma)\n    \n    loss = {{diff_adv_new_dsm_b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_dsm_b1",
+                    "placeholder": "x + ??? * noise",
+                    "acceptable": ["x + sigma * noise"],
+                    "hint": "Perturb x with Gaussian noise scaled by sigma: x_tilde = x + sigma * noise."
+                },
+                {
+                    "id": "diff_adv_new_dsm_b2",
+                    "placeholder": "-noise / ???",
+                    "acceptable": ["-noise / sigma", "-noise / (sigma ** 2) * sigma"],
+                    "hint": "The exact score of N(x, sigma^2 I) evaluated at x_tilde is -(x_tilde - x)/sigma^2 = -noise/sigma."
+                },
+                {
+                    "id": "diff_adv_new_dsm_b3",
+                    "placeholder": "0.5 * torch.mean((pred_score - ???) ** 2)",
+                    "acceptable": ["0.5 * torch.mean((pred_score - target_score) ** 2)", "F.mse_loss(pred_score, target_score)"],
+                    "hint": "MSE between the predicted score and the target score of the perturbation kernel."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_sliced_score_matching",
+            "title": "Sliced Score Matching Loss",
+            "difficulty": "medium",
+            "description": "Implement sliced score matching, which avoids computing the Jacobian trace by projecting the score onto random directions.",
+            "info": "Sliced score matching (Song et al., 2019) is a scalable alternative to the original score matching objective, which requires computing tr(nabla_x s_theta(x)), a costly Jacobian trace. Instead, SSM projects the score onto random vectors v and matches the projected score. The loss is E_v[v^T nabla_x s_theta(x) v + 0.5 * (v^T s_theta(x))^2], where v is drawn from a simple distribution (e.g., Rademacher or standard Gaussian). The first term requires only a vector-Jacobian product (efficiently computed via autograd), not the full Jacobian. This makes training feasible for high-dimensional data.",
+            "code": "import torch\n\ndef sliced_score_matching_loss(score_model, x):\n    \"\"\"Sliced score matching loss.\n    Args:\n        score_model: score network s_theta(x)\n        x: data samples, shape (B, D)\n    Returns:\n        loss: scalar SSM loss\n    \"\"\"\n    x = x.requires_grad_(True)\n    score = score_model(x)\n    \n    # Random projection vectors (Rademacher distribution)\n    v = {{diff_adv_new_ssm_b1}}\n    \n    # Compute v^T * nabla_x * (s_theta(x)^T v) via autograd\n    sv = torch.sum(score * v)\n    grad_sv = {{diff_adv_new_ssm_b2}}\n    vJv = torch.sum(grad_sv * v, dim=-1)\n    \n    # Squared norm term: 0.5 * (v^T s_theta)^2\n    sv_per_sample = torch.sum(score * v, dim=-1)\n    loss = {{diff_adv_new_ssm_b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_ssm_b1",
+                    "placeholder": "torch.randint(0, 2, x.shape, device=x.device).float() * 2 - ???",
+                    "acceptable": ["torch.randint(0, 2, x.shape, device=x.device).float() * 2 - 1", "torch.randint(0, 2, x.shape, device=x.device).float() * 2 - 1.0"],
+                    "hint": "Rademacher random vectors: values in {-1, +1}. Generate 0/1 then map to -1/+1 via *2-1."
+                },
+                {
+                    "id": "diff_adv_new_ssm_b2",
+                    "placeholder": "torch.autograd.grad(sv, x, create_graph=???)[0]",
+                    "acceptable": ["torch.autograd.grad(sv, x, create_graph=True)[0]"],
+                    "hint": "Use autograd to compute the gradient of the projected score w.r.t. x. create_graph=True for backprop."
+                },
+                {
+                    "id": "diff_adv_new_ssm_b3",
+                    "placeholder": "torch.mean(vJv + 0.5 * ??? ** 2)",
+                    "acceptable": ["torch.mean(vJv + 0.5 * sv_per_sample ** 2)"],
+                    "hint": "The SSM loss is E[v^T J v + 0.5 * (v^T s)^2], averaged over the batch."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_ncsn_multi_scale",
+            "title": "Noise Conditional Score Network (NCSN) Multi-Scale Loss",
+            "difficulty": "medium",
+            "description": "Implement the multi-scale denoising score matching loss used in NCSN, which trains across a geometric sequence of noise levels.",
+            "info": "NCSN (Song & Ermon, 2019) trains a single score network conditioned on the noise level sigma. The model is trained across L noise levels forming a geometric sequence from sigma_1 (largest) to sigma_L (smallest). At each noise level, the denoising score matching loss is weighted by sigma^2 to ensure that the loss magnitudes are comparable across scales. The total loss is (1/L) * sum_{i=1}^{L} sigma_i^2 * E[||s_theta(x_tilde, sigma_i) + noise/sigma_i||^2]. This multi-scale training is critical for the model to learn scores at all noise levels for effective annealed Langevin sampling.",
+            "code": "import torch\n\ndef ncsn_multi_scale_loss(score_model, x, sigmas):\n    \"\"\"NCSN loss across multiple noise levels.\n    Args:\n        score_model: score network s_theta(x, sigma)\n        x: clean data, shape (B, ...)\n        sigmas: tensor of noise levels, shape (L,)\n    Returns:\n        loss: weighted average loss across all noise levels\n    \"\"\"\n    L = sigmas.shape[0]\n    total_loss = 0.0\n    \n    for i in range(L):\n        sigma = sigmas[i]\n        noise = torch.randn_like(x)\n        x_noisy = x + sigma * noise\n        score_pred = score_model(x_noisy, sigma)\n        target = {{diff_adv_new_ncsn_b1}}\n        loss_i = {{diff_adv_new_ncsn_b2}} * torch.mean((score_pred - target) ** 2)\n        total_loss = total_loss + loss_i\n    \n    return {{diff_adv_new_ncsn_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_ncsn_b1",
+                    "placeholder": "-noise / ???",
+                    "acceptable": ["-noise / sigma"],
+                    "hint": "The target score for Gaussian perturbation is -noise / sigma (gradient of log N(x, sigma^2 I))."
+                },
+                {
+                    "id": "diff_adv_new_ncsn_b2",
+                    "placeholder": "sigma ** ???",
+                    "acceptable": ["sigma ** 2"],
+                    "hint": "Weight each noise level's loss by sigma^2 to equalize the loss magnitudes across scales."
+                },
+                {
+                    "id": "diff_adv_new_ncsn_b3",
+                    "placeholder": "total_loss / ???",
+                    "acceptable": ["total_loss / L"],
+                    "hint": "Average the total loss across all L noise levels."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_flow_matching_loss",
+            "title": "Flow Matching (Conditional Flow Matching) Loss",
+            "difficulty": "medium",
+            "description": "Implement the conditional flow matching loss (Lipman et al., 2023) which trains a velocity field that transports noise to data along straight paths.",
+            "info": "Flow matching (Lipman et al., 2023) and its conditional variant train a neural ODE velocity field v_theta(x_t, t) by regressing onto conditional vector fields. The optimal transport conditional path is x_t = (1-t)*noise + t*x_0, making the target velocity simply x_0 - noise. The loss is E_{t,x_0,noise}[||v_theta(x_t, t) - (x_0 - noise)||^2]. This is simpler and more stable than score matching, as the target is a constant vector for each pair (x_0, noise). Flow matching connects to rectified flows and is the basis for Stable Diffusion 3's architecture. It avoids the need for a noise schedule entirely.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef flow_matching_loss(velocity_model, x_0):\n    \"\"\"Conditional flow matching loss (OT path).\n    Args:\n        velocity_model: neural network v_theta(x_t, t)\n        x_0: clean data batch, shape (B, C, H, W)\n    Returns:\n        loss: scalar flow matching loss\n    \"\"\"\n    B = x_0.shape[0]\n    # Sample time uniformly in [0, 1]\n    t = torch.rand(B, device=x_0.device)\n    noise = torch.randn_like(x_0)\n    \n    # Interpolate along straight path\n    t_bc = t.view(-1, *([1] * (x_0.dim() - 1)))\n    x_t = {{diff_adv_new_fm_b1}}\n    \n    # Target velocity (direction of the straight path)\n    target_v = {{diff_adv_new_fm_b2}}\n    \n    # Predict velocity\n    pred_v = velocity_model(x_t, t)\n    loss = {{diff_adv_new_fm_b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_fm_b1",
+                    "placeholder": "(1 - t_bc) * ??? + t_bc * ???",
+                    "acceptable": ["(1 - t_bc) * noise + t_bc * x_0"],
+                    "hint": "The OT conditional path is x_t = (1-t)*noise + t*x_0. At t=0 it is noise, at t=1 it is data."
+                },
+                {
+                    "id": "diff_adv_new_fm_b2",
+                    "placeholder": "x_0 - ???",
+                    "acceptable": ["x_0 - noise"],
+                    "hint": "The velocity along the straight path is dx_t/dt = x_0 - noise, a constant for each pair."
+                },
+                {
+                    "id": "diff_adv_new_fm_b3",
+                    "placeholder": "F.mse_loss(pred_v, ???)",
+                    "acceptable": ["F.mse_loss(pred_v, target_v)"],
+                    "hint": "MSE between the predicted velocity and the target velocity."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_inpainting_repaint",
+            "title": "Diffusion Inpainting with RePaint",
+            "difficulty": "medium",
+            "description": "Implement the core inpainting step from RePaint (Lugmayr et al., 2022), which uses a pre-trained diffusion model for inpainting by replacing known regions at each reverse step.",
+            "info": "RePaint (Lugmayr et al., 2022) performs image inpainting using a pre-trained unconditional diffusion model without any fine-tuning. At each reverse step, the known (unmasked) pixels are replaced with forward-diffused versions of the original image at the current noise level, while the unknown (masked) pixels are denoised by the model. The key formula is: x_{t-1} = mask * q_sample(x_known, t-1) + (1-mask) * model_denoised. RePaint also introduces resampling: jumping back and forth in the diffusion process to improve coherence between known and unknown regions.",
+            "code": "import torch\n\ndef repaint_inpaint_step(x_t, t, model, x_known, mask, alpha_bar, alpha, beta):\n    \"\"\"Single RePaint inpainting step.\n    Args:\n        x_t: current noisy image at timestep t\n        t: current timestep (integer)\n        model: pre-trained noise prediction model\n        x_known: original image (known content)\n        mask: binary mask (1 = known/keep, 0 = unknown/inpaint)\n        alpha_bar: cumulative alpha schedule\n    Returns:\n        x_prev: image at timestep t-1\n    \"\"\"\n    # Denoise the full image with the model\n    pred_noise = model(x_t, t)\n    x_denoised_prev = reverse_step(x_t, pred_noise, t, alpha, alpha_bar, beta)\n    \n    # Forward-diffuse the known image to timestep t-1\n    if t > 0:\n        noise = torch.randn_like(x_known)\n        t_prev = t - 1\n        x_known_noisy = {{diff_adv_new_inp_b1}}\n    else:\n        x_known_noisy = x_known\n    \n    # Combine: keep known regions, use denoised for unknown\n    x_prev = {{diff_adv_new_inp_b2}}\n    return x_prev\n\ndef repaint_resample(x_prev, t, alpha_bar, beta):\n    \"\"\"Resample step: go forward one step to re-harmonize.\"\"\"\n    noise = torch.randn_like(x_prev)\n    beta_t = beta[t]\n    return {{diff_adv_new_inp_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_inp_b1",
+                    "placeholder": "q_sample(x_known, ???, alpha_bar, noise)",
+                    "acceptable": ["q_sample(x_known, t_prev, alpha_bar, noise)"],
+                    "hint": "Forward-diffuse x_known to timestep t-1 using the q_sample function."
+                },
+                {
+                    "id": "diff_adv_new_inp_b2",
+                    "placeholder": "mask * ??? + (1 - mask) * ???",
+                    "acceptable": ["mask * x_known_noisy + (1 - mask) * x_denoised_prev"],
+                    "hint": "Known pixels come from the noised original, unknown pixels come from model denoising."
+                },
+                {
+                    "id": "diff_adv_new_inp_b3",
+                    "placeholder": "torch.sqrt(1 - beta_t) * x_prev + torch.sqrt(???) * noise",
+                    "acceptable": ["torch.sqrt(1 - beta_t) * x_prev + torch.sqrt(beta_t) * noise"],
+                    "hint": "One forward step adds noise: x_t = sqrt(1 - beta_t) * x_{t-1} + sqrt(beta_t) * noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_super_resolution",
+            "title": "Diffusion-Based Super-Resolution Conditioning",
+            "difficulty": "medium",
+            "description": "Implement the conditioning mechanism for diffusion-based super-resolution, where a low-resolution image is upsampled and concatenated as input to the denoising model.",
+            "info": "SR3 (Saharia et al., 2022) and similar diffusion super-resolution models condition the denoising process on a low-resolution input image. The low-res image is upsampled (via bicubic interpolation) to the target resolution and concatenated channel-wise with the noisy high-res image x_t. The U-Net then takes this concatenated input (2*C channels) and predicts the noise. During training, the model learns to denoise while being guided by the low-res conditioning. This approach naturally handles uncertainty in the upsampling task, generating diverse plausible high-res outputs from a single low-res input.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass SuperResolutionDiffusion(nn.Module):\n    def __init__(self, unet, scale_factor=4):\n        super().__init__()\n        self.unet = unet  # expects (2*C) input channels\n        self.scale_factor = scale_factor\n    \n    def prepare_conditioning(self, low_res):\n        \"\"\"Upsample low-res image to target resolution.\"\"\"\n        return {{diff_adv_new_sr_b1}}\n    \n    def training_step(self, high_res, low_res, t, alpha_bar):\n        \"\"\"One training step for SR diffusion.\"\"\"\n        noise = torch.randn_like(high_res)\n        x_t = q_sample(high_res, t, alpha_bar, noise)\n        \n        # Condition by concatenating upsampled low-res\n        lr_up = self.prepare_conditioning(low_res)\n        model_input = {{diff_adv_new_sr_b2}}\n        \n        pred_noise = self.unet(model_input, t)\n        return {{diff_adv_new_sr_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_sr_b1",
+                    "placeholder": "F.interpolate(low_res, scale_factor=self.scale_factor, mode=???)",
+                    "acceptable": ["F.interpolate(low_res, scale_factor=self.scale_factor, mode='bicubic')", "F.interpolate(low_res, scale_factor=self.scale_factor, mode='bilinear')"],
+                    "hint": "Upsample using bicubic (or bilinear) interpolation to match the high-res spatial size."
+                },
+                {
+                    "id": "diff_adv_new_sr_b2",
+                    "placeholder": "torch.cat([x_t, lr_up], dim=???)",
+                    "acceptable": ["torch.cat([x_t, lr_up], dim=1)", "torch.cat((x_t, lr_up), dim=1)"],
+                    "hint": "Concatenate the noisy high-res and upsampled low-res along the channel dimension (dim=1)."
+                },
+                {
+                    "id": "diff_adv_new_sr_b3",
+                    "placeholder": "F.mse_loss(pred_noise, ???)",
+                    "acceptable": ["F.mse_loss(pred_noise, noise)", "F.mse_loss(noise, pred_noise)"],
+                    "hint": "Standard MSE loss between predicted and true noise, same as normal DDPM training."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_clip_text_conditioning",
+            "title": "CLIP Text Conditioning for Diffusion",
+            "difficulty": "medium",
+            "description": "Implement the text conditioning pipeline that encodes a text prompt using CLIP and projects it for cross-attention in a diffusion U-Net.",
+            "info": "Text-to-image diffusion models like Stable Diffusion use CLIP (Radford et al., 2021) text embeddings to condition the denoising process. The text prompt is tokenized, passed through the CLIP text encoder to produce a sequence of token embeddings (not just the [CLS] token), and then projected to match the U-Net's cross-attention dimension. The U-Net uses cross-attention layers where image features are queries and text embeddings are keys/values. This allows the model to attend to relevant parts of the text description at each spatial location. CLIP's joint vision-language space provides rich semantic guidance.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass TextConditioner(nn.Module):\n    def __init__(self, clip_model, clip_dim=768, cross_attn_dim=320):\n        super().__init__()\n        self.clip = clip_model  # frozen CLIP text encoder\n        self.proj = nn.Linear(clip_dim, cross_attn_dim)\n    \n    @torch.no_grad()\n    def encode_text(self, tokens):\n        \"\"\"Encode tokenized text with frozen CLIP.\"\"\"\n        text_embeddings = {{diff_adv_new_clip_b1}}\n        return text_embeddings\n    \n    def forward(self, tokens):\n        \"\"\"Get projected text embeddings for cross-attention.\"\"\"\n        text_emb = self.encode_text(tokens)\n        return {{diff_adv_new_clip_b2}}\n\nclass CrossAttentionBlock(nn.Module):\n    def __init__(self, dim, context_dim, num_heads=8):\n        super().__init__()\n        self.norm = nn.LayerNorm(dim)\n        self.to_q = nn.Linear(dim, dim)\n        self.to_k = nn.Linear(context_dim, dim)\n        self.to_v = nn.Linear(context_dim, dim)\n        self.to_out = nn.Linear(dim, dim)\n        self.num_heads = num_heads\n        self.head_dim = dim // num_heads\n    \n    def forward(self, x, context):\n        \"\"\"x: image features (B, HW, D), context: text embeddings (B, seq_len, context_dim)\"\"\"\n        h = self.norm(x)\n        q = self.to_q(h)\n        k, v = {{diff_adv_new_clip_b3}}\n        scale = self.head_dim ** -0.5\n        attn = torch.softmax(torch.bmm(q, k.transpose(-1, -2)) * scale, dim=-1)\n        out = torch.bmm(attn, v)\n        return x + self.to_out(out)",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_clip_b1",
+                    "placeholder": "self.clip.encode_text(???)",
+                    "acceptable": ["self.clip.encode_text(tokens)", "self.clip(tokens)"],
+                    "hint": "Pass the tokenized text through the frozen CLIP text encoder."
+                },
+                {
+                    "id": "diff_adv_new_clip_b2",
+                    "placeholder": "self.proj(???)",
+                    "acceptable": ["self.proj(text_emb)"],
+                    "hint": "Project the CLIP embeddings to the cross-attention dimension using the linear projection."
+                },
+                {
+                    "id": "diff_adv_new_clip_b3",
+                    "placeholder": "self.to_k(???), self.to_v(???)",
+                    "acceptable": ["self.to_k(context), self.to_v(context)"],
+                    "hint": "Keys and values come from the text context (cross-attention), not from the image features."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_controlnet",
+            "title": "ControlNet Zero Convolution and Feature Injection",
+            "difficulty": "hard",
+            "description": "Implement the key components of ControlNet (Zhang et al., 2023): the zero-initialized convolution layers and the feature injection mechanism into a frozen diffusion U-Net.",
+            "info": "ControlNet (Zhang et al., 2023) adds spatial conditioning (edge maps, depth, pose, etc.) to a pre-trained diffusion model by creating a trainable copy of the encoder blocks. The outputs of the trainable copy are added to the frozen model's skip connections via 'zero convolutions' -- 1x1 convolutions initialized to zero weights and zero bias. This zero initialization ensures that at the start of training the ControlNet has no effect on the pre-trained model, preserving its quality. During training, only the ControlNet copy and zero convolutions are updated while the original U-Net remains frozen.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef zero_module(module):\n    \"\"\"Initialize all parameters of a module to zero.\"\"\"\n    for p in module.parameters():\n        {{diff_adv_new_cn_b1}}\n    return module\n\nclass ControlNet(nn.Module):\n    def __init__(self, frozen_unet_encoder, hint_channels=3):\n        super().__init__()\n        import copy\n        # Trainable copy of the encoder\n        self.control_encoder = copy.deepcopy(frozen_unet_encoder)\n        # Input convolution for the conditioning hint\n        self.input_hint_block = nn.Conv2d(hint_channels, 320, 3, padding=1)\n        # Zero convolutions for each encoder level\n        self.zero_convs = nn.ModuleList([\n            {{diff_adv_new_cn_b2}}\n            for ch in [320, 320, 640, 640, 1280, 1280]\n        ])\n    \n    def forward(self, x, t_emb, hint):\n        \"\"\"Produce control signals for each U-Net decoder level.\"\"\"\n        hint_emb = self.input_hint_block(hint)\n        h = x + hint_emb\n        control_outputs = []\n        for block, zero_conv in zip(self.control_encoder, self.zero_convs):\n            h = block(h, t_emb)\n            control_outputs.append({{diff_adv_new_cn_b3}})\n        return control_outputs",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_cn_b1",
+                    "placeholder": "p.data.???()",
+                    "acceptable": ["p.data.zero_()", "nn.init.zeros_(p)"],
+                    "hint": "Zero out all parameters in-place using .zero_() to initialize the zero convolution."
+                },
+                {
+                    "id": "diff_adv_new_cn_b2",
+                    "placeholder": "zero_module(nn.Conv2d(ch, ch, ???))",
+                    "acceptable": ["zero_module(nn.Conv2d(ch, ch, 1))", "zero_module(nn.Conv2d(ch, ch, 1, padding=0))"],
+                    "hint": "Zero convolutions are 1x1 convolutions (kernel_size=1) initialized to zero via zero_module."
+                },
+                {
+                    "id": "diff_adv_new_cn_b3",
+                    "placeholder": "zero_conv(???)",
+                    "acceptable": ["zero_conv(h)"],
+                    "hint": "Pass the encoder features through the zero convolution before injecting into the frozen U-Net."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_ip_adapter",
+            "title": "IP-Adapter Image Prompt Conditioning",
+            "difficulty": "hard",
+            "description": "Implement the IP-Adapter (Ye et al., 2023) mechanism that enables image-prompt conditioning by injecting CLIP image embeddings through a separate cross-attention path.",
+            "info": "IP-Adapter (Ye et al., 2023) enables image-conditioned generation by adding a decoupled cross-attention mechanism. The CLIP image embedding of a reference image is projected through a learned linear layer and used as keys/values in a new cross-attention layer, separate from the text cross-attention. The outputs of both attention paths are combined with a weighting factor. Only the image projection and new cross-attention layers are trained; the original model is frozen. This decoupled design prevents catastrophic forgetting and allows flexible combination of text and image prompts.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass IPAdapterCrossAttention(nn.Module):\n    def __init__(self, dim, clip_image_dim=1024, num_heads=8):\n        super().__init__()\n        self.num_heads = num_heads\n        self.head_dim = dim // num_heads\n        # Original text cross-attention (frozen)\n        self.to_q = nn.Linear(dim, dim)\n        self.to_k_text = nn.Linear(dim, dim)\n        self.to_v_text = nn.Linear(dim, dim)\n        # New image cross-attention (trainable)\n        self.to_k_image = nn.Linear(dim, dim)\n        self.to_v_image = nn.Linear(dim, dim)\n        self.image_proj = {{diff_adv_new_ipa_b1}}\n        self.to_out = nn.Linear(dim, dim)\n    \n    def forward(self, x, text_context, image_embedding, ip_scale=1.0):\n        \"\"\"x: (B, HW, D), text_context: (B, S, D), image_embedding: (B, 1, clip_dim)\"\"\"\n        q = self.to_q(x)\n        scale = self.head_dim ** -0.5\n        \n        # Text cross-attention\n        k_text, v_text = self.to_k_text(text_context), self.to_v_text(text_context)\n        attn_text = torch.softmax(torch.bmm(q, k_text.transpose(-1, -2)) * scale, dim=-1)\n        out_text = torch.bmm(attn_text, v_text)\n        \n        # Image cross-attention\n        image_tokens = {{diff_adv_new_ipa_b2}}\n        k_img, v_img = self.to_k_image(image_tokens), self.to_v_image(image_tokens)\n        attn_img = torch.softmax(torch.bmm(q, k_img.transpose(-1, -2)) * scale, dim=-1)\n        out_img = torch.bmm(attn_img, v_img)\n        \n        # Combine text and image attention\n        out = {{diff_adv_new_ipa_b3}}\n        return x + self.to_out(out)",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_ipa_b1",
+                    "placeholder": "nn.Linear(clip_image_dim, ???)",
+                    "acceptable": ["nn.Linear(clip_image_dim, dim)"],
+                    "hint": "Project the CLIP image embedding from clip_image_dim to the U-Net's cross-attention dim."
+                },
+                {
+                    "id": "diff_adv_new_ipa_b2",
+                    "placeholder": "self.image_proj(???)",
+                    "acceptable": ["self.image_proj(image_embedding)"],
+                    "hint": "Project the CLIP image embedding to the cross-attention dimension."
+                },
+                {
+                    "id": "diff_adv_new_ipa_b3",
+                    "placeholder": "out_text + ip_scale * ???",
+                    "acceptable": ["out_text + ip_scale * out_img"],
+                    "hint": "Add the image attention output scaled by ip_scale to the text attention output."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_lora_diffusion",
+            "title": "LoRA (Low-Rank Adaptation) for Diffusion Models",
+            "difficulty": "medium",
+            "description": "Implement a LoRA layer that adds a low-rank update to a pre-trained linear layer in a diffusion U-Net, enabling efficient fine-tuning.",
+            "info": "LoRA (Hu et al., 2021) adapts pre-trained models by adding trainable low-rank decomposition matrices to frozen weight matrices. For a weight matrix W of shape (out, in), LoRA adds delta_W = B @ A where A has shape (rank, in) and B has shape (out, rank), with rank << min(in, out). The forward pass becomes y = Wx + (B @ A) * scale * x. A is initialized with Gaussian values and B with zeros, so the initial delta_W is zero. For diffusion models, LoRA is typically applied to the attention projection layers (Q, K, V, O) in the U-Net, reducing trainable parameters from billions to a few megabytes.",
+            "code": "import torch\nimport torch.nn as nn\nimport math\n\nclass LoRALinear(nn.Module):\n    def __init__(self, original_linear, rank=4, alpha=1.0):\n        super().__init__()\n        self.original = original_linear\n        self.original.weight.requires_grad_(False)\n        if self.original.bias is not None:\n            self.original.bias.requires_grad_(False)\n        \n        in_features = original_linear.in_features\n        out_features = original_linear.out_features\n        self.rank = rank\n        self.scale = alpha / rank\n        \n        # Low-rank matrices\n        self.lora_A = {{diff_adv_new_lora_b1}}\n        self.lora_B = {{diff_adv_new_lora_b2}}\n        nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))\n        nn.init.zeros_(self.lora_B)\n    \n    def forward(self, x):\n        # Original frozen output + low-rank adaptation\n        original_out = self.original(x)\n        lora_out = {{diff_adv_new_lora_b3}}\n        return original_out + lora_out * self.scale",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_lora_b1",
+                    "placeholder": "nn.Parameter(torch.empty(rank, ???))",
+                    "acceptable": ["nn.Parameter(torch.empty(rank, in_features))"],
+                    "hint": "Matrix A projects from input dimension to rank: shape (rank, in_features)."
+                },
+                {
+                    "id": "diff_adv_new_lora_b2",
+                    "placeholder": "nn.Parameter(torch.empty(???, rank))",
+                    "acceptable": ["nn.Parameter(torch.empty(out_features, rank))"],
+                    "hint": "Matrix B projects from rank to output dimension: shape (out_features, rank)."
+                },
+                {
+                    "id": "diff_adv_new_lora_b3",
+                    "placeholder": "x @ self.lora_A.T @ ???",
+                    "acceptable": ["x @ self.lora_A.T @ self.lora_B.T", "F.linear(F.linear(x, self.lora_A), self.lora_B)"],
+                    "hint": "The LoRA output is x @ A^T @ B^T, equivalent to (B @ A) @ x^T transposed."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_sdxl_dual_text_encoder",
+            "title": "SDXL Dual Text Encoder Conditioning",
+            "difficulty": "medium",
+            "description": "Implement the dual text encoder conditioning used in SDXL, which concatenates embeddings from CLIP ViT-L and OpenCLIP ViT-bigG for richer text representation.",
+            "info": "SDXL (Podell et al., 2023) uses two text encoders: OpenAI CLIP ViT-L/14 (768-dim) and OpenCLIP ViT-bigG/14 (1280-dim). The token-level embeddings from both encoders are concatenated along the feature dimension to produce a 2048-dimensional conditioning sequence. Additionally, SDXL conditions on the pooled text embedding from the second (larger) encoder, which is added to the timestep embedding. This dual-encoder approach captures both fine-grained token semantics and global prompt understanding. SDXL also conditions on the original image resolution and crop coordinates as additional microconditioning signals.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SDXLTextConditioning(nn.Module):\n    def __init__(self, clip_l_dim=768, clip_g_dim=1280, time_dim=1280):\n        super().__init__()\n        self.combined_dim = clip_l_dim + clip_g_dim  # 2048\n        # Project pooled embedding to timestep embedding space\n        self.pool_proj = nn.Linear(clip_g_dim, time_dim)\n    \n    def forward(self, clip_l_tokens, clip_g_tokens, clip_g_pooled, time_emb):\n        \"\"\"Compute SDXL text conditioning.\n        Args:\n            clip_l_tokens: CLIP ViT-L token embeddings (B, S, 768)\n            clip_g_tokens: OpenCLIP ViT-bigG token embeddings (B, S, 1280)\n            clip_g_pooled: OpenCLIP pooled embedding (B, 1280)\n            time_emb: timestep embedding (B, time_dim)\n        Returns:\n            context: cross-attention context (B, S, 2048)\n            augmented_time_emb: time embedding augmented with pooled text (B, time_dim)\n        \"\"\"\n        # Concatenate token embeddings from both encoders\n        context = {{diff_adv_new_sdxl_b1}}\n        \n        # Augment timestep embedding with pooled text embedding\n        pooled_proj = {{diff_adv_new_sdxl_b2}}\n        augmented_time_emb = {{diff_adv_new_sdxl_b3}}\n        \n        return context, augmented_time_emb",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_sdxl_b1",
+                    "placeholder": "torch.cat([clip_l_tokens, ???], dim=-1)",
+                    "acceptable": ["torch.cat([clip_l_tokens, clip_g_tokens], dim=-1)", "torch.cat([clip_l_tokens, clip_g_tokens], dim=2)"],
+                    "hint": "Concatenate the two text encoder outputs along the feature dimension (last dim) to get 768+1280=2048."
+                },
+                {
+                    "id": "diff_adv_new_sdxl_b2",
+                    "placeholder": "self.pool_proj(???)",
+                    "acceptable": ["self.pool_proj(clip_g_pooled)"],
+                    "hint": "Project the pooled embedding from the larger CLIP model to match the time embedding dimension."
+                },
+                {
+                    "id": "diff_adv_new_sdxl_b3",
+                    "placeholder": "time_emb + ???",
+                    "acceptable": ["time_emb + pooled_proj"],
+                    "hint": "Add the projected pooled text embedding to the timestep embedding."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_dit_block",
+            "title": "DiT (Diffusion Transformer) Block with AdaLN",
+            "difficulty": "hard",
+            "description": "Implement a Diffusion Transformer (DiT) block that uses adaptive layer normalization (adaLN-Zero) for timestep and class conditioning.",
+            "info": "DiT (Peebles & Xie, 2023) replaces the U-Net backbone with a Vision Transformer (ViT) for diffusion models. The key architectural innovation is adaLN-Zero: instead of standard LayerNorm, the model predicts scale (gamma) and shift (beta) parameters from the conditioning signal (timestep + class label), and also predicts a per-layer gating parameter alpha initialized to zero. The conditioning is processed as: adaLN(h) = gamma * LayerNorm(h) + beta, followed by gating: alpha * block_output. The zero initialization of alpha ensures the transformer initially acts as an identity function, improving training stability. DiT achieves state-of-the-art FID on ImageNet.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DiTBlock(nn.Module):\n    def __init__(self, hidden_size, num_heads, cond_dim):\n        super().__init__()\n        self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False)\n        self.attn = nn.MultiheadAttention(hidden_size, num_heads, batch_first=True)\n        self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False)\n        self.mlp = nn.Sequential(\n            nn.Linear(hidden_size, 4 * hidden_size),\n            nn.GELU(),\n            nn.Linear(4 * hidden_size, hidden_size)\n        )\n        # adaLN-Zero: predict 6 modulation parameters\n        self.adaLN_modulation = nn.Sequential(\n            nn.SiLU(),\n            nn.Linear(cond_dim, {{diff_adv_new_dit_b1}})\n        )\n        # Initialize the last linear to zero for zero-init gating\n        nn.init.zeros_(self.adaLN_modulation[-1].weight)\n        nn.init.zeros_(self.adaLN_modulation[-1].bias)\n    \n    def forward(self, x, c):\n        \"\"\"x: (B, N, D) patch tokens, c: (B, cond_dim) conditioning.\"\"\"\n        # Get modulation parameters\n        gamma1, beta1, alpha1, gamma2, beta2, alpha2 = self.adaLN_modulation(c).chunk(6, dim=-1)\n        \n        # Modulated self-attention\n        h = {{diff_adv_new_dit_b2}}\n        attn_out, _ = self.attn(h, h, h)\n        x = x + alpha1.unsqueeze(1) * attn_out\n        \n        # Modulated MLP\n        h = (1 + gamma2.unsqueeze(1)) * self.norm2(x) + beta2.unsqueeze(1)\n        x = x + {{diff_adv_new_dit_b3}} * self.mlp(h)\n        return x",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_dit_b1",
+                    "placeholder": "6 * ???",
+                    "acceptable": ["6 * hidden_size"],
+                    "hint": "adaLN-Zero predicts 6 parameters per feature dim: gamma1, beta1, alpha1, gamma2, beta2, alpha2."
+                },
+                {
+                    "id": "diff_adv_new_dit_b2",
+                    "placeholder": "(1 + gamma1.unsqueeze(1)) * self.norm1(x) + ???.unsqueeze(1)",
+                    "acceptable": ["(1 + gamma1.unsqueeze(1)) * self.norm1(x) + beta1.unsqueeze(1)"],
+                    "hint": "Adaptive LayerNorm: (1 + gamma) * LN(x) + beta. Unsqueeze for token-dimension broadcasting."
+                },
+                {
+                    "id": "diff_adv_new_dit_b3",
+                    "placeholder": "alpha2.???(1)",
+                    "acceptable": ["alpha2.unsqueeze(1)"],
+                    "hint": "Gate the MLP output with alpha2, unsqueezed for broadcasting over the sequence dimension."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_dit_patchify",
+            "title": "DiT Image Patchification and Position Embedding",
+            "difficulty": "easy",
+            "description": "Implement the patchification step for DiT that converts an image into a sequence of patch tokens with positional embeddings, similar to ViT.",
+            "info": "DiT (Peebles & Xie, 2023) tokenizes images the same way as ViT: the image is split into non-overlapping patches, each linearly projected to produce patch embeddings. For a 256x256 image with patch size 2 in latent space (after VAE encoding to 32x32), this creates 256 tokens. Learnable positional embeddings are added to distinguish spatial locations. Unlike U-Net based models, DiT processes all patches uniformly with full self-attention, making spatial reasoning more flexible. The patch embedding can be implemented as a single Conv2d with kernel size and stride equal to the patch size.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DiTPatchEmbed(nn.Module):\n    def __init__(self, patch_size=2, in_channels=4, embed_dim=1152, img_size=32):\n        super().__init__()\n        self.patch_size = patch_size\n        self.num_patches = (img_size // patch_size) ** 2\n        # Project patches to embedding dimension\n        self.proj = {{diff_adv_new_ditp_b1}}\n        # Learnable position embeddings\n        self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim))\n        nn.init.normal_(self.pos_embed, std=0.02)\n    \n    def forward(self, x):\n        \"\"\"x: (B, C, H, W) latent image -> (B, num_patches, embed_dim)\"\"\"\n        # Patchify: Conv2d with stride = patch_size\n        x = self.proj(x)  # (B, embed_dim, H/P, W/P)\n        x = {{diff_adv_new_ditp_b2}}\n        x = {{diff_adv_new_ditp_b3}}\n        return x",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_ditp_b1",
+                    "placeholder": "nn.Conv2d(in_channels, embed_dim, kernel_size=???, stride=???)",
+                    "acceptable": ["nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)"],
+                    "hint": "Use a Conv2d with kernel_size=patch_size and stride=patch_size to extract non-overlapping patches."
+                },
+                {
+                    "id": "diff_adv_new_ditp_b2",
+                    "placeholder": "x.flatten(2).???(1, 2)",
+                    "acceptable": ["x.flatten(2).transpose(1, 2)"],
+                    "hint": "Flatten spatial dims and transpose to get (B, num_patches, embed_dim) from (B, embed_dim, N)."
+                },
+                {
+                    "id": "diff_adv_new_ditp_b3",
+                    "placeholder": "x + self.???",
+                    "acceptable": ["x + self.pos_embed"],
+                    "hint": "Add the learnable positional embeddings to the patch tokens."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_latent_diffusion_encode_decode",
+            "title": "Latent Diffusion Model Encode/Decode Pipeline",
+            "difficulty": "easy",
+            "description": "Implement the encode and decode steps of a Latent Diffusion Model (LDM) that performs diffusion in the latent space of a pre-trained VAE.",
+            "info": "Latent Diffusion Models (Rombach et al., 2022) run the diffusion process in a compressed latent space rather than pixel space, dramatically reducing computational cost. A pre-trained VAE encodes images to a lower-dimensional latent representation z = E(x) and decodes back with x_hat = D(z). The diffusion model operates entirely on z, with the VAE encoder and decoder used only at the boundaries. The scaling factor (0.18215 for SD 1.x) normalizes the latent distribution to have unit variance. This two-stage approach enables high-resolution image generation with modest GPU requirements.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass LatentDiffusionPipeline(nn.Module):\n    def __init__(self, vae, diffusion_model, scale_factor=0.18215):\n        super().__init__()\n        self.vae = vae  # pre-trained VAE with encode() and decode()\n        self.diffusion_model = diffusion_model\n        self.scale_factor = scale_factor\n    \n    @torch.no_grad()\n    def encode_to_latent(self, x):\n        \"\"\"Encode pixel-space image to scaled latent.\"\"\"\n        z = self.vae.encode(x).latent_dist.sample()\n        return {{diff_adv_new_ldm_b1}}\n    \n    @torch.no_grad()\n    def decode_from_latent(self, z):\n        \"\"\"Decode scaled latent back to pixel space.\"\"\"\n        z_unscaled = {{diff_adv_new_ldm_b2}}\n        return self.vae.decode(z_unscaled).sample\n    \n    def training_step(self, x, t, cond, alpha_bar):\n        \"\"\"Train diffusion on latents.\"\"\"\n        z = self.encode_to_latent(x)\n        noise = torch.randn_like(z)\n        z_noisy = q_sample(z, t, alpha_bar, noise)\n        pred_noise = {{diff_adv_new_ldm_b3}}\n        return F.mse_loss(pred_noise, noise)",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_ldm_b1",
+                    "placeholder": "z * self.???",
+                    "acceptable": ["z * self.scale_factor"],
+                    "hint": "Multiply the latent by the scale factor to normalize its distribution."
+                },
+                {
+                    "id": "diff_adv_new_ldm_b2",
+                    "placeholder": "z / self.???",
+                    "acceptable": ["z / self.scale_factor"],
+                    "hint": "Divide by the scale factor to undo the normalization before decoding."
+                },
+                {
+                    "id": "diff_adv_new_ldm_b3",
+                    "placeholder": "self.diffusion_model(z_noisy, t, ???)",
+                    "acceptable": ["self.diffusion_model(z_noisy, t, cond)"],
+                    "hint": "The diffusion model predicts noise from the noisy latent, timestep, and conditioning."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_noise_level_conditioning_sr",
+            "title": "Noise Level Conditioning for Cascaded Diffusion",
+            "difficulty": "medium",
+            "description": "Implement noise-level conditioning (augmentation level embedding) used in cascaded diffusion models like Imagen to bridge between cascade stages.",
+            "info": "Cascaded diffusion models (e.g., Imagen by Saharia et al., 2022) generate images in multiple stages: a base model generates a low-resolution image, and subsequent super-resolution models upscale it. To make the super-resolution stages robust to imperfections from the previous stage, conditioning augmentation adds Gaussian noise to the low-res input at a random level during training, and the noise level is provided as an additional conditioning signal. At inference, a small augmentation level (e.g., sigma=0.1) is used. This simple technique dramatically improves cascaded generation quality by preventing error accumulation between stages.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass NoiseLevelConditioner(nn.Module):\n    def __init__(self, embed_dim=256):\n        super().__init__()\n        self.embed = nn.Sequential(\n            nn.Linear(1, embed_dim),\n            nn.SiLU(),\n            nn.Linear(embed_dim, embed_dim)\n        )\n    \n    def augment_conditioning(self, low_res_image, aug_level):\n        \"\"\"Add noise to low-res conditioning image.\n        Args:\n            low_res_image: conditioning image (B, C, H, W)\n            aug_level: noise level sigma (scalar or (B,))\n        \"\"\"\n        noise = torch.randn_like(low_res_image)\n        augmented = {{diff_adv_new_nlc_b1}}\n        return augmented\n    \n    def forward(self, low_res_image, aug_level):\n        \"\"\"Get augmented image and noise level embedding.\"\"\"\n        augmented = self.augment_conditioning(low_res_image, aug_level)\n        # Encode the augmentation level\n        if isinstance(aug_level, float):\n            aug_level = torch.tensor([aug_level], device=low_res_image.device)\n        aug_level = aug_level.view(-1, 1).float()\n        level_emb = {{diff_adv_new_nlc_b2}}\n        return {{diff_adv_new_nlc_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_nlc_b1",
+                    "placeholder": "low_res_image + ??? * noise",
+                    "acceptable": ["low_res_image + aug_level * noise"],
+                    "hint": "Add Gaussian noise scaled by the augmentation level: x_aug = x + sigma * noise."
+                },
+                {
+                    "id": "diff_adv_new_nlc_b2",
+                    "placeholder": "self.embed(???)",
+                    "acceptable": ["self.embed(aug_level)"],
+                    "hint": "Pass the augmentation level through the embedding network."
+                },
+                {
+                    "id": "diff_adv_new_nlc_b3",
+                    "placeholder": "augmented, ???",
+                    "acceptable": ["augmented, level_emb"],
+                    "hint": "Return both the augmented conditioning image and the noise level embedding."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_cfg_rescale",
+            "title": "CFG Rescale (Addressing Over-Saturation)",
+            "difficulty": "easy",
+            "description": "Implement the CFG rescale technique that prevents color over-saturation caused by high classifier-free guidance scales.",
+            "info": "High classifier-free guidance scales (w > 7) often produce over-saturated, high-contrast images. Lin et al. (2023, 'Common Diffusion Noise Schedules and Sample Steps are Flawed') proposed a simple fix: after applying CFG, rescale the guided noise prediction to match the standard deviation of the conditional prediction. The rescaled output is: eps_final = phi * eps_rescaled + (1 - phi) * eps_cfg, where eps_rescaled = eps_cfg * (std(eps_cond) / std(eps_cfg)) and phi controls the rescale strength (typically 0.7). This preserves the directional guidance while preventing magnitude explosion that causes saturation.",
+            "code": "import torch\n\ndef cfg_with_rescale(eps_cond, eps_uncond, guidance_scale, rescale_phi=0.7):\n    \"\"\"Classifier-free guidance with rescale to prevent over-saturation.\n    Args:\n        eps_cond: conditional noise prediction\n        eps_uncond: unconditional noise prediction\n        guidance_scale: w, guidance strength\n        rescale_phi: rescale interpolation factor (0 = no rescale, 1 = full rescale)\n    Returns:\n        eps_final: rescaled guided prediction\n    \"\"\"\n    # Standard CFG\n    eps_cfg = eps_uncond + guidance_scale * (eps_cond - eps_uncond)\n    \n    # Compute per-channel std ratio\n    std_cond = {{diff_adv_new_cfgr_b1}}\n    std_cfg = eps_cfg.std(dim=[2, 3], keepdim=True)\n    \n    # Rescale to match conditional std\n    eps_rescaled = eps_cfg * {{diff_adv_new_cfgr_b2}}\n    \n    # Interpolate between rescaled and original CFG\n    eps_final = {{diff_adv_new_cfgr_b3}}\n    return eps_final",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_cfgr_b1",
+                    "placeholder": "eps_cond.std(dim=[?, ?], keepdim=True)",
+                    "acceptable": ["eps_cond.std(dim=[2, 3], keepdim=True)"],
+                    "hint": "Compute the spatial standard deviation (over H, W dims) of the conditional prediction."
+                },
+                {
+                    "id": "diff_adv_new_cfgr_b2",
+                    "placeholder": "(std_cond / ???)",
+                    "acceptable": ["(std_cond / std_cfg)", "std_cond / (std_cfg + 1e-8)"],
+                    "hint": "Scale eps_cfg by the ratio std_cond / std_cfg to match the conditional magnitude."
+                },
+                {
+                    "id": "diff_adv_new_cfgr_b3",
+                    "placeholder": "rescale_phi * ??? + (1 - rescale_phi) * ???",
+                    "acceptable": ["rescale_phi * eps_rescaled + (1 - rescale_phi) * eps_cfg"],
+                    "hint": "Interpolate between the rescaled version and the original CFG output using phi."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_rectified_flow",
+            "title": "Rectified Flow Training and Sampling",
+            "difficulty": "medium",
+            "description": "Implement training and Euler sampling for Rectified Flows (Liu et al., 2022), which learn straight-line transport between noise and data distributions.",
+            "info": "Rectified Flows (Liu et al., 2022) learn an ODE that transports samples along straight lines between the noise distribution (t=0) and data distribution (t=1). The interpolation is x_t = (1-t)*z + t*x_0, where z ~ N(0,I). The model learns the velocity field v_theta(x_t, t) to match the target velocity x_0 - z. At inference, Euler integration with just a few steps follows the learned flow from noise to data. The key insight is that straight paths are optimal for transport, minimizing the kinetic energy. Rectified flows can be iteratively 'reflow'd to make paths even straighter, enabling fewer sampling steps.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef rectified_flow_loss(velocity_model, x_0):\n    \"\"\"Rectified flow training loss.\n    Args:\n        velocity_model: v_theta(x_t, t)\n        x_0: clean data (B, C, H, W)\n    \"\"\"\n    B = x_0.shape[0]\n    t = torch.rand(B, device=x_0.device)\n    z = torch.randn_like(x_0)\n    t_bc = t.view(-1, *([1] * (x_0.dim() - 1)))\n    \n    # Linear interpolation path\n    x_t = {{diff_adv_new_rf_b1}}\n    target_velocity = x_0 - z\n    \n    pred_velocity = velocity_model(x_t, t)\n    return F.mse_loss(pred_velocity, target_velocity)\n\n@torch.no_grad()\ndef rectified_flow_sample(velocity_model, shape, device, num_steps=50):\n    \"\"\"Sample by integrating the velocity field from t=0 to t=1.\"\"\"\n    x = torch.randn(shape, device=device)  # start from noise at t=0\n    dt = {{diff_adv_new_rf_b2}}\n    for i in range(num_steps):\n        t = torch.full((shape[0],), i * dt, device=device)\n        v = velocity_model(x, t)\n        x = {{diff_adv_new_rf_b3}}\n    return x",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_rf_b1",
+                    "placeholder": "(1 - t_bc) * ??? + t_bc * ???",
+                    "acceptable": ["(1 - t_bc) * z + t_bc * x_0"],
+                    "hint": "Linear interpolation: x_t = (1-t)*z + t*x_0, going from noise at t=0 to data at t=1."
+                },
+                {
+                    "id": "diff_adv_new_rf_b2",
+                    "placeholder": "1.0 / ???",
+                    "acceptable": ["1.0 / num_steps"],
+                    "hint": "The time step size is 1/num_steps since we integrate from t=0 to t=1."
+                },
+                {
+                    "id": "diff_adv_new_rf_b3",
+                    "placeholder": "x + ??? * dt",
+                    "acceptable": ["x + v * dt"],
+                    "hint": "Euler step: x_{next} = x + velocity * dt."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_sdxl_size_conditioning",
+            "title": "SDXL Micro-Conditioning (Size and Crop Conditioning)",
+            "difficulty": "easy",
+            "description": "Implement the micro-conditioning mechanism in SDXL that conditions the model on the original image size and crop coordinates to avoid artifacts.",
+            "info": "SDXL (Podell et al., 2023) introduces micro-conditioning to handle the fact that training images have varying resolutions and are often cropped. The model is conditioned on: (1) the original image resolution (height, width), and (2) the crop coordinates (top, left). These are encoded using sinusoidal embeddings and concatenated to the timestep embedding. At inference, setting the original size to the target size and crop coordinates to (0,0) tells the model to generate a full, uncropped image at the desired resolution. This simple trick dramatically reduces common artifacts like cut-off objects and unnatural compositions.",
+            "code": "import torch\nimport torch.nn as nn\nimport math\n\ndef fourier_encode(values, dim=256):\n    \"\"\"Sinusoidal encoding for scalar values.\"\"\"\n    half = dim // 2\n    freqs = torch.exp(-math.log(10000) * torch.arange(half, device=values.device) / half)\n    args = values[:, None] * freqs[None, :]\n    return torch.cat([torch.sin(args), torch.cos(args)], dim=-1)\n\nclass SDXLMicroConditioning(nn.Module):\n    def __init__(self, embed_dim=256, time_dim=1280):\n        super().__init__()\n        # 6 values: orig_h, orig_w, crop_top, crop_left, target_h, target_w\n        self.proj = nn.Linear(embed_dim * 6, time_dim)\n    \n    def forward(self, orig_size, crop_coords, target_size, time_emb):\n        \"\"\"Encode and add micro-conditioning to time embedding.\n        Args:\n            orig_size: (B, 2) original (height, width)\n            crop_coords: (B, 2) crop (top, left)\n            target_size: (B, 2) target (height, width)\n            time_emb: (B, time_dim)\n        \"\"\"\n        # Encode each value separately and concatenate\n        all_conds = {{diff_adv_new_sdxlmc_b1}}\n        embeds = [fourier_encode(all_conds[:, i]) for i in range(6)]\n        micro_emb = {{diff_adv_new_sdxlmc_b2}}\n        projected = self.proj(micro_emb)\n        return {{diff_adv_new_sdxlmc_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_sdxlmc_b1",
+                    "placeholder": "torch.cat([orig_size, crop_coords, ???], dim=-1)",
+                    "acceptable": ["torch.cat([orig_size, crop_coords, target_size], dim=-1)", "torch.cat([orig_size, crop_coords, target_size], dim=1)"],
+                    "hint": "Concatenate all 3 pairs of values: original size, crop coordinates, and target size into (B, 6)."
+                },
+                {
+                    "id": "diff_adv_new_sdxlmc_b2",
+                    "placeholder": "torch.cat(embeds, dim=???)",
+                    "acceptable": ["torch.cat(embeds, dim=-1)", "torch.cat(embeds, dim=1)"],
+                    "hint": "Concatenate all 6 Fourier embeddings along the feature dimension."
+                },
+                {
+                    "id": "diff_adv_new_sdxlmc_b3",
+                    "placeholder": "time_emb + ???",
+                    "acceptable": ["time_emb + projected"],
+                    "hint": "Add the projected micro-conditioning embedding to the timestep embedding."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_neg_prompt",
+            "title": "Negative Prompts with Classifier-Free Guidance",
+            "difficulty": "easy",
+            "description": "Implement negative prompt support for classifier-free guidance, where the unconditional prediction is replaced with a negative-conditioned prediction.",
+            "info": "Negative prompts allow users to specify what they do NOT want in the generated image. Instead of using a null/unconditional embedding for the 'unconditional' branch of CFG, the negative prompt embedding is used. The guided prediction becomes: eps_guided = eps_neg + w * (eps_cond - eps_neg), where eps_neg is the model's prediction conditioned on the negative prompt text. This effectively pushes the generation away from the negative prompt concept while pulling toward the positive prompt. Negative prompts like 'blurry, low quality, deformed' are widely used in practice to improve generation quality with Stable Diffusion.",
+            "code": "import torch\n\ndef negative_prompt_guidance(model, x_t, t, pos_cond, neg_cond, guidance_scale):\n    \"\"\"CFG with negative prompt instead of unconditional.\n    Args:\n        model: noise prediction model(x_t, t, cond)\n        x_t: noisy input\n        t: current timestep\n        pos_cond: positive (desired) text embedding\n        neg_cond: negative (undesired) text embedding\n        guidance_scale: w\n    Returns:\n        guided noise prediction\n    \"\"\"\n    # Batch both predictions for efficiency\n    x_batch = torch.cat([x_t, x_t], dim=0)\n    t_batch = torch.cat([t, t], dim=0)\n    cond_batch = {{diff_adv_new_neg_b1}}\n    \n    # Single batched forward pass\n    eps_both = model(x_batch, t_batch, cond_batch)\n    eps_pos, eps_neg = {{diff_adv_new_neg_b2}}\n    \n    # Guided prediction (negative prompt replaces unconditional)\n    eps_guided = {{diff_adv_new_neg_b3}}\n    return eps_guided",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_neg_b1",
+                    "placeholder": "torch.cat([pos_cond, ???], dim=0)",
+                    "acceptable": ["torch.cat([pos_cond, neg_cond], dim=0)"],
+                    "hint": "Batch the positive and negative conditioning together for a single efficient forward pass."
+                },
+                {
+                    "id": "diff_adv_new_neg_b2",
+                    "placeholder": "eps_both.chunk(?, dim=0)",
+                    "acceptable": ["eps_both.chunk(2, dim=0)"],
+                    "hint": "Split the batched output back into positive and negative predictions."
+                },
+                {
+                    "id": "diff_adv_new_neg_b3",
+                    "placeholder": "eps_neg + guidance_scale * (??? - ???)",
+                    "acceptable": ["eps_neg + guidance_scale * (eps_pos - eps_neg)"],
+                    "hint": "Same CFG formula but with eps_neg replacing eps_uncond: eps_neg + w*(eps_pos - eps_neg)."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_self_conditioning",
+            "title": "Self-Conditioning for Diffusion Models",
+            "difficulty": "medium",
+            "description": "Implement the self-conditioning technique where the model's own previous x_0 prediction is fed back as an additional input to improve coherence.",
+            "info": "Self-conditioning (Chen et al., 2022 'Analog Bits') provides the model with its own previous x_0 estimate as additional context. During training, with 50% probability, a first forward pass predicts x_0 (with stop-gradient), and this prediction is concatenated channel-wise to x_t for a second forward pass. The other 50% of the time, a zero tensor is used (no self-conditioning). At inference, each step uses the x_0 prediction from the previous step as the self-conditioning input. This technique improves sample quality by giving the model a 'rough draft' to refine, and is used in models like Imagen and Recurrent Flow Matching.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef self_conditioning_training_step(model, x_0, t, alpha_bar, p_self_cond=0.5):\n    \"\"\"Training step with self-conditioning.\n    model expects input of shape (B, 2*C, H, W): concat of x_t and x0_estimate.\n    \"\"\"\n    noise = torch.randn_like(x_0)\n    x_t = q_sample(x_0, t, alpha_bar, noise)\n    \n    # With probability p, compute a self-conditioning estimate\n    if torch.rand(1).item() < p_self_cond:\n        with torch.no_grad():\n            # First pass with zero self-conditioning\n            zeros = torch.zeros_like(x_t)\n            eps_initial = model(torch.cat([x_t, zeros], dim=1), t)\n            x0_estimate = {{diff_adv_new_sc_b1}}\n    else:\n        x0_estimate = torch.zeros_like(x_0)\n    \n    # Main forward pass with self-conditioning\n    model_input = {{diff_adv_new_sc_b2}}\n    eps_pred = model(model_input, t)\n    loss = {{diff_adv_new_sc_b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_sc_b1",
+                    "placeholder": "(x_t - torch.sqrt(1 - alpha_bar[t]).view(-1,1,1,1) * eps_initial) / torch.sqrt(???).view(-1,1,1,1)",
+                    "acceptable": ["(x_t - torch.sqrt(1 - alpha_bar[t]).view(-1,1,1,1) * eps_initial) / torch.sqrt(alpha_bar[t]).view(-1,1,1,1)"],
+                    "hint": "Predict x_0 from x_t and initial noise prediction: x_0 = (x_t - sqrt(1-alpha_bar)*eps) / sqrt(alpha_bar)."
+                },
+                {
+                    "id": "diff_adv_new_sc_b2",
+                    "placeholder": "torch.cat([x_t, ???], dim=1)",
+                    "acceptable": ["torch.cat([x_t, x0_estimate], dim=1)", "torch.cat([x_t, x0_estimate.detach()], dim=1)"],
+                    "hint": "Concatenate x_t with the x_0 estimate (or zeros) along the channel dimension."
+                },
+                {
+                    "id": "diff_adv_new_sc_b3",
+                    "placeholder": "F.mse_loss(eps_pred, ???)",
+                    "acceptable": ["F.mse_loss(eps_pred, noise)", "F.mse_loss(noise, eps_pred)"],
+                    "hint": "Standard noise prediction MSE loss, same as regular DDPM training."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_snr_weighting",
+            "title": "Min-SNR Weighted Loss for Diffusion Training",
+            "difficulty": "medium",
+            "description": "Implement the Min-SNR-gamma loss weighting strategy that balances the loss across different noise levels for more stable diffusion training.",
+            "info": "Hang et al. (2023, 'Efficient Diffusion Training via Min-SNR Weighting Strategy') observed that the standard DDPM loss implicitly assigns very different weights to different timesteps, causing conflicting gradients. The signal-to-noise ratio (SNR) at timestep t is SNR(t) = alpha_bar_t / (1 - alpha_bar_t). The Min-SNR-gamma weighting clips the SNR-based weight: weight(t) = min(SNR(t), gamma) / SNR(t), where gamma is typically 5. This reduces the weight for low-noise timesteps (high SNR) that dominate training, leading to faster convergence and better FID scores. It can be applied to any parameterization (noise, x_0, or v).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef compute_snr(alpha_bar_t):\n    \"\"\"Compute signal-to-noise ratio at timestep t.\n    SNR(t) = alpha_bar_t / (1 - alpha_bar_t)\n    \"\"\"\n    return {{diff_adv_new_snr_b1}}\n\ndef min_snr_loss(model, x_0, t, alpha_bar, gamma=5.0):\n    \"\"\"DDPM loss with Min-SNR-gamma weighting.\"\"\"\n    noise = torch.randn_like(x_0)\n    x_t = q_sample(x_0, t, alpha_bar, noise)\n    pred_noise = model(x_t, t)\n    \n    # Per-sample MSE (no reduction)\n    mse = F.mse_loss(pred_noise, noise, reduction='none').mean(dim=[1, 2, 3])\n    \n    # Min-SNR weight\n    snr = compute_snr(alpha_bar[t])\n    weight = {{diff_adv_new_snr_b2}}\n    \n    # Weighted loss\n    loss = {{diff_adv_new_snr_b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_snr_b1",
+                    "placeholder": "alpha_bar_t / (??? - alpha_bar_t)",
+                    "acceptable": ["alpha_bar_t / (1 - alpha_bar_t)", "alpha_bar_t / (1.0 - alpha_bar_t)"],
+                    "hint": "SNR is the ratio of signal variance to noise variance: alpha_bar / (1 - alpha_bar)."
+                },
+                {
+                    "id": "diff_adv_new_snr_b2",
+                    "placeholder": "torch.clamp(snr, max=???) / snr",
+                    "acceptable": ["torch.clamp(snr, max=gamma) / snr", "torch.minimum(snr, torch.tensor(gamma)) / snr"],
+                    "hint": "Min-SNR weight: min(SNR, gamma) / SNR. This clips the weight to at most 1 for high SNR."
+                },
+                {
+                    "id": "diff_adv_new_snr_b3",
+                    "placeholder": "(weight * ???).mean()",
+                    "acceptable": ["(weight * mse).mean()"],
+                    "hint": "Apply the per-sample weight to the per-sample MSE and take the mean."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_new_img2img_sdedit",
+            "title": "SDEdit (Image-to-Image with Diffusion)",
+            "difficulty": "easy",
+            "description": "Implement SDEdit (Meng et al., 2021) which performs image-to-image translation by adding noise to a source image and denoising with a text-conditioned model.",
+            "info": "SDEdit (Meng et al., 2021) enables image-to-image generation without task-specific training. Given a source image, noise is added to a specific timestep t_start (controlled by a 'strength' parameter), and then the standard reverse diffusion process denoises it with optional text conditioning. Lower strength (fewer noising steps) preserves more of the original image structure; higher strength (more noising steps) allows more creative freedom. With strength=1.0, the process starts from pure noise (identical to text-to-image). This technique is widely used in Stable Diffusion's img2img pipeline.",
+            "code": "import torch\n\n@torch.no_grad()\ndef sdedit(model, source_image, alpha_bar, alpha, beta, T, strength=0.75, cond=None, guidance_scale=7.5):\n    \"\"\"SDEdit image-to-image generation.\n    Args:\n        model: conditional noise prediction model\n        source_image: input image (B, C, H, W) in [-1, 1]\n        strength: how much to noise (0=keep original, 1=full generation)\n    \"\"\"\n    # Determine starting timestep based on strength\n    t_start = {{diff_adv_new_sde_b1}}\n    \n    # Forward-diffuse the source image to t_start\n    noise = torch.randn_like(source_image)\n    t_tensor = torch.full((source_image.shape[0],), t_start, device=source_image.device, dtype=torch.long)\n    x = {{diff_adv_new_sde_b2}}\n    \n    # Denoise from t_start back to 0\n    for t_val in range(t_start, -1, -1):\n        t_batch = torch.full((source_image.shape[0],), t_val, device=source_image.device, dtype=torch.long)\n        eps = classifier_free_guidance_step(model, x, t_batch, cond, guidance_scale)\n        x = {{diff_adv_new_sde_b3}}\n    \n    return x.clamp(-1, 1)",
+            "blanks": [
+                {
+                    "id": "diff_adv_new_sde_b1",
+                    "placeholder": "int(T * ???)",
+                    "acceptable": ["int(T * strength)", "int(strength * T)"],
+                    "hint": "The starting timestep is strength * T. Higher strength means more noise and more steps."
+                },
+                {
+                    "id": "diff_adv_new_sde_b2",
+                    "placeholder": "q_sample(source_image, t_tensor, alpha_bar, ???)",
+                    "acceptable": ["q_sample(source_image, t_tensor, alpha_bar, noise)"],
+                    "hint": "Forward-diffuse the source image to t_start using the standard q_sample function."
+                },
+                {
+                    "id": "diff_adv_new_sde_b3",
+                    "placeholder": "reverse_step(x, eps, t_val, alpha, alpha_bar, ???)",
+                    "acceptable": ["reverse_step(x, eps, t_val, alpha, alpha_bar, beta)"],
+                    "hint": "Apply the standard DDPM reverse step with the guided noise prediction."
+                }
+            ]
         }
     ]
 }

@@ -64,6 +64,716 @@
                     "hint": "CE = -sum(y_true * log(y_pred))."
                 }
             ]
+        },
+        {
+            "id": "loss_new_mae",
+            "title": "Mean Absolute Error (L1 Loss)",
+            "difficulty": "easy",
+            "description": "Implement the Mean Absolute Error (MAE / L1) loss function.",
+            "info": "MAE computes the average of absolute differences between predictions and targets, making it more robust to outliers than MSE. Because MAE penalizes all errors linearly, a single large outlier does not dominate the loss. The gradient of MAE is constant in magnitude (either +1 or -1), which can cause instability near the minimum where the gradient does not smoothly approach zero. MAE corresponds to maximum likelihood estimation under a Laplacian error distribution.",
+            "code": "import numpy as np\n\ndef mae(y_true, y_pred):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": [
+                        "np.mean(np.abs(y_true - y_pred))",
+                        "np.mean(np.abs(y_pred - y_true))"
+                    ],
+                    "hint": "MAE = mean of |y_true - y_pred|."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_huber",
+            "title": "Huber Loss",
+            "difficulty": "medium",
+            "description": "Implement the Huber loss with a given delta threshold. For errors smaller than delta use quadratic loss; for larger errors use linear loss.",
+            "info": "Huber loss combines the best properties of MSE and MAE by being quadratic for small errors and linear for large errors, controlled by the delta parameter. This makes it differentiable everywhere (unlike MAE at zero) while still being robust to outliers (unlike MSE). When delta is very large, Huber loss approximates MSE; when delta is very small, it approximates MAE. It is widely used in reinforcement learning (e.g., DQN) and robust regression where occasional outliers are expected but smooth gradients near the optimum are desired.",
+            "code": "import numpy as np\n\ndef huber_loss(y_true, y_pred, delta=1.0):\n    error = y_true - y_pred\n    abs_error = np.abs(error)\n    quadratic = {{b1}}\n    linear = {{b2}}\n    return np.mean(np.where(abs_error <= delta, quadratic, linear))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * ???",
+                    "acceptable": [
+                        "0.5 * error ** 2",
+                        "0.5 * abs_error ** 2"
+                    ],
+                    "hint": "Quadratic part: 0.5 * error^2 for |error| <= delta."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "delta * (??? - ???)",
+                    "acceptable": [
+                        "delta * (abs_error - 0.5 * delta)",
+                        "delta * abs_error - 0.5 * delta ** 2"
+                    ],
+                    "hint": "Linear part: delta * |error| - 0.5 * delta^2."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_smooth_l1",
+            "title": "Smooth L1 Loss",
+            "difficulty": "medium",
+            "description": "Implement the Smooth L1 loss with beta parameter. This is equivalent to Huber loss with delta=beta, scaled by 1/beta for the quadratic region.",
+            "info": "Smooth L1 loss is a variant of Huber loss popularized by the Fast R-CNN paper for bounding box regression. It is defined as 0.5*x^2/beta when |x| < beta and |x| - 0.5*beta otherwise, where x is the element-wise difference. The beta parameter controls the transition point between quadratic and linear regimes. Smooth L1 is less sensitive to outliers than MSE while providing smoother gradients near zero than MAE, making it the default regression loss in most modern object detection frameworks.",
+            "code": "import numpy as np\n\ndef smooth_l1_loss(y_true, y_pred, beta=1.0):\n    diff = np.abs(y_true - y_pred)\n    return np.mean(np.where(diff < beta, {{b1}}, {{b2}}))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * ??? / beta",
+                    "acceptable": [
+                        "0.5 * diff ** 2 / beta"
+                    ],
+                    "hint": "Quadratic region: 0.5 * diff^2 / beta."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "diff - ???",
+                    "acceptable": [
+                        "diff - 0.5 * beta"
+                    ],
+                    "hint": "Linear region: |diff| - 0.5 * beta."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_focal",
+            "title": "Focal Loss",
+            "difficulty": "hard",
+            "description": "Implement focal loss for binary classification. y_pred are probabilities, gamma controls focus on hard examples, alpha balances classes.",
+            "info": "Focal loss was introduced by Lin et al. (2017) in the RetinaNet paper to address extreme class imbalance in one-stage object detectors. It adds a modulating factor (1-p_t)^gamma to the standard cross-entropy, which down-weights the loss for well-classified examples and focuses training on hard negatives. When gamma=0, focal loss reduces to standard cross-entropy; as gamma increases, the effect of the modulating factor grows. This simple modification allowed one-stage detectors to match or surpass the accuracy of two-stage detectors like Faster R-CNN for the first time.",
+            "code": "import numpy as np\n\ndef focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25):\n    eps = 1e-7\n    y_pred = np.clip(y_pred, eps, 1 - eps)\n    p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)\n    alpha_t = y_true * alpha + (1 - y_true) * (1 - alpha)\n    focal_weight = {{b1}}\n    ce = {{b2}}\n    return np.mean(alpha_t * focal_weight * ce)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(1 - ???) ** gamma",
+                    "acceptable": [
+                        "(1 - p_t) ** gamma"
+                    ],
+                    "hint": "Modulating factor: (1 - p_t)^gamma."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-np.log(???)",
+                    "acceptable": [
+                        "-np.log(p_t)"
+                    ],
+                    "hint": "Cross-entropy term: -log(p_t)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_dice",
+            "title": "Dice Loss",
+            "difficulty": "medium",
+            "description": "Implement the soft Dice loss for binary segmentation. y_true and y_pred are flattened arrays of values in [0,1].",
+            "info": "Dice loss is derived from the Sorensen-Dice coefficient, a set similarity measure originally developed for ecological community data. It computes 2*|A intersection B| / (|A| + |B|), which for soft predictions becomes 2*sum(p*g) / (sum(p) + sum(g)). Dice loss directly optimizes the overlap between predicted and ground-truth segmentation masks and is inherently robust to class imbalance because it normalizes by the total area. It is the dominant loss function in medical image segmentation, often used alongside cross-entropy for improved training stability.",
+            "code": "import numpy as np\n\ndef dice_loss(y_true, y_pred, smooth=1.0):\n    intersection = {{b1}}\n    return 1 - (2. * intersection + smooth) / ({{b2}} + smooth)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sum(??? * ???)",
+                    "acceptable": [
+                        "np.sum(y_true * y_pred)"
+                    ],
+                    "hint": "Intersection: sum of element-wise product of y_true and y_pred."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.sum(???) + np.sum(???)",
+                    "acceptable": [
+                        "np.sum(y_true) + np.sum(y_pred)"
+                    ],
+                    "hint": "Denominator: sum(y_true) + sum(y_pred)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_iou",
+            "title": "IoU Loss (Jaccard Loss)",
+            "difficulty": "medium",
+            "description": "Implement the soft IoU (Jaccard) loss for binary segmentation. y_true and y_pred are arrays in [0,1].",
+            "info": "IoU (Intersection over Union) loss is based on the Jaccard index, defined as |A intersection B| / |A union B|. For soft predictions this becomes sum(p*g) / (sum(p) + sum(g) - sum(p*g)). Unlike the Dice coefficient, IoU more harshly penalizes cases where one set is much larger than the other, because the union grows faster than the denominator in Dice. IoU loss is widely used in object detection and segmentation tasks and is closely related to the mIoU metric used for evaluation. A smooth term is added to avoid division by zero.",
+            "code": "import numpy as np\n\ndef iou_loss(y_true, y_pred, smooth=1.0):\n    intersection = np.sum(y_true * y_pred)\n    union = {{b1}}\n    return 1 - (intersection + smooth) / (union + smooth)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sum(???) + np.sum(???) - ???",
+                    "acceptable": [
+                        "np.sum(y_true) + np.sum(y_pred) - intersection"
+                    ],
+                    "hint": "Union = sum(y_true) + sum(y_pred) - intersection."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_tversky",
+            "title": "Tversky Loss",
+            "difficulty": "medium",
+            "description": "Implement the Tversky loss for binary segmentation. alpha and beta control the penalty for false positives and false negatives respectively. y_true and y_pred are flattened arrays in [0,1].",
+            "info": "Tversky loss is a generalization of the Dice loss based on the Tversky index, which introduces asymmetric weights for false positives (alpha) and false negatives (beta). When alpha=beta=0.5, it reduces to the standard Dice coefficient; when alpha=beta=1, it becomes the Jaccard index. By setting beta > alpha, the model is penalized more for false negatives, which is useful in medical imaging where missing a lesion is worse than a false alarm. Tversky loss was further extended to Focal Tversky Loss, which applies a focal parameter to focus on hard examples, achieving strong results on small-structure segmentation tasks.",
+            "code": "import numpy as np\n\ndef tversky_loss(y_true, y_pred, alpha=0.5, beta=0.5, smooth=1.0):\n    tp = np.sum(y_true * y_pred)\n    fp = np.sum({{b1}})\n    fn = np.sum({{b2}})\n    return 1 - (tp + smooth) / (tp + alpha * fp + beta * fn + smooth)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(1 - ???) * ???",
+                    "acceptable": [
+                        "(1 - y_true) * y_pred"
+                    ],
+                    "hint": "False positives: predicted positive but actually negative."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? * (1 - ???)",
+                    "acceptable": [
+                        "y_true * (1 - y_pred)"
+                    ],
+                    "hint": "False negatives: actually positive but predicted negative."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_contrastive",
+            "title": "Contrastive Loss",
+            "difficulty": "medium",
+            "description": "Implement the contrastive loss (Hadsell et al., 2006) for pairs. y is 1 for similar pairs, 0 for dissimilar. d is the Euclidean distance between embeddings.",
+            "info": "Contrastive loss is a metric learning objective that pulls similar pairs closer and pushes dissimilar pairs apart in embedding space. For similar pairs (y=1), the loss is simply d^2; for dissimilar pairs (y=0), the loss is max(0, margin - d)^2, which only penalizes dissimilar pairs that are closer than the margin. The margin hyperparameter defines a radius around each sample beyond which dissimilar pairs contribute zero loss. Contrastive loss was foundational for Siamese networks and is still used in face verification and few-shot learning.",
+            "code": "import numpy as np\n\ndef contrastive_loss(y, d, margin=1.0):\n    pos = {{b1}}\n    neg = {{b2}}\n    return np.mean(y * pos + (1 - y) * neg)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "d ** ???",
+                    "acceptable": [
+                        "d ** 2"
+                    ],
+                    "hint": "Positive pair loss: d^2."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.maximum(???, ???) ** 2",
+                    "acceptable": [
+                        "np.maximum(0, margin - d) ** 2",
+                        "np.maximum(margin - d, 0) ** 2"
+                    ],
+                    "hint": "Negative pair loss: max(0, margin - d)^2."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_triplet",
+            "title": "Triplet Loss",
+            "difficulty": "medium",
+            "description": "Implement the triplet loss. d_pos is distance from anchor to positive, d_neg is distance from anchor to negative.",
+            "info": "Triplet loss operates on triplets of (anchor, positive, negative) samples and enforces that the anchor is closer to the positive than to the negative by at least a margin. It is defined as max(0, d(a,p) - d(a,n) + margin). Triplet loss was popularized by the FaceNet paper (Schroff et al., 2015) for face recognition and requires careful mining of hard or semi-hard triplets for effective training. Compared to contrastive loss, triplet loss considers relative distances rather than absolute ones, making it more flexible for learning embeddings.",
+            "code": "import numpy as np\n\ndef triplet_loss(d_pos, d_neg, margin=1.0):\n    return np.mean({{b1}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.maximum(???, 0)",
+                    "acceptable": [
+                        "np.maximum(d_pos - d_neg + margin, 0)",
+                        "np.maximum(d_pos - d_neg + margin, 0.0)"
+                    ],
+                    "hint": "max(0, d_pos - d_neg + margin)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_ntxent",
+            "title": "NT-Xent Loss (SimCLR)",
+            "difficulty": "hard",
+            "description": "Implement the NT-Xent (Normalized Temperature-scaled Cross-Entropy) loss for a single positive pair (z_i, z_j) against a set of negative similarities neg_sims. All inputs are cosine similarities already computed.",
+            "info": "NT-Xent loss is the contrastive objective used in SimCLR (Chen et al., 2020) for self-supervised visual representation learning. It takes a positive pair of augmented views and contrasts them against all other samples in the batch as negatives. The loss is -log(exp(sim(z_i,z_j)/tau) / sum(exp(sim(z_i,z_k)/tau))) where tau is a temperature parameter that controls the concentration of the distribution. Lower temperatures make the model focus more on hard negatives, while higher temperatures create a smoother distribution over negatives.",
+            "code": "import numpy as np\n\ndef nt_xent_loss(pos_sim, neg_sims, temperature=0.5):\n    pos_exp = np.exp({{b1}})\n    neg_exp_sum = np.sum(np.exp({{b2}}))\n    return -np.log(pos_exp / (pos_exp + neg_exp_sum))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "pos_sim / ???",
+                    "acceptable": [
+                        "pos_sim / temperature"
+                    ],
+                    "hint": "Scale positive similarity by temperature."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "neg_sims / ???",
+                    "acceptable": [
+                        "neg_sims / temperature"
+                    ],
+                    "hint": "Scale negative similarities by temperature."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_infonce",
+            "title": "InfoNCE Loss",
+            "difficulty": "hard",
+            "description": "Implement the InfoNCE loss. Given a matrix of logits where logits[i,i] are positive pairs and all off-diagonal entries are negatives, compute the mean loss over all anchors.",
+            "info": "InfoNCE (Noise-Contrastive Estimation) loss was introduced by van den Oord et al. (2018) in the Contrastive Predictive Coding (CPC) paper. It frames contrastive learning as a (K+1)-way classification problem, where the model must identify the true positive among K negatives. InfoNCE provides a lower bound on the mutual information between the representations, connecting self-supervised learning to information-theoretic principles. It is the theoretical foundation for many modern contrastive objectives including SimCLR, MoCo, and CLIP.",
+            "code": "import numpy as np\nfrom scipy.special import logsumexp\n\ndef infonce_loss(logits):\n    # logits: (N, N) matrix, positive pairs on diagonal\n    labels = np.arange(logits.shape[0])\n    log_sum_exp = logsumexp(logits, axis=1)\n    positives = {{b1}}\n    return np.mean({{b2}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "logits[???, ???]",
+                    "acceptable": [
+                        "logits[labels, labels]",
+                        "logits[np.arange(logits.shape[0]), np.arange(logits.shape[0])]"
+                    ],
+                    "hint": "Extract the diagonal (positive pair logits)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "log_sum_exp - ???",
+                    "acceptable": [
+                        "log_sum_exp - positives",
+                        "-positives + log_sum_exp"
+                    ],
+                    "hint": "Loss per sample = log_sum_exp - positive_logit."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_hinge",
+            "title": "Hinge Loss",
+            "difficulty": "easy",
+            "description": "Implement the hinge loss for binary classification. Labels y are in {-1, +1} and scores are raw model outputs (not probabilities).",
+            "info": "Hinge loss is the classic loss function for Support Vector Machines (SVMs), defined as max(0, 1 - y*f(x)). It only penalizes predictions that are on the wrong side of the decision boundary or within the margin, making it a maximum-margin classifier. Samples that are correctly classified with a margin greater than 1 contribute zero loss, creating sparse gradients. Hinge loss is not differentiable at the kink point (where y*f(x)=1), but subgradients are used in practice for optimization.",
+            "code": "import numpy as np\n\ndef hinge_loss(y, scores):\n    return np.mean({{b1}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.maximum(???, ???)",
+                    "acceptable": [
+                        "np.maximum(0, 1 - y * scores)",
+                        "np.maximum(0.0, 1.0 - y * scores)",
+                        "np.maximum(1 - y * scores, 0)"
+                    ],
+                    "hint": "Hinge loss = max(0, 1 - y * score)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_kl_div",
+            "title": "KL Divergence",
+            "difficulty": "medium",
+            "description": "Implement the KL divergence KL(P || Q) between two discrete probability distributions P and Q.",
+            "info": "Kullback-Leibler divergence measures how one probability distribution P diverges from a reference distribution Q. It is defined as sum(P(x) * log(P(x)/Q(x))) and is always non-negative, equaling zero only when P and Q are identical (Gibbs' inequality). KL divergence is asymmetric, meaning KL(P||Q) != KL(Q||P), which has important implications: minimizing KL(P||Q) tends to produce mode-seeking behavior (Q avoids placing mass where P is zero), while minimizing KL(Q||P) is mode-covering. KL divergence is central to variational inference, information theory, and is the core component of the ELBO in VAEs.",
+            "code": "import numpy as np\n\ndef kl_divergence(p, q):\n    eps = 1e-10\n    p = np.clip(p, eps, 1)\n    q = np.clip(q, eps, 1)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sum(p * np.log(???))",
+                    "acceptable": [
+                        "np.sum(p * np.log(p / q))"
+                    ],
+                    "hint": "KL(P||Q) = sum(P * log(P/Q))."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_js_div",
+            "title": "Jensen-Shannon Divergence",
+            "difficulty": "medium",
+            "description": "Implement the Jensen-Shannon divergence between two discrete distributions P and Q using the KL divergence.",
+            "info": "Jensen-Shannon divergence is a symmetrized and smoothed version of KL divergence, defined as JSD(P||Q) = 0.5*KL(P||M) + 0.5*KL(Q||M) where M = 0.5*(P+Q) is the mixture distribution. Unlike KL divergence, JSD is symmetric, always finite, and bounded between 0 and log(2). The square root of JSD is a true metric (satisfies the triangle inequality), making it suitable for measuring distances between distributions. JSD plays a central role in the original GAN formulation, where the generator implicitly minimizes JSD between the real and generated data distributions.",
+            "code": "import numpy as np\n\ndef kl(p, q):\n    eps = 1e-10\n    return np.sum(p * np.log(np.clip(p, eps, 1) / np.clip(q, eps, 1)))\n\ndef js_divergence(p, q):\n    m = {{b1}}\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * (??? + ???)",
+                    "acceptable": [
+                        "0.5 * (p + q)"
+                    ],
+                    "hint": "M is the average of P and Q."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "0.5 * kl(???, ???) + 0.5 * kl(???, ???)",
+                    "acceptable": [
+                        "0.5 * kl(p, m) + 0.5 * kl(q, m)"
+                    ],
+                    "hint": "JSD = 0.5 * KL(P||M) + 0.5 * KL(Q||M)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_wasserstein",
+            "title": "Wasserstein Distance (1D)",
+            "difficulty": "hard",
+            "description": "Implement the 1-Wasserstein distance (Earth Mover's Distance) between two 1D discrete distributions given as sorted sample arrays.",
+            "info": "The Wasserstein distance, also known as Earth Mover's Distance, measures the minimum cost of transforming one distribution into another, intuitively the amount of 'earth' that must be moved times the distance moved. For 1D distributions, it simplifies to the integral of the absolute difference between their CDFs. Unlike KL and JS divergence, Wasserstein distance is a true metric and provides meaningful gradients even when distributions have non-overlapping supports. This property is what motivated the Wasserstein GAN (WGAN), which solved the training instability of vanilla GANs caused by JS divergence saturating when distributions are disjoint.",
+            "code": "import numpy as np\n\ndef wasserstein_1d(p_samples, q_samples):\n    p_sorted = np.sort(p_samples)\n    q_sorted = np.sort(q_samples)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.mean(np.???(p_sorted - q_sorted))",
+                    "acceptable": [
+                        "np.mean(np.abs(p_sorted - q_sorted))"
+                    ],
+                    "hint": "For equal-size sorted samples: mean of |p_sorted - q_sorted|."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_perceptual",
+            "title": "Perceptual Loss (Feature Matching)",
+            "difficulty": "hard",
+            "description": "Implement a perceptual loss that computes the MSE between feature maps extracted from a pretrained network. features_pred and features_target are lists of feature tensors (numpy arrays) from multiple layers.",
+            "info": "Perceptual loss, introduced by Johnson et al. (2016), measures the difference between images in a learned feature space rather than pixel space. It passes both the generated and target images through a pretrained network (typically VGG) and computes the MSE between intermediate feature maps. This encourages the generated image to be perceptually similar to the target, capturing texture, style, and semantic content rather than exact pixel values. Perceptual loss is widely used in super-resolution (SRGAN), style transfer, and image-to-image translation, often combined with adversarial and reconstruction losses.",
+            "code": "import numpy as np\n\ndef perceptual_loss(features_pred, features_target):\n    loss = 0.0\n    for fp, ft in zip(features_pred, features_target):\n        loss += {{b1}}\n    return loss / len(features_pred)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.mean((??? - ???) ** 2)",
+                    "acceptable": [
+                        "np.mean((fp - ft) ** 2)"
+                    ],
+                    "hint": "MSE between corresponding feature maps."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_ssim",
+            "title": "SSIM Loss (Simplified)",
+            "difficulty": "hard",
+            "description": "Implement a simplified SSIM (Structural Similarity Index) loss between two image patches x and y (1D numpy arrays). SSIM ranges from -1 to 1 where 1 means identical.",
+            "info": "SSIM was designed to match human perception of image quality by comparing luminance, contrast, and structure between image patches. It is defined as (2*mu_x*mu_y + C1)(2*sigma_xy + C2) / ((mu_x^2 + mu_y^2 + C1)(sigma_x^2 + sigma_y^2 + C2)), where C1 and C2 are small stability constants. Unlike MSE, SSIM is invariant to uniform changes in brightness and contrast, making it a better proxy for perceived quality. SSIM loss (1 - SSIM) is used in image generation, compression, and super-resolution, often combined with L1 or perceptual loss for best results.",
+            "code": "import numpy as np\n\ndef ssim_loss(x, y, C1=0.01**2, C2=0.03**2):\n    mu_x, mu_y = np.mean(x), np.mean(y)\n    sigma_x2 = np.var(x)\n    sigma_y2 = np.var(y)\n    sigma_xy = {{b1}}\n    ssim = (2 * mu_x * mu_y + C1) * (2 * sigma_xy + C2) / ((mu_x**2 + mu_y**2 + C1) * ({{b2}} + C2))\n    return 1 - ssim",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.mean((x - ???) * (y - ???))",
+                    "acceptable": [
+                        "np.mean((x - mu_x) * (y - mu_y))"
+                    ],
+                    "hint": "Cross-covariance: mean((x - mu_x) * (y - mu_y))."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "sigma_x2 + ???",
+                    "acceptable": [
+                        "sigma_x2 + sigma_y2"
+                    ],
+                    "hint": "Sum of the two variances."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_cosine_embedding",
+            "title": "Cosine Embedding Loss",
+            "difficulty": "easy",
+            "description": "Implement the cosine embedding loss. y=1 means similar pair, y=-1 means dissimilar pair. x1 and x2 are embedding vectors.",
+            "info": "Cosine embedding loss measures similarity between two vectors using cosine similarity and is used for learning embeddings where direction matters more than magnitude. For similar pairs (y=1), it minimizes 1 - cos_sim; for dissimilar pairs (y=-1), it minimizes max(0, cos_sim - margin). Unlike Euclidean-based contrastive loss, cosine embedding loss operates on the angular distance between vectors, making it invariant to vector norms. It is commonly used in sentence embedding models, recommendation systems, and any setting where normalized representations are preferred.",
+            "code": "import numpy as np\n\ndef cosine_embedding_loss(x1, x2, y, margin=0.0):\n    cos_sim = np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))\n    if y == 1:\n        return {{b1}}\n    else:\n        return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 - ???",
+                    "acceptable": [
+                        "1 - cos_sim"
+                    ],
+                    "hint": "For similar pairs, loss = 1 - cosine_similarity."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.maximum(???, ???)",
+                    "acceptable": [
+                        "np.maximum(0, cos_sim - margin)",
+                        "np.maximum(cos_sim - margin, 0)"
+                    ],
+                    "hint": "For dissimilar pairs, loss = max(0, cos_sim - margin)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_margin_ranking",
+            "title": "Margin Ranking Loss",
+            "difficulty": "easy",
+            "description": "Implement the margin ranking loss. y=1 means x1 should be ranked higher than x2, y=-1 means x2 should be ranked higher.",
+            "info": "Margin ranking loss is a pairwise ranking objective that enforces a margin between the scores of two inputs based on their relative ordering. It is defined as max(0, -y*(x1-x2) + margin), penalizing cases where the score difference does not respect the specified ranking by at least the margin. This loss is foundational in learning-to-rank systems, recommendation engines, and metric learning. Unlike pointwise losses such as MSE, margin ranking loss directly optimizes the relative ordering of items, which is often what matters in retrieval and ranking applications.",
+            "code": "import numpy as np\n\ndef margin_ranking_loss(x1, x2, y, margin=0.0):\n    return np.mean({{b1}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.maximum(???, 0)",
+                    "acceptable": [
+                        "np.maximum(-y * (x1 - x2) + margin, 0)",
+                        "np.maximum(0, -y * (x1 - x2) + margin)"
+                    ],
+                    "hint": "max(0, -y * (x1 - x2) + margin)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_ctc",
+            "title": "CTC Loss Forward (Simplified)",
+            "difficulty": "hard",
+            "description": "Implement the core idea of CTC loss: given log probabilities for a sequence of length T over an alphabet of size C (with index 0 as blank), compute the negative log-likelihood for a target consisting of a single character at index `target_idx` by marginalizing over all valid alignments.",
+            "info": "Connectionist Temporal Classification (CTC) loss enables training sequence-to-sequence models without requiring aligned input-output pairs. It introduces a blank token and marginalizes over all possible alignments that map to the target sequence after collapsing repeated characters and removing blanks. CTC was introduced by Graves et al. (2006) and revolutionized speech recognition by removing the need for frame-level alignment labels. The forward-backward algorithm is used to efficiently compute the total probability of all valid alignments, making the loss tractable despite the exponential number of possible alignment paths.",
+            "code": "import numpy as np\nfrom scipy.special import logsumexp\n\ndef ctc_loss_single_char(log_probs, target_idx):\n    # log_probs: (T, C) log-probabilities at each time step\n    # For single char target, valid emissions at each step: blank(0) or target_idx\n    T = log_probs.shape[0]\n    # Must emit target_idx at least once\n    # Sum over all timesteps t where target is emitted, rest are blank\n    log_likelihoods = []\n    for t in range(T):\n        log_p = log_probs[t, target_idx]\n        log_blanks = {{b1}}\n        log_likelihoods.append(log_p + log_blanks)\n    return -logsumexp(log_likelihoods)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sum(???) - log_probs[t, 0]",
+                    "acceptable": [
+                        "np.sum(log_probs[:, 0]) - log_probs[t, 0]"
+                    ],
+                    "hint": "Sum of blank log-probs for all timesteps except t."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_label_smoothing",
+            "title": "Label Smoothing Cross-Entropy",
+            "difficulty": "medium",
+            "description": "Implement cross-entropy loss with label smoothing. y_true is one-hot, y_pred are probabilities, and smoothing is the label smoothing factor.",
+            "info": "Label smoothing is a regularization technique introduced in the Inception-v2 paper that replaces hard one-hot target labels with a mixture of the one-hot distribution and a uniform distribution. The smoothed target becomes (1-epsilon)*y_true + epsilon/K, where K is the number of classes. This prevents the model from becoming overconfident by discouraging very large logit differences, which improves calibration and generalization. Label smoothing has become standard practice in modern classification models and is particularly effective in knowledge distillation and machine translation.",
+            "code": "import numpy as np\n\ndef label_smoothing_ce(y_true, y_pred, smoothing=0.1):\n    n_classes = y_true.shape[-1]\n    y_smooth = {{b1}}\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(1 - smoothing) * ??? + smoothing / ???",
+                    "acceptable": [
+                        "(1 - smoothing) * y_true + smoothing / n_classes"
+                    ],
+                    "hint": "Mix one-hot with uniform: (1-eps)*y_true + eps/K."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-np.sum(??? * np.log(???))",
+                    "acceptable": [
+                        "-np.sum(y_smooth * np.log(y_pred))",
+                        "-np.sum(y_smooth * np.log(np.clip(y_pred, 1e-10, 1)))"
+                    ],
+                    "hint": "Standard cross-entropy using smoothed labels."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_mixup",
+            "title": "Mixup Loss",
+            "difficulty": "medium",
+            "description": "Implement the mixup training loss. Given a mixing coefficient lam, the loss is a weighted combination of cross-entropy with both original targets.",
+            "info": "Mixup (Zhang et al., 2018) is a data augmentation strategy that trains on convex combinations of input pairs and their labels, creating virtual training examples. The mixed input is x_mix = lam*x_i + (1-lam)*x_j and the loss is lam*CE(pred, y_i) + (1-lam)*CE(pred, y_j). Mixup acts as a strong regularizer by encouraging linear behavior between training examples, reducing overfitting and improving robustness to adversarial examples and corrupted labels. It has been extended to CutMix, Manifold Mixup, and other variants that mix at different levels of the network.",
+            "code": "import numpy as np\n\ndef cross_entropy(y_true, y_pred):\n    return -np.sum(y_true * np.log(np.clip(y_pred, 1e-10, 1)))\n\ndef mixup_loss(y_pred, y_a, y_b, lam):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "lam * cross_entropy(???, ???) + (1 - lam) * cross_entropy(???, ???)",
+                    "acceptable": [
+                        "lam * cross_entropy(y_a, y_pred) + (1 - lam) * cross_entropy(y_b, y_pred)"
+                    ],
+                    "hint": "Weighted sum: lam * CE(y_a, pred) + (1-lam) * CE(y_b, pred)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_kd",
+            "title": "Knowledge Distillation Loss",
+            "difficulty": "hard",
+            "description": "Implement the knowledge distillation loss combining soft target loss (from teacher) and hard target loss (from ground truth). student_logits and teacher_logits are raw logits, y_true is one-hot labels.",
+            "info": "Knowledge distillation (Hinton et al., 2015) transfers knowledge from a large teacher model to a smaller student model by training the student to match the teacher's soft probability distribution. The soft targets are obtained by applying softmax with a high temperature T, which reveals inter-class similarities learned by the teacher. The total loss is alpha*T^2*KL(soft_teacher||soft_student) + (1-alpha)*CE(y_true, student), where the T^2 factor compensates for the reduced gradient magnitude at high temperatures. This technique is fundamental for model compression and has been extended to feature-level and attention-based distillation.",
+            "code": "import numpy as np\n\ndef softmax(x, T=1.0):\n    e = np.exp((x - np.max(x)) / T)\n    return e / e.sum()\n\ndef kd_loss(student_logits, teacher_logits, y_true, T=4.0, alpha=0.5):\n    soft_student = softmax(student_logits, T)\n    soft_teacher = softmax(teacher_logits, T)\n    hard_student = softmax(student_logits, 1.0)\n    soft_loss = -np.sum({{b1}})\n    hard_loss = -np.sum({{b2}})\n    return alpha * T * T * soft_loss + (1 - alpha) * hard_loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "soft_teacher * np.log(???)",
+                    "acceptable": [
+                        "soft_teacher * np.log(soft_student)"
+                    ],
+                    "hint": "Soft target cross-entropy: teacher_soft * log(student_soft)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "y_true * np.log(???)",
+                    "acceptable": [
+                        "y_true * np.log(hard_student)"
+                    ],
+                    "hint": "Hard target cross-entropy: y_true * log(student_hard)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_vae_elbo",
+            "title": "VAE Loss (ELBO)",
+            "difficulty": "hard",
+            "description": "Implement the VAE loss consisting of reconstruction loss (BCE) and KL divergence regularizer. mu and logvar are the encoder outputs for the latent distribution parameters.",
+            "info": "The VAE loss is derived from the Evidence Lower Bound (ELBO) on the marginal log-likelihood log p(x). It consists of two terms: a reconstruction loss that measures how well the decoder reconstructs the input from the latent code, and a KL divergence term that regularizes the latent distribution to be close to a standard normal prior. The KL divergence for a Gaussian q(z|x) = N(mu, sigma^2) against N(0,1) has a closed-form solution: -0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2). Balancing these two terms is crucial; too much KL weight causes posterior collapse, while too little leads to poor latent structure.",
+            "code": "import numpy as np\n\ndef vae_loss(x, x_recon, mu, logvar):\n    # Reconstruction loss (BCE, element-wise then summed)\n    recon = -np.sum(x * np.log(x_recon + 1e-8) + (1 - x) * np.log(1 - x_recon + 1e-8))\n    # KL divergence\n    kl = {{b1}}\n    return recon + kl",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "-0.5 * np.sum(1 + ??? - ??? - np.exp(???))",
+                    "acceptable": [
+                        "-0.5 * np.sum(1 + logvar - mu ** 2 - np.exp(logvar))",
+                        "-0.5 * np.sum(1 + logvar - mu**2 - np.exp(logvar))"
+                    ],
+                    "hint": "KL = -0.5 * sum(1 + log(var) - mu^2 - var), where logvar = log(var)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_gan_vanilla",
+            "title": "Vanilla GAN Loss",
+            "difficulty": "medium",
+            "description": "Implement the vanilla GAN losses for both generator and discriminator. d_real is discriminator output on real data, d_fake on generated data.",
+            "info": "The vanilla GAN loss was introduced by Goodfellow et al. (2014) and frames the GAN training as a minimax game. The discriminator maximizes log(D(x)) + log(1-D(G(z))), while the generator minimizes log(1-D(G(z))) or, in practice, maximizes log(D(G(z))) to avoid vanishing gradients early in training. This objective can be shown to minimize the Jensen-Shannon divergence between the real and generated distributions at the theoretical optimum. However, vanilla GAN training is notoriously unstable because the JS divergence can saturate when the discriminator becomes too strong, leading to vanishing generator gradients.",
+            "code": "import numpy as np\n\ndef gan_discriminator_loss(d_real, d_fake):\n    return {{b1}}\n\ndef gan_generator_loss(d_fake):\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "-np.mean(np.log(???) + np.log(???))",
+                    "acceptable": [
+                        "-np.mean(np.log(d_real) + np.log(1 - d_fake))",
+                        "-np.mean(np.log(d_real + 1e-8) + np.log(1 - d_fake + 1e-8))"
+                    ],
+                    "hint": "D loss = -mean(log(D(real)) + log(1 - D(fake)))."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-np.mean(np.log(???))",
+                    "acceptable": [
+                        "-np.mean(np.log(d_fake))",
+                        "-np.mean(np.log(d_fake + 1e-8))"
+                    ],
+                    "hint": "G loss (non-saturating) = -mean(log(D(fake)))."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_wgan",
+            "title": "Wasserstein GAN Loss",
+            "difficulty": "medium",
+            "description": "Implement the WGAN losses for critic (discriminator) and generator. The critic outputs unbounded real values (no sigmoid).",
+            "info": "Wasserstein GAN (Arjovsky et al., 2017) replaces the JS divergence objective with the Wasserstein-1 distance, which provides meaningful gradients even when the real and generated distributions have non-overlapping supports. The critic (replacing the discriminator) maximizes E[f(real)] - E[f(fake)], while the generator minimizes -E[f(fake)]. The critic must satisfy a Lipschitz constraint, originally enforced via weight clipping and later improved with gradient penalty (WGAN-GP). WGAN training is significantly more stable than vanilla GAN, with the critic loss correlating with generated sample quality, providing a useful training diagnostic.",
+            "code": "import numpy as np\n\ndef wgan_critic_loss(c_real, c_fake):\n    return {{b1}}\n\ndef wgan_generator_loss(c_fake):\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "-(np.mean(???) - np.mean(???))",
+                    "acceptable": [
+                        "-(np.mean(c_real) - np.mean(c_fake))",
+                        "np.mean(c_fake) - np.mean(c_real)"
+                    ],
+                    "hint": "Critic loss = -(mean(critic_real) - mean(critic_fake))."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-np.mean(???)",
+                    "acceptable": [
+                        "-np.mean(c_fake)"
+                    ],
+                    "hint": "Generator loss = -mean(critic_fake)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_gan_hinge",
+            "title": "Hinge GAN Loss",
+            "difficulty": "medium",
+            "description": "Implement the hinge-based GAN losses for discriminator and generator, as used in Spectral Normalization GAN (SN-GAN) and BigGAN.",
+            "info": "The hinge GAN loss applies the hinge function to the discriminator outputs, defined as D_loss = -mean(min(0, -1+D(real))) - mean(min(0, -1-D(fake))) or equivalently using ReLU as mean(relu(1-D(real))) + mean(relu(1+D(fake))). The generator loss is simply -mean(D(fake)). Hinge GAN loss provides more stable training than the vanilla GAN objective because it stops pushing the discriminator output once samples are correctly classified with sufficient margin. This loss was used in Spectral Normalization GAN, BigGAN, and other high-fidelity image generation models.",
+            "code": "import numpy as np\n\ndef hinge_gan_d_loss(d_real, d_fake):\n    return {{b1}}\n\ndef hinge_gan_g_loss(d_fake):\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.mean(np.maximum(???, ???)) + np.mean(np.maximum(???, ???))",
+                    "acceptable": [
+                        "np.mean(np.maximum(0, 1 - d_real)) + np.mean(np.maximum(0, 1 + d_fake))",
+                        "np.mean(np.maximum(1 - d_real, 0)) + np.mean(np.maximum(1 + d_fake, 0))"
+                    ],
+                    "hint": "D loss = mean(relu(1-D(real))) + mean(relu(1+D(fake)))."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-np.mean(???)",
+                    "acceptable": [
+                        "-np.mean(d_fake)"
+                    ],
+                    "hint": "G loss = -mean(D(fake))."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_reconstruction",
+            "title": "Reconstruction Loss (L1 + L2)",
+            "difficulty": "easy",
+            "description": "Implement a combined reconstruction loss that mixes L1 and L2 losses with a weighting factor alpha.",
+            "info": "Reconstruction loss measures how faithfully a model (such as an autoencoder or image generator) can reproduce its input. Combining L1 and L2 losses leverages the strengths of both: L2 penalizes large errors strongly and produces smooth outputs, while L1 preserves sharp edges and is more robust to outliers. A common weighting is alpha*L1 + (1-alpha)*L2, where alpha is tuned as a hyperparameter. This combination is frequently used in image-to-image translation (pix2pix), autoencoders, and inpainting networks to balance sharpness with smooth reconstruction.",
+            "code": "import numpy as np\n\ndef reconstruction_loss(x, x_recon, alpha=0.5):\n    l1 = {{b1}}\n    l2 = {{b2}}\n    return alpha * l1 + (1 - alpha) * l2",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.mean(np.???(x - x_recon))",
+                    "acceptable": [
+                        "np.mean(np.abs(x - x_recon))"
+                    ],
+                    "hint": "L1 = mean absolute error."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.mean((x - x_recon) ** ???)",
+                    "acceptable": [
+                        "np.mean((x - x_recon) ** 2)"
+                    ],
+                    "hint": "L2 = mean squared error."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_focal_multiclass",
+            "title": "Multi-class Focal Loss (PyTorch)",
+            "difficulty": "hard",
+            "description": "Implement multi-class focal loss in PyTorch. logits has shape (N, C), targets has shape (N,) with class indices.",
+            "info": "Multi-class focal loss extends the binary focal loss to multi-class classification by applying the modulating factor to the standard softmax cross-entropy. For each sample, it computes -(1-p_t)^gamma * log(p_t) where p_t is the predicted probability of the true class. This formulation is critical for training on highly imbalanced multi-class datasets such as object detection with many background proposals. The gamma parameter typically ranges from 1 to 5, with gamma=2 being the most common default. Multi-class focal loss can be efficiently implemented using PyTorch's gather operation to extract the relevant class probabilities.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef multiclass_focal_loss(logits, targets, gamma=2.0):\n    probs = F.softmax(logits, dim=1)\n    targets_one_hot = F.one_hot(targets, num_classes=logits.shape[1]).float()\n    p_t = {{b1}}\n    focal_weight = (1 - p_t) ** gamma\n    ce = {{b2}}\n    return torch.mean(focal_weight * ce)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(probs * ???).sum(dim=1)",
+                    "acceptable": [
+                        "(probs * targets_one_hot).sum(dim=1)"
+                    ],
+                    "hint": "Extract predicted probability of the true class: sum(probs * one_hot)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-torch.log(??? + 1e-8)",
+                    "acceptable": [
+                        "-torch.log(p_t + 1e-8)"
+                    ],
+                    "hint": "Cross-entropy for the true class: -log(p_t)."
+                }
+            ]
+        },
+        {
+            "id": "loss_new_gradient_penalty",
+            "title": "WGAN Gradient Penalty",
+            "difficulty": "hard",
+            "description": "Implement the gradient penalty term for WGAN-GP. Given interpolated samples x_interp and the critic's gradients w.r.t. those samples, compute the penalty.",
+            "info": "The gradient penalty (GP) was introduced in WGAN-GP (Gulrajani et al., 2017) as a differentiable alternative to weight clipping for enforcing the Lipschitz constraint on the critic. It penalizes the critic when the gradient norm deviates from 1 on interpolated samples between real and fake data. The penalty is lambda * E[(||grad_D(x_hat)||_2 - 1)^2], where x_hat = epsilon*x_real + (1-epsilon)*x_fake. This encourages the critic to be a 1-Lipschitz function, which is necessary for the Wasserstein distance estimate to be valid. WGAN-GP is more stable and flexible than weight clipping, becoming the standard approach for Wasserstein GAN training.",
+            "code": "import numpy as np\n\ndef gradient_penalty(gradients, lam=10.0):\n    # gradients: (batch_size, ...) flattened critic gradients w.r.t. interpolated inputs\n    # Compute L2 norm per sample\n    grad_norms = {{b1}}\n    return lam * {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sqrt(np.sum(gradients ** 2, axis=???) + 1e-12)",
+                    "acceptable": [
+                        "np.sqrt(np.sum(gradients ** 2, axis=1) + 1e-12)"
+                    ],
+                    "hint": "L2 norm per sample along the feature axis."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.mean((??? - 1) ** 2)",
+                    "acceptable": [
+                        "np.mean((grad_norms - 1) ** 2)",
+                        "np.mean((grad_norms - 1.0) ** 2)"
+                    ],
+                    "hint": "Penalty = mean((||grad|| - 1)^2)."
+                }
+            ]
         }
     ]
 }

@@ -12,13 +12,23 @@
                 {
                     "id": "sqrt_signal",
                     "placeholder": "sqrt of signal coefficient",
-                    "acceptable": ["torch.sqrt(a_bar_t)", "a_bar_t.sqrt()", "a_bar_t ** 0.5", "torch.sqrt(a_bar_t)"],
+                    "acceptable": [
+                        "torch.sqrt(a_bar_t)",
+                        "a_bar_t.sqrt()",
+                        "a_bar_t ** 0.5",
+                        "torch.sqrt(a_bar_t)"
+                    ],
                     "hint": "The signal is scaled by the square root of alpha_bar_t. Use torch.sqrt() or .sqrt()."
                 },
                 {
                     "id": "sqrt_noise",
                     "placeholder": "sqrt of noise coefficient",
-                    "acceptable": ["torch.sqrt(1 - a_bar_t)", "(1 - a_bar_t).sqrt()", "(1 - a_bar_t) ** 0.5", "torch.sqrt(1.0 - a_bar_t)"],
+                    "acceptable": [
+                        "torch.sqrt(1 - a_bar_t)",
+                        "(1 - a_bar_t).sqrt()",
+                        "(1 - a_bar_t) ** 0.5",
+                        "torch.sqrt(1.0 - a_bar_t)"
+                    ],
                     "hint": "The noise is scaled by the square root of (1 - alpha_bar_t). Use torch.sqrt(1 - a_bar_t)."
                 }
             ]
@@ -34,13 +44,23 @@
                 {
                     "id": "sample_t",
                     "placeholder": "sample random timesteps in [0, T)",
-                    "acceptable": ["torch.randint(0, T, (B,), device=x_0.device)", "torch.randint(0, T, (B,)).to(x_0.device)", "torch.randint(T, (B,), device=x_0.device)", "torch.randint(0, T, size=(B,), device=x_0.device)"],
+                    "acceptable": [
+                        "torch.randint(0, T, (B,), device=x_0.device)",
+                        "torch.randint(0, T, (B,)).to(x_0.device)",
+                        "torch.randint(T, (B,), device=x_0.device)",
+                        "torch.randint(0, T, size=(B,), device=x_0.device)"
+                    ],
                     "hint": "Use torch.randint to sample B integer timesteps uniformly from 0 to T-1."
                 },
                 {
                     "id": "compute_loss",
                     "placeholder": "MSE between predicted and actual noise",
-                    "acceptable": ["F.mse_loss(noise_pred, noise)", "F.mse_loss(noise_pred, noise, reduction='mean')", "((noise_pred - noise) ** 2).mean()", "torch.mean((noise_pred - noise) ** 2)"],
+                    "acceptable": [
+                        "F.mse_loss(noise_pred, noise)",
+                        "F.mse_loss(noise_pred, noise, reduction='mean')",
+                        "((noise_pred - noise) ** 2).mean()",
+                        "torch.mean((noise_pred - noise) ** 2)"
+                    ],
                     "hint": "Compute MSE loss between the predicted noise (noise_pred) and the actual noise. Use F.mse_loss()."
                 }
             ]
@@ -56,13 +76,21 @@
                 {
                     "id": "linear_betas",
                     "placeholder": "linearly spaced values from beta_start to beta_end",
-                    "acceptable": ["torch.linspace(beta_start, beta_end, T)", "torch.linspace(beta_start, beta_end, steps=T)"],
+                    "acceptable": [
+                        "torch.linspace(beta_start, beta_end, T)",
+                        "torch.linspace(beta_start, beta_end, steps=T)"
+                    ],
                     "hint": "Use torch.linspace to create T evenly spaced values between beta_start and beta_end."
                 },
                 {
                     "id": "cumulative_product",
                     "placeholder": "cumulative product of alphas",
-                    "acceptable": ["torch.cumprod(alphas, dim=0)", "alphas.cumprod(dim=0)", "torch.cumprod(alphas, 0)", "alphas.cumprod(0)"],
+                    "acceptable": [
+                        "torch.cumprod(alphas, dim=0)",
+                        "alphas.cumprod(dim=0)",
+                        "torch.cumprod(alphas, 0)",
+                        "alphas.cumprod(0)"
+                    ],
                     "hint": "Use torch.cumprod along dimension 0 to compute the running product of all alphas up to each timestep."
                 }
             ]
@@ -78,7 +106,12 @@
                 {
                     "id": "posterior_mean",
                     "placeholder": "posterior mean formula",
-                    "acceptable": ["(1.0 / torch.sqrt(alpha_t)) * (x_t - coeff * eps_pred)", "(x_t - coeff * eps_pred) / torch.sqrt(alpha_t)", "(x_t - coeff * eps_pred) * (1.0 / torch.sqrt(alpha_t))", "(1 / torch.sqrt(alpha_t)) * (x_t - coeff * eps_pred)"],
+                    "acceptable": [
+                        "(1.0 / torch.sqrt(alpha_t)) * (x_t - coeff * eps_pred)",
+                        "(x_t - coeff * eps_pred) / torch.sqrt(alpha_t)",
+                        "(x_t - coeff * eps_pred) * (1.0 / torch.sqrt(alpha_t))",
+                        "(1 / torch.sqrt(alpha_t)) * (x_t - coeff * eps_pred)"
+                    ],
                     "hint": "The posterior mean is (1/sqrt(alpha_t)) * (x_t - (beta_t/sqrt(1-alpha_bar_t)) * eps_pred). The coefficient 'coeff' already holds beta_t/sqrt(1-alpha_bar_t)."
                 }
             ]
@@ -94,7 +127,11 @@
                 {
                     "id": "predict_x0",
                     "placeholder": "predict x_0 from x_t and eps_pred",
-                    "acceptable": ["(x_t - torch.sqrt(1.0 - a_bar_t) * eps_pred) / torch.sqrt(a_bar_t)", "(x_t - torch.sqrt(1 - a_bar_t) * eps_pred) / torch.sqrt(a_bar_t)", "(x_t - (1 - a_bar_t).sqrt() * eps_pred) / a_bar_t.sqrt()"],
+                    "acceptable": [
+                        "(x_t - torch.sqrt(1.0 - a_bar_t) * eps_pred) / torch.sqrt(a_bar_t)",
+                        "(x_t - torch.sqrt(1 - a_bar_t) * eps_pred) / torch.sqrt(a_bar_t)",
+                        "(x_t - (1 - a_bar_t).sqrt() * eps_pred) / a_bar_t.sqrt()"
+                    ],
                     "hint": "Rearrange x_t = sqrt(a_bar_t)*x_0 + sqrt(1-a_bar_t)*eps to solve for x_0: x_0 = (x_t - sqrt(1-a_bar_t)*eps) / sqrt(a_bar_t)."
                 }
             ]
@@ -110,13 +147,22 @@
                 {
                     "id": "sigma_formula",
                     "placeholder": "sigma controlled by eta",
-                    "acceptable": ["eta * torch.sqrt((1 - a_bar_prev) / (1 - a_bar_t)) * torch.sqrt(1 - a_bar_t / a_bar_prev)", "eta * torch.sqrt((1 - a_bar_prev) / (1 - a_bar_t) * (1 - a_bar_t / a_bar_prev))", "eta * ((1 - a_bar_prev) / (1 - a_bar_t) * (1 - a_bar_t / a_bar_prev)).sqrt()"],
+                    "acceptable": [
+                        "eta * torch.sqrt((1 - a_bar_prev) / (1 - a_bar_t)) * torch.sqrt(1 - a_bar_t / a_bar_prev)",
+                        "eta * torch.sqrt((1 - a_bar_prev) / (1 - a_bar_t) * (1 - a_bar_t / a_bar_prev))",
+                        "eta * ((1 - a_bar_prev) / (1 - a_bar_t) * (1 - a_bar_t / a_bar_prev)).sqrt()"
+                    ],
                     "hint": "sigma = eta * sqrt((1 - a_bar_prev)/(1 - a_bar_t)) * sqrt(1 - a_bar_t/a_bar_prev). This controls the noise injected at each step."
                 },
                 {
                     "id": "dir_coefficient",
                     "placeholder": "direction coefficient accounting for sigma",
-                    "acceptable": ["torch.sqrt(1 - a_bar_prev - sigma_t ** 2)", "torch.sqrt(1 - a_bar_prev - sigma_t**2)", "(1 - a_bar_prev - sigma_t ** 2).sqrt()", "(1 - a_bar_prev - sigma_t**2).sqrt()"],
+                    "acceptable": [
+                        "torch.sqrt(1 - a_bar_prev - sigma_t ** 2)",
+                        "torch.sqrt(1 - a_bar_prev - sigma_t**2)",
+                        "(1 - a_bar_prev - sigma_t ** 2).sqrt()",
+                        "(1 - a_bar_prev - sigma_t**2).sqrt()"
+                    ],
                     "hint": "The direction coefficient becomes sqrt(1 - alpha_bar_prev - sigma_t^2), reducing the deterministic noise direction to make room for stochastic noise."
                 }
             ]
@@ -132,7 +178,10 @@
                 {
                     "id": "posterior_variance",
                     "placeholder": "beta_tilde formula",
-                    "acceptable": ["beta_t * (1.0 - a_bar_prev) / (1.0 - a_bar_t)", "beta_t * (1 - a_bar_prev) / (1 - a_bar_t)"],
+                    "acceptable": [
+                        "beta_t * (1.0 - a_bar_prev) / (1.0 - a_bar_t)",
+                        "beta_t * (1 - a_bar_prev) / (1 - a_bar_t)"
+                    ],
                     "hint": "The posterior variance is beta_tilde_t = beta_t * (1 - alpha_bar_{t-1}) / (1 - alpha_bar_t). It is smaller than beta_t."
                 }
             ]
@@ -148,13 +197,21 @@
                 {
                     "id": "compute_gradient",
                     "placeholder": "gradient of log p(y|x_t) w.r.t. x_in",
-                    "acceptable": ["torch.autograd.grad(selected, x_in)[0]", "torch.autograd.grad(selected, x_in, retain_graph=False)[0]", "torch.autograd.grad(outputs=selected, inputs=x_in)[0]"],
+                    "acceptable": [
+                        "torch.autograd.grad(selected, x_in)[0]",
+                        "torch.autograd.grad(selected, x_in, retain_graph=False)[0]",
+                        "torch.autograd.grad(outputs=selected, inputs=x_in)[0]"
+                    ],
                     "hint": "Use torch.autograd.grad to compute the gradient of the selected log probabilities with respect to x_in. Index [0] to get the tensor."
                 },
                 {
                     "id": "guided_eps",
                     "placeholder": "noise prediction modified by classifier gradient",
-                    "acceptable": ["eps_pred - torch.sqrt(1 - a_bar_t) * guidance_scale * grad", "eps_pred - (1 - a_bar_t).sqrt() * guidance_scale * grad", "eps_pred - torch.sqrt(1.0 - a_bar_t) * guidance_scale * grad"],
+                    "acceptable": [
+                        "eps_pred - torch.sqrt(1 - a_bar_t) * guidance_scale * grad",
+                        "eps_pred - (1 - a_bar_t).sqrt() * guidance_scale * grad",
+                        "eps_pred - torch.sqrt(1.0 - a_bar_t) * guidance_scale * grad"
+                    ],
                     "hint": "Subtract sqrt(1 - alpha_bar_t) * guidance_scale * gradient from the noise prediction. The gradient pushes toward higher p(y|x_t)."
                 }
             ]
@@ -170,7 +227,12 @@
                 {
                     "id": "cfg_formula",
                     "placeholder": "classifier-free guidance interpolation",
-                    "acceptable": ["eps_uncond + guidance_scale * (eps_cond - eps_uncond)", "(1 + guidance_scale) * eps_cond - guidance_scale * eps_uncond", "eps_uncond + (eps_cond - eps_uncond) * guidance_scale", "(1.0 + guidance_scale) * eps_cond - guidance_scale * eps_uncond"],
+                    "acceptable": [
+                        "eps_uncond + guidance_scale * (eps_cond - eps_uncond)",
+                        "(1 + guidance_scale) * eps_cond - guidance_scale * eps_uncond",
+                        "eps_uncond + (eps_cond - eps_uncond) * guidance_scale",
+                        "(1.0 + guidance_scale) * eps_cond - guidance_scale * eps_uncond"
+                    ],
                     "hint": "CFG extrapolates: eps_uncond + w * (eps_cond - eps_uncond). When w=0, you get eps_cond. When w>0, it amplifies the conditional direction."
                 }
             ]
@@ -186,7 +248,11 @@
                 {
                     "id": "cosine_f",
                     "placeholder": "cosine function for schedule",
-                    "acceptable": ["torch.cos((steps / T + s) / (1 + s) * math.pi / 2) ** 2", "torch.cos(((steps / T) + s) / (1 + s) * math.pi / 2) ** 2", "torch.cos((steps / T + s) / (1.0 + s) * math.pi * 0.5) ** 2"],
+                    "acceptable": [
+                        "torch.cos((steps / T + s) / (1 + s) * math.pi / 2) ** 2",
+                        "torch.cos(((steps / T) + s) / (1 + s) * math.pi / 2) ** 2",
+                        "torch.cos((steps / T + s) / (1.0 + s) * math.pi * 0.5) ** 2"
+                    ],
                     "hint": "f(t) = cos((t/T + s)/(1+s) * pi/2)^2. Use torch.cos with math.pi and square the result."
                 }
             ]
@@ -202,13 +268,20 @@
                 {
                     "id": "compute_snr",
                     "placeholder": "signal-to-noise ratio",
-                    "acceptable": ["a_bar_t / (1 - a_bar_t)", "a_bar_t / (1.0 - a_bar_t)"],
+                    "acceptable": [
+                        "a_bar_t / (1 - a_bar_t)",
+                        "a_bar_t / (1.0 - a_bar_t)"
+                    ],
                     "hint": "SNR(t) = alpha_bar_t / (1 - alpha_bar_t). This is the ratio of signal variance to noise variance."
                 },
                 {
                     "id": "min_snr_formula",
                     "placeholder": "min-SNR-gamma weight",
-                    "acceptable": ["torch.clamp(snr, max=gamma) / snr", "torch.minimum(snr, torch.tensor(gamma)) / snr", "torch.min(snr, torch.tensor(gamma)) / snr"],
+                    "acceptable": [
+                        "torch.clamp(snr, max=gamma) / snr",
+                        "torch.minimum(snr, torch.tensor(gamma)) / snr",
+                        "torch.min(snr, torch.tensor(gamma)) / snr"
+                    ],
                     "hint": "Weight = min(SNR, gamma) / SNR. Use torch.clamp(snr, max=gamma) / snr to clip SNR at gamma before dividing."
                 }
             ]
@@ -224,7 +297,14 @@
                 {
                     "id": "compute_std",
                     "placeholder": "standard deviation from log-variance",
-                    "acceptable": ["torch.exp(0.5 * logvar)", "torch.exp(logvar / 2)", "torch.exp(logvar * 0.5)", "(0.5 * logvar).exp()", "(logvar / 2).exp()", "(logvar * 0.5).exp()"],
+                    "acceptable": [
+                        "torch.exp(0.5 * logvar)",
+                        "torch.exp(logvar / 2)",
+                        "torch.exp(logvar * 0.5)",
+                        "(0.5 * logvar).exp()",
+                        "(logvar / 2).exp()",
+                        "(logvar * 0.5).exp()"
+                    ],
                     "hint": "Convert log-variance to standard deviation: std = exp(logvar / 2) = exp(0.5 * logvar). This is the standard VAE reparameterization."
                 }
             ]
@@ -240,7 +320,12 @@
                 {
                     "id": "undo_scaling",
                     "placeholder": "reverse the scale factor",
-                    "acceptable": ["z / scale_factor", "z * (1.0 / scale_factor)", "z / 0.18215", "1.0 / scale_factor * z"],
+                    "acceptable": [
+                        "z / scale_factor",
+                        "z * (1.0 / scale_factor)",
+                        "z / 0.18215",
+                        "1.0 / scale_factor * z"
+                    ],
                     "hint": "Simply divide z by the scale_factor to reverse the normalization applied during encoding."
                 }
             ]
@@ -256,7 +341,12 @@
                 {
                     "id": "distill_loss",
                     "placeholder": "MSE between student and teacher x0 predictions",
-                    "acceptable": ["F.mse_loss(x0_student, x0_teacher.detach())", "F.mse_loss(x0_student, x0_teacher)", "((x0_student - x0_teacher.detach()) ** 2).mean()", "((x0_student - x0_teacher) ** 2).mean()"],
+                    "acceptable": [
+                        "F.mse_loss(x0_student, x0_teacher.detach())",
+                        "F.mse_loss(x0_student, x0_teacher)",
+                        "((x0_student - x0_teacher.detach()) ** 2).mean()",
+                        "((x0_student - x0_teacher) ** 2).mean()"
+                    ],
                     "hint": "Compute the MSE between the student's x_0 prediction and the teacher's x_0 prediction. The teacher output should be detached."
                 }
             ]
@@ -272,7 +362,12 @@
                 {
                     "id": "init_noise",
                     "placeholder": "sample initial noise x_T",
-                    "acceptable": ["torch.randn(shape, device=device)", "torch.randn(*shape, device=device)", "torch.randn(shape).to(device)", "torch.randn(size=shape, device=device)"],
+                    "acceptable": [
+                        "torch.randn(shape, device=device)",
+                        "torch.randn(*shape, device=device)",
+                        "torch.randn(shape).to(device)",
+                        "torch.randn(size=shape, device=device)"
+                    ],
                     "hint": "Start from pure Gaussian noise x_T ~ N(0, I). Use torch.randn with the given shape and device."
                 }
             ]
@@ -288,7 +383,12 @@
                 {
                     "id": "create_subsequence",
                     "placeholder": "uniformly spaced timesteps",
-                    "acceptable": ["list(range(0, T, step_size))", "list(range(0, T, T // num_steps))", "torch.arange(0, T, step_size).tolist()", "list(torch.arange(0, T, step_size).numpy())"],
+                    "acceptable": [
+                        "list(range(0, T, step_size))",
+                        "list(range(0, T, T // num_steps))",
+                        "torch.arange(0, T, step_size).tolist()",
+                        "list(torch.arange(0, T, step_size).numpy())"
+                    ],
                     "hint": "Create a list of evenly spaced timesteps from 0 to T with spacing T//num_steps. Use range(0, T, step_size)."
                 }
             ]
@@ -304,13 +404,23 @@
                 {
                     "id": "ddim_noise_dir",
                     "placeholder": "DDIM noise direction coefficient",
-                    "acceptable": ["torch.sqrt(1 - a_bar_prev)", "torch.sqrt(1.0 - a_bar_prev)", "(1 - a_bar_prev).sqrt()", "(1.0 - a_bar_prev).sqrt()"],
+                    "acceptable": [
+                        "torch.sqrt(1 - a_bar_prev)",
+                        "torch.sqrt(1.0 - a_bar_prev)",
+                        "(1 - a_bar_prev).sqrt()",
+                        "(1.0 - a_bar_prev).sqrt()"
+                    ],
                     "hint": "In DDIM, the noise direction coefficient is sqrt(1 - alpha_bar_{t-1}). This is the deterministic counterpart of the stochastic noise."
                 },
                 {
                     "id": "ddpm_noise_scale",
                     "placeholder": "DDPM noise standard deviation",
-                    "acceptable": ["torch.sqrt(beta_t)", "beta_t.sqrt()", "torch.sqrt(betas[t])", "beta_t ** 0.5"],
+                    "acceptable": [
+                        "torch.sqrt(beta_t)",
+                        "beta_t.sqrt()",
+                        "torch.sqrt(betas[t])",
+                        "beta_t ** 0.5"
+                    ],
                     "hint": "In DDPM, the noise is scaled by sqrt(beta_t), the standard deviation of the reverse process."
                 }
             ]
@@ -326,13 +436,19 @@
                 {
                     "id": "v_to_x0",
                     "placeholder": "recover x_0 from v and x_t",
-                    "acceptable": ["torch.sqrt(alpha_bar_t) * x_t - torch.sqrt(1 - alpha_bar_t) * v_pred", "alpha_bar_t.sqrt() * x_t - (1 - alpha_bar_t).sqrt() * v_pred"],
+                    "acceptable": [
+                        "torch.sqrt(alpha_bar_t) * x_t - torch.sqrt(1 - alpha_bar_t) * v_pred",
+                        "alpha_bar_t.sqrt() * x_t - (1 - alpha_bar_t).sqrt() * v_pred"
+                    ],
                     "hint": "x_0 = sqrt(alpha_bar_t) * x_t - sqrt(1 - alpha_bar_t) * v. Derived by substituting x_t and v definitions."
                 },
                 {
                     "id": "v_to_eps",
                     "placeholder": "recover eps from v and x_t",
-                    "acceptable": ["torch.sqrt(alpha_bar_t) * v_pred + torch.sqrt(1 - alpha_bar_t) * x_t", "alpha_bar_t.sqrt() * v_pred + (1 - alpha_bar_t).sqrt() * x_t"],
+                    "acceptable": [
+                        "torch.sqrt(alpha_bar_t) * v_pred + torch.sqrt(1 - alpha_bar_t) * x_t",
+                        "alpha_bar_t.sqrt() * v_pred + (1 - alpha_bar_t).sqrt() * x_t"
+                    ],
                     "hint": "eps = sqrt(alpha_bar_t) * v + sqrt(1 - alpha_bar_t) * x_t. Derived similarly from the definitions."
                 }
             ]
@@ -348,13 +464,23 @@
                 {
                     "id": "floor_indices",
                     "placeholder": "floor of scaled timesteps as long tensor",
-                    "acceptable": ["t_scaled.long()", "t_scaled.floor().long()", "t_scaled.to(torch.long)", "torch.floor(t_scaled).long()"],
+                    "acceptable": [
+                        "t_scaled.long()",
+                        "t_scaled.floor().long()",
+                        "t_scaled.to(torch.long)",
+                        "torch.floor(t_scaled).long()"
+                    ],
                     "hint": "Compute the floor of t_scaled and convert to long integers for indexing. Use .long() or .floor().long()."
                 },
                 {
                     "id": "lerp_formula",
                     "placeholder": "linear interpolation between a_low and a_high",
-                    "acceptable": ["a_low + frac * (a_high - a_low)", "(1 - frac) * a_low + frac * a_high", "a_low * (1 - frac) + a_high * frac", "torch.lerp(a_low, a_high, frac)"],
+                    "acceptable": [
+                        "a_low + frac * (a_high - a_low)",
+                        "(1 - frac) * a_low + frac * a_high",
+                        "a_low * (1 - frac) + a_high * frac",
+                        "torch.lerp(a_low, a_high, frac)"
+                    ],
                     "hint": "Linear interpolation: result = a_low + frac * (a_high - a_low), or equivalently (1-frac)*a_low + frac*a_high."
                 }
             ]
@@ -370,8 +496,681 @@
                 {
                     "id": "clip_x0",
                     "placeholder": "clip x0_pred to [-clip_range, clip_range]",
-                    "acceptable": ["torch.clamp(x0_pred, -clip_range, clip_range)", "x0_pred.clamp(-clip_range, clip_range)", "torch.clamp(x0_pred, min=-clip_range, max=clip_range)", "x0_pred.clamp(min=-clip_range, max=clip_range)"],
+                    "acceptable": [
+                        "torch.clamp(x0_pred, -clip_range, clip_range)",
+                        "x0_pred.clamp(-clip_range, clip_range)",
+                        "torch.clamp(x0_pred, min=-clip_range, max=clip_range)",
+                        "x0_pred.clamp(min=-clip_range, max=clip_range)"
+                    ],
                     "hint": "Use torch.clamp to restrict x0_pred to the range [-clip_range, clip_range]. This prevents extreme predictions."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_karras_sigma_schedule",
+            "title": "Karras Noise Schedule (Sigma Ramp)",
+            "difficulty": "medium",
+            "description": "Implement the Karras et al. sigma schedule that spaces noise levels according to an inverse-rho ramp between sigma_max and sigma_min. This schedule concentrates more steps at lower noise levels where fine detail emerges.",
+            "info": "The Karras noise schedule (from 'Elucidating the Design Space of Diffusion-Based Generative Models') uses a power-function ramp: sigma_i = (sigma_max^(1/rho) + i/(N-1) * (sigma_min^(1/rho) - sigma_max^(1/rho)))^rho for i in 0..N-1. The parameter rho controls the distribution of steps; rho=7 is the recommended default, which puts more steps at low noise levels. This yields significantly better FID than uniform or linear sigma spacing at equal step counts. The final entry is appended as 0 to denote the clean signal endpoint.",
+            "code": "import torch\n\ndef karras_sigmas(n_steps, sigma_min=0.002, sigma_max=80.0, rho=7.0):\n    \"\"\"Build the Karras sigma schedule.\n    \n    Args:\n        n_steps: number of discretization steps\n        sigma_min: minimum noise level\n        sigma_max: maximum noise level\n        rho: controls step distribution (7 is default)\n    Returns:\n        sigmas: tensor of shape [n_steps + 1] ending with 0\n    \"\"\"\n    ramp = torch.linspace(0, 1, n_steps)\n    min_inv_rho = sigma_min ** (1.0 / rho)\n    max_inv_rho = sigma_max ** (1.0 / rho)\n    sigmas = {{sigma_formula}}\n    # Append 0 for the final clean step\n    return torch.cat([sigmas, torch.zeros(1)])",
+            "blanks": [
+                {
+                    "id": "sigma_formula",
+                    "placeholder": "compute sigmas from ramp using inverse-rho interpolation",
+                    "acceptable": [
+                        "(max_inv_rho + ramp * (min_inv_rho - max_inv_rho)) ** rho",
+                        "((1 - ramp) * max_inv_rho + ramp * min_inv_rho) ** rho",
+                        "(max_inv_rho * (1 - ramp) + min_inv_rho * ramp) ** rho",
+                        "torch.pow(max_inv_rho + ramp * (min_inv_rho - max_inv_rho), rho)"
+                    ],
+                    "hint": "Interpolate in the inverse-rho space: mix sigma_max^(1/rho) and sigma_min^(1/rho) linearly along the ramp, then raise to the power rho."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_edm_precondition",
+            "title": "EDM Preconditioning: Scaling Inputs and Outputs",
+            "difficulty": "hard",
+            "description": "Implement the EDM (Elucidating Diffusion Models) preconditioning wrapper that scales the network input and output so the underlying neural network F_theta operates on unit-variance data regardless of the noise level sigma.",
+            "info": "The EDM framework introduces preconditioning coefficients that depend on sigma: c_skip(sigma) = sigma_data^2 / (sigma^2 + sigma_data^2), c_out(sigma) = sigma * sigma_data / sqrt(sigma^2 + sigma_data^2), c_in(sigma) = 1 / sqrt(sigma^2 + sigma_data^2), and c_noise is log(sigma)/4. These ensure that F_theta always sees inputs and produces outputs with approximately unit variance, which stabilizes training across all noise levels. The denoised output is D(x; sigma) = c_skip * x + c_out * F_theta(c_in * x, c_noise). This separation of preconditioning from the network architecture is a core insight of the EDM paper.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass EDMPrecond(nn.Module):\n    \"\"\"EDM preconditioning wrapper.\"\"\"\n    def __init__(self, network, sigma_data=0.5):\n        super().__init__()\n        self.network = network\n        self.sigma_data = sigma_data\n    \n    def forward(self, x, sigma):\n        \"\"\"Compute D(x; sigma) with EDM preconditioning.\n        \n        Args:\n            x: noisy input [B, C, H, W]\n            sigma: noise levels [B] or [B, 1, 1, 1]\n        \"\"\"\n        sigma = sigma.view(-1, 1, 1, 1)\n        sd = self.sigma_data\n        \n        c_skip = sd ** 2 / (sigma ** 2 + sd ** 2)\n        c_out = sigma * sd / torch.sqrt(sigma ** 2 + sd ** 2)\n        c_in = {{c_in_formula}}\n        c_noise = torch.log(sigma.squeeze()) / 4.0\n        \n        F_x = self.network(c_in * x, c_noise)\n        return {{denoised_output}}",
+            "blanks": [
+                {
+                    "id": "c_in_formula",
+                    "placeholder": "input scaling coefficient",
+                    "acceptable": [
+                        "1.0 / torch.sqrt(sigma ** 2 + sd ** 2)",
+                        "1.0 / (sigma ** 2 + sd ** 2).sqrt()",
+                        "(sigma ** 2 + sd ** 2) ** (-0.5)",
+                        "torch.rsqrt(sigma ** 2 + sd ** 2)"
+                    ],
+                    "hint": "c_in = 1 / sqrt(sigma^2 + sigma_data^2). This normalizes the noisy input so that F_theta sees unit-variance data."
+                },
+                {
+                    "id": "denoised_output",
+                    "placeholder": "combine skip connection and network output",
+                    "acceptable": [
+                        "c_skip * x + c_out * F_x",
+                        "x * c_skip + F_x * c_out"
+                    ],
+                    "hint": "D(x; sigma) = c_skip * x + c_out * F_theta(c_in * x, c_noise). The skip connection preserves signal and F_x provides the learned correction."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_heun_sampler",
+            "title": "Heun's Method (2nd-Order ODE Solver) for Diffusion",
+            "difficulty": "hard",
+            "description": "Implement one step of Heun's method (also called the improved Euler method) for solving the probability flow ODE in diffusion sampling. Heun's method uses a predictor-corrector approach: first take an Euler step to predict the next point, evaluate the derivative there, then average the two derivatives.",
+            "info": "Heun's method is a second-order ODE solver that achieves better accuracy than Euler's method by evaluating the denoiser at both the current and predicted-next noise levels. For the diffusion ODE dx/dt = (x - D(x,t))/t, an Euler step gives x_next_euler, then we evaluate D again at (x_next_euler, t_next) and average the two slopes. This costs 2 network evaluations per step but typically achieves equivalent quality to Euler in half the steps. It is the recommended sampler in the Karras/EDM framework. The key formula is x_{i+1} = x_i + (h/2)(d_i + d_{i+1}), where d values are the ODE derivatives at start and predicted endpoint.",
+            "code": "import torch\n\ndef heun_step(denoiser, x, sigma, sigma_next):\n    \"\"\"One step of Heun's 2nd-order sampler.\n    \n    Args:\n        denoiser: model that returns D(x, sigma) (denoised prediction)\n        x: current sample [B, C, H, W]\n        sigma: current noise level (scalar or [B,1,1,1])\n        sigma_next: next noise level\n    Returns:\n        x_next: sample at sigma_next\n    \"\"\"\n    # Evaluate derivative at current point\n    d_cur = (x - denoiser(x, sigma)) / sigma\n    \n    # Euler prediction\n    x_next_euler = x + (sigma_next - sigma) * d_cur\n    \n    if sigma_next == 0:\n        return x_next_euler  # No correction at final step\n    \n    # Evaluate derivative at predicted point\n    d_next = {{derivative_at_predicted}}\n    \n    # Heun correction: average of two derivatives\n    x_next = x + (sigma_next - sigma) * {{avg_derivative}}  \n    return x_next",
+            "blanks": [
+                {
+                    "id": "derivative_at_predicted",
+                    "placeholder": "ODE derivative evaluated at the Euler-predicted point",
+                    "acceptable": [
+                        "(x_next_euler - denoiser(x_next_euler, sigma_next)) / sigma_next"
+                    ],
+                    "hint": "The ODE derivative is (x - D(x, sigma)) / sigma. Evaluate it at x=x_next_euler, sigma=sigma_next."
+                },
+                {
+                    "id": "avg_derivative",
+                    "placeholder": "average the two derivatives",
+                    "acceptable": [
+                        "(d_cur + d_next) / 2",
+                        "0.5 * (d_cur + d_next)",
+                        "(d_cur + d_next) * 0.5"
+                    ],
+                    "hint": "Heun's method averages the slopes at the start and predicted end: (d_cur + d_next) / 2."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_dpm_solver_2",
+            "title": "DPM-Solver-2: Second-Order Multistep Diffusion Sampler",
+            "difficulty": "hard",
+            "description": "Implement a single second-order step of DPM-Solver-2, which uses the current and previous model evaluations to achieve 2nd-order accuracy with only one new function evaluation per step (after the first step).",
+            "info": "DPM-Solver-2 is a dedicated ODE solver for diffusion models that exploits the semi-linear structure of the diffusion ODE. Working in the log-SNR (lambda) domain, it uses a linear multistep approach: given model outputs at the current and previous noise levels, it extrapolates to achieve 2nd-order accuracy. The key advantage over Heun is that DPM-Solver-2 requires only 1 NFE per step (after the initial step), since it reuses the model output from the previous step. The formula in sigma-space involves computing a midpoint correction using the difference of consecutive denoiser outputs. This makes it extremely efficient for few-step generation, often achieving great results in 10-20 steps.",
+            "code": "import torch\n\ndef dpm_solver_2_step(denoiser, x, sigma, sigma_next, sigma_prev, d_prev):\n    \"\"\"One multistep DPM-Solver-2 step.\n    \n    Args:\n        denoiser: model returning D(x, sigma)\n        x: current sample\n        sigma, sigma_next: current and next noise levels\n        sigma_prev: previous noise level (for multistep)\n        d_prev: ODE derivative from the previous step\n    Returns:\n        x_next, d_cur for reuse in next step\n    \"\"\"\n    # Current derivative\n    d_cur = (x - denoiser(x, sigma)) / sigma\n    \n    # Compute step size ratio for 2nd order correction\n    h = sigma_next - sigma\n    h_prev = sigma - sigma_prev\n    r = h / h_prev\n    \n    # 2nd order correction using previous derivative\n    d_corrected = {{second_order_deriv}}\n    \n    x_next = x + h * d_corrected\n    return x_next, d_cur",
+            "blanks": [
+                {
+                    "id": "second_order_deriv",
+                    "placeholder": "extrapolated derivative for 2nd-order accuracy",
+                    "acceptable": [
+                        "d_cur + 0.5 * r * (d_cur - d_prev)",
+                        "d_cur + (r / 2) * (d_cur - d_prev)",
+                        "(1 + 0.5 * r) * d_cur - 0.5 * r * d_prev",
+                        "(1 + r / 2) * d_cur - (r / 2) * d_prev"
+                    ],
+                    "hint": "The 2nd-order extrapolation is d_cur + (r/2)*(d_cur - d_prev), where r = h/h_prev is the step size ratio."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_edm_loss_weighting",
+            "title": "EDM Loss Weighting by Sigma",
+            "difficulty": "medium",
+            "description": "Implement the EDM training loss with sigma-dependent weighting. The EDM framework weights the denoising loss by a function of sigma so that all noise levels contribute approximately equally to the total loss.",
+            "info": "In the EDM framework, the training loss is weighted by lambda(sigma) = (sigma^2 + sigma_data^2) / (sigma * sigma_data)^2. This weighting compensates for the fact that denoising is inherently easier at low noise levels and harder at high noise levels. Without such weighting, the loss would be dominated by high-sigma samples. The weighting is derived so that the effective gradient contribution from each log-sigma interval is approximately uniform. Combined with log-normal sigma sampling during training (log(sigma) ~ N(P_mean, P_std^2)), this ensures stable, balanced optimization across the full noise range.",
+            "code": "import torch\n\ndef edm_training_loss(model, x_0, sigma_data=0.5, P_mean=-1.2, P_std=1.2):\n    \"\"\"Compute one EDM training loss step.\n    \n    Args:\n        model: EDM-preconditioned denoiser\n        x_0: clean data [B, C, H, W]\n        sigma_data: data standard deviation\n    Returns:\n        weighted loss scalar\n    \"\"\"\n    B = x_0.shape[0]\n    \n    # Sample sigma from log-normal distribution\n    log_sigma = {{sample_log_sigma}}\n    sigma = log_sigma.exp().view(-1, 1, 1, 1)\n    \n    # Generate noisy data\n    noise = torch.randn_like(x_0)\n    x_noisy = x_0 + sigma * noise\n    \n    # Model prediction\n    D_x = model(x_noisy, sigma)\n    \n    # Loss weighting\n    weight = (sigma ** 2 + sigma_data ** 2) / (sigma * sigma_data) ** 2\n    \n    loss = weight * ((D_x - x_0) ** 2)\n    return loss.mean()",
+            "blanks": [
+                {
+                    "id": "sample_log_sigma",
+                    "placeholder": "sample log-sigma from normal distribution",
+                    "acceptable": [
+                        "torch.randn(B, device=x_0.device) * P_std + P_mean",
+                        "P_mean + P_std * torch.randn(B, device=x_0.device)",
+                        "torch.normal(P_mean, P_std, size=(B,), device=x_0.device)"
+                    ],
+                    "hint": "Sample log(sigma) from N(P_mean, P_std^2). Use torch.randn scaled by P_std and shifted by P_mean."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_min_snr_gamma",
+            "title": "Min-SNR-gamma Loss Weighting",
+            "difficulty": "medium",
+            "description": "Implement the Min-SNR-gamma weighting strategy that clips the signal-to-noise ratio used for loss weighting at a maximum value gamma. This prevents extremely high weights at low noise levels from destabilizing training.",
+            "info": "The Min-SNR-gamma strategy (from 'Efficient Diffusion Training via Min-SNR Weighting') modifies the standard SNR-based loss weighting by clamping: weight(t) = min(SNR(t), gamma) / SNR(t), where SNR(t) = alpha_bar_t / (1 - alpha_bar_t). The gamma parameter (typically 5) acts as a soft upper bound on the effective weight. At high SNR (low noise, easy timesteps), the weight is reduced from 1 to gamma/SNR, preventing these already-easy steps from dominating gradients. At low SNR (high noise), the weight remains 1. This simple modification dramatically improves training convergence and final sample quality, and has become standard practice in modern diffusion training.",
+            "code": "import torch\n\ndef min_snr_gamma_weight(alpha_bar, t, gamma=5.0):\n    \"\"\"Compute Min-SNR-gamma loss weights.\n    \n    Args:\n        alpha_bar: cumulative product schedule [T]\n        t: sampled timesteps [B]\n        gamma: SNR clipping threshold\n    Returns:\n        weights [B]\n    \"\"\"\n    a_bar_t = alpha_bar[t]\n    snr = {{compute_snr}}\n    \n    # Min-SNR-gamma weighting\n    weight = {{min_snr_weight}}\n    return weight",
+            "blanks": [
+                {
+                    "id": "compute_snr",
+                    "placeholder": "signal-to-noise ratio from alpha_bar_t",
+                    "acceptable": [
+                        "a_bar_t / (1 - a_bar_t)",
+                        "a_bar_t / (1.0 - a_bar_t)"
+                    ],
+                    "hint": "SNR(t) = alpha_bar_t / (1 - alpha_bar_t). This is the ratio of signal power to noise power at timestep t."
+                },
+                {
+                    "id": "min_snr_weight",
+                    "placeholder": "clamped SNR divided by SNR",
+                    "acceptable": [
+                        "torch.clamp(snr, max=gamma) / snr",
+                        "torch.minimum(snr, torch.tensor(gamma)) / snr",
+                        "snr.clamp(max=gamma) / snr"
+                    ],
+                    "hint": "weight = min(SNR, gamma) / SNR. Use torch.clamp(snr, max=gamma) / snr."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_cfg_rescale",
+            "title": "CFG Rescale to Prevent Over-Saturation",
+            "difficulty": "medium",
+            "description": "Implement CFG rescale, a technique from Imagen that rescales the classifier-free guidance output to match the standard deviation of the conditional prediction. This prevents the color saturation artifacts that occur with high guidance scales.",
+            "info": "Classifier-free guidance (CFG) amplifies the conditional signal but also inflates the norm of the output, causing over-saturated, unnaturally vivid samples at high guidance scales. CFG rescale (from the Imagen paper) fixes this by computing the guided output as usual, then rescaling it so its per-channel standard deviation matches that of the conditional-only prediction. The rescale factor phi in [0, 1] controls the blend: result = phi * rescaled + (1 - phi) * guided. At phi=0 this is standard CFG; at phi=1 the std is fully normalized. A typical value is phi=0.7. This simple post-processing step allows using higher guidance scales without saturation artifacts.",
+            "code": "import torch\n\ndef cfg_with_rescale(cond_pred, uncond_pred, guidance_scale, rescale_phi=0.7):\n    \"\"\"Apply classifier-free guidance with rescaling.\n    \n    Args:\n        cond_pred: conditional model output [B, C, H, W]\n        uncond_pred: unconditional model output [B, C, H, W]\n        guidance_scale: CFG weight (e.g. 7.5)\n        rescale_phi: rescale interpolation factor\n    Returns:\n        guided output [B, C, H, W]\n    \"\"\"\n    # Standard CFG\n    guided = uncond_pred + guidance_scale * (cond_pred - uncond_pred)\n    \n    # Compute std of conditional and guided predictions\n    std_cond = cond_pred.std(dim=[2, 3], keepdim=True)\n    std_guided = guided.std(dim=[2, 3], keepdim=True)\n    \n    # Rescale guided to match conditional std\n    rescaled = guided * {{rescale_factor}}\n    \n    # Blend between rescaled and original guided\n    return {{blend_formula}}",
+            "blanks": [
+                {
+                    "id": "rescale_factor",
+                    "placeholder": "ratio to normalize guided std to match cond std",
+                    "acceptable": [
+                        "(std_cond / (std_guided + 1e-8))",
+                        "std_cond / (std_guided + 1e-8)",
+                        "std_cond / std_guided.clamp(min=1e-8)"
+                    ],
+                    "hint": "Multiply guided output by std_cond / std_guided to normalize its standard deviation. Add a small epsilon for numerical safety."
+                },
+                {
+                    "id": "blend_formula",
+                    "placeholder": "interpolate between rescaled and original guided",
+                    "acceptable": [
+                        "rescale_phi * rescaled + (1 - rescale_phi) * guided",
+                        "(1 - rescale_phi) * guided + rescale_phi * rescaled",
+                        "torch.lerp(guided, rescaled, rescale_phi)"
+                    ],
+                    "hint": "Blend: result = rescale_phi * rescaled + (1 - rescale_phi) * guided."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_dynamic_thresholding",
+            "title": "Dynamic Thresholding (Imagen-Style)",
+            "difficulty": "medium",
+            "description": "Implement dynamic thresholding as used in Imagen. Instead of clipping x_0 predictions to a fixed range, compute a percentile-based threshold and rescale values to stay within bounds. This allows high guidance scales without saturation.",
+            "info": "Dynamic thresholding, introduced in the Imagen paper, is an improvement over static clipping of predicted x_0. At each sampling step, the predicted x_0 is thresholded: compute the p-th percentile (e.g., p=99.5) of the absolute values, set s = max(percentile, 1.0), then clip x_0 to [-s, s] and divide by s. This adaptively determines the clipping range based on the actual data distribution at each step. When the prediction is well-behaved (percentile < 1), it behaves like standard [-1, 1] clipping. When predictions are extreme (as often happens with high CFG), it rescales them back proportionally rather than hard-clipping, preserving relative structure. This is critical for generating high-quality images with guidance scales above 10.",
+            "code": "import torch\n\ndef dynamic_threshold(x0_pred, percentile=0.995):\n    \"\"\"Apply dynamic thresholding to predicted x_0.\n    \n    Args:\n        x0_pred: predicted clean image [B, C, H, W]\n        percentile: quantile for threshold (e.g. 0.995)\n    Returns:\n        thresholded x0_pred\n    \"\"\"\n    B = x0_pred.shape[0]\n    flat = x0_pred.reshape(B, -1).abs()\n    \n    s = torch.quantile(flat, percentile, dim=1)\n    s = {{clamp_threshold}}\n    s = s.view(-1, 1, 1, 1)\n    \n    return {{clip_and_rescale}}",
+            "blanks": [
+                {
+                    "id": "clamp_threshold",
+                    "placeholder": "ensure threshold is at least 1.0",
+                    "acceptable": [
+                        "torch.clamp(s, min=1.0)",
+                        "s.clamp(min=1.0)",
+                        "torch.maximum(s, torch.ones_like(s))"
+                    ],
+                    "hint": "Use torch.clamp(s, min=1.0) so that when predictions are in [-1,1] range, we do standard clipping."
+                },
+                {
+                    "id": "clip_and_rescale",
+                    "placeholder": "clip x0_pred to [-s, s] then divide by s",
+                    "acceptable": [
+                        "torch.clamp(x0_pred, -s, s) / s",
+                        "x0_pred.clamp(-s, s) / s"
+                    ],
+                    "hint": "Clip to [-s, s] and divide by s: torch.clamp(x0_pred, -s, s) / s."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_score_distillation",
+            "title": "Score Distillation Sampling (SDS) Loss",
+            "difficulty": "hard",
+            "description": "Implement the Score Distillation Sampling (SDS) loss used in DreamFusion to optimize a differentiable 3D representation using a pretrained 2D diffusion model as a critic.",
+            "info": "Score Distillation Sampling (SDS), introduced in DreamFusion, enables text-to-3D generation by distilling a pretrained 2D diffusion model. Given a differentiable renderer that produces an image x = g(theta), SDS adds noise to get x_t, predicts the noise with the frozen diffusion model, and computes the gradient as w(t) * (eps_pred - eps). The key insight is that we do NOT backpropagate through the diffusion model (the U-Net Jacobian term is dropped). This makes the gradient cheap to compute while still providing a useful optimization signal. SDS tends to produce over-saturated, smooth results, which motivated follow-up works like VSD.",
+            "code": "import torch\n\ndef sds_loss(diffusion_model, rendered_image, text_embedding, \n            alpha_bar, guidance_scale=100.0):\n    \"\"\"Compute SDS loss for optimizing a differentiable renderer.\n    \n    Args:\n        diffusion_model: frozen pretrained diffusion model\n        rendered_image: differentiable rendering x = g(theta) [B, C, H, W]\n        text_embedding: CLIP/T5 text embeddings for conditioning\n        alpha_bar: noise schedule\n        guidance_scale: CFG scale\n    Returns:\n        sds_loss: scalar loss to backprop through the renderer\n    \"\"\"\n    B = rendered_image.shape[0]\n    device = rendered_image.device\n    \n    t = torch.randint(20, 980, (B,), device=device)\n    a_bar_t = alpha_bar[t].view(-1, 1, 1, 1)\n    \n    noise = torch.randn_like(rendered_image)\n    x_t = torch.sqrt(a_bar_t) * rendered_image + torch.sqrt(1 - a_bar_t) * noise\n    \n    with torch.no_grad():\n        eps_cond = diffusion_model(x_t, t, text_embedding)\n        eps_uncond = diffusion_model(x_t, t, None)\n        eps_pred = eps_uncond + guidance_scale * (eps_cond - eps_uncond)\n    \n    w = {{sds_weight}}\n    grad = w * (eps_pred - noise)\n    \n    loss = {{sds_loss_formula}}\n    return loss.mean()",
+            "blanks": [
+                {
+                    "id": "sds_weight",
+                    "placeholder": "noise-schedule-dependent weight",
+                    "acceptable": [
+                        "1 - a_bar_t",
+                        "(1 - a_bar_t)",
+                        "(1.0 - a_bar_t)"
+                    ],
+                    "hint": "A common SDS weight is w(t) = (1 - alpha_bar_t), which down-weights high-noise timesteps."
+                },
+                {
+                    "id": "sds_loss_formula",
+                    "placeholder": "pseudo-loss that produces the SDS gradient",
+                    "acceptable": [
+                        "0.5 * torch.sum(grad.detach() * rendered_image)",
+                        "(grad.detach() * rendered_image).sum() * 0.5",
+                        "0.5 * (grad.detach() * rendered_image).sum()"
+                    ],
+                    "hint": "The SDS 'loss' is constructed so that d(loss)/d(rendered_image) = grad. Use 0.5 * sum(grad.detach() * rendered_image)."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_truncated_diffusion",
+            "title": "Truncated Diffusion: Starting from Partially Noised Data",
+            "difficulty": "easy",
+            "description": "Implement truncated diffusion sampling that starts denoising from a partially noised version of a reference image instead of pure Gaussian noise. This is the basis for image-to-image generation (SDEdit/img2img).",
+            "info": "Truncated diffusion (used in SDEdit and img2img pipelines) adds noise to an input image up to some intermediate timestep t_start < T, then denoises from there. The strength parameter controls how much of the original image structure is preserved: high strength means more noise and more creative freedom, while low strength preserves more of the original. The noised image at timestep t_start is x_t = sqrt(alpha_bar_t) * x_ref + sqrt(1 - alpha_bar_t) * noise. Then standard DDIM/DDPM sampling proceeds from t_start down to 0. This provides a simple way to control the fidelity-creativity tradeoff.",
+            "code": "import torch\n\ndef truncated_diffusion_init(x_ref, alpha_bar, num_inference_steps, strength=0.75):\n    \"\"\"Initialize truncated diffusion from a reference image.\n    \n    Args:\n        x_ref: reference image [B, C, H, W] in [-1, 1]\n        alpha_bar: full noise schedule [T]\n        num_inference_steps: total DDIM steps if starting from pure noise\n        strength: fraction of steps to actually denoise (0=no change, 1=full denoise)\n    Returns:\n        x_t_start: noised reference image\n        start_step_index: which step index to start denoising from\n    \"\"\"\n    start_step_index = {{compute_start_step}}\n    \n    T = len(alpha_bar)\n    t_start = int((start_step_index / num_inference_steps) * (T - 1))\n    a_bar_t = alpha_bar[t_start]\n    \n    noise = torch.randn_like(x_ref)\n    x_t_start = torch.sqrt(a_bar_t) * x_ref + torch.sqrt(1 - a_bar_t) * noise\n    \n    return x_t_start, start_step_index",
+            "blanks": [
+                {
+                    "id": "compute_start_step",
+                    "placeholder": "number of denoising steps based on strength",
+                    "acceptable": [
+                        "int(num_inference_steps * strength)",
+                        "int(strength * num_inference_steps)",
+                        "round(num_inference_steps * strength)"
+                    ],
+                    "hint": "start_step_index = int(num_inference_steps * strength). If strength=0.75 and steps=50, we start at step 37."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_cold_diffusion",
+            "title": "Cold Diffusion: Deterministic Degradation Operator",
+            "difficulty": "medium",
+            "description": "Implement a cold diffusion forward process using a deterministic degradation (e.g., blurring) instead of Gaussian noise. Cold diffusion shows that the key mechanism of diffusion models is iterative refinement, not the stochastic noise process specifically.",
+            "info": "Cold Diffusion (Bansal et al. 2022) demonstrates that diffusion-style iterative generation works with deterministic degradation operators, not just Gaussian noise. The forward process applies progressively stronger degradation (e.g., Gaussian blur, downsampling, masking) parameterized by a severity level t. The reverse process learns to undo one step of degradation at a time. For Gaussian blur, the kernel size and/or sigma increase with t. The key insight is that iterative refinement through a sequence of degradation levels is what makes generation work, challenging the theoretical assumptions about score matching and Langevin dynamics.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef gaussian_blur_degradation(x_0, t, max_kernel_size=31, max_sigma=10.0, T=1000):\n    \"\"\"Apply Gaussian blur as a cold diffusion degradation.\n    \n    Args:\n        x_0: clean images [B, C, H, W]\n        t: degradation severity level (0 = clean, T = max blur)\n        max_kernel_size: maximum blur kernel size (must be odd)\n        max_sigma: maximum blur sigma\n        T: total number of degradation levels\n    Returns:\n        x_t: blurred images\n    \"\"\"\n    sigma_blur = (t / T) * max_sigma\n    if sigma_blur < 0.01:\n        return x_0\n    \n    ks = max_kernel_size\n    half = ks // 2\n    coords = torch.arange(ks, dtype=torch.float32, device=x_0.device) - half\n    kernel_1d = {{gaussian_kernel_1d}}\n    kernel_1d = kernel_1d / kernel_1d.sum()\n    \n    kernel_2d = kernel_1d.unsqueeze(1) * kernel_1d.unsqueeze(0)\n    kernel_2d = kernel_2d.view(1, 1, ks, ks).repeat(x_0.shape[1], 1, 1, 1)\n    \n    x_t = F.conv2d(x_0, kernel_2d, padding=half, groups=x_0.shape[1])\n    return x_t",
+            "blanks": [
+                {
+                    "id": "gaussian_kernel_1d",
+                    "placeholder": "1D Gaussian kernel from coords and sigma_blur",
+                    "acceptable": [
+                        "torch.exp(-coords ** 2 / (2 * sigma_blur ** 2))",
+                        "torch.exp(-(coords ** 2) / (2 * sigma_blur ** 2))",
+                        "(-coords ** 2 / (2 * sigma_blur ** 2)).exp()",
+                        "torch.exp(-0.5 * (coords / sigma_blur) ** 2)"
+                    ],
+                    "hint": "A Gaussian kernel is exp(-x^2 / (2*sigma^2)). Use torch.exp(-coords ** 2 / (2 * sigma_blur ** 2))."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_adaptive_step_schedule",
+            "title": "Adaptive Step Scheduling Based on Local Error",
+            "difficulty": "hard",
+            "description": "Implement an adaptive step-size controller for diffusion ODE sampling that adjusts the step size based on a local error estimate. If the error is too large, reject the step and reduce the step size; if small, accept and potentially increase it.",
+            "info": "Adaptive step-size control estimates the local truncation error by comparing solutions of different orders. For diffusion sampling, one approach compares a 1st-order (Euler) and 2nd-order (Heun) solution: the difference gives an error estimate. If the error exceeds a tolerance (atol + rtol * |x|), the step is rejected and retried with a smaller step. If the error is well below tolerance, the next step is made larger. The step-size update factor is typically (tol / error)^(1/(order+1)) clamped to a safe range. This can significantly reduce the total number of function evaluations for a given quality target.",
+            "code": "import torch\n\ndef adaptive_step(denoiser, x, sigma, sigma_next, atol=1e-3, rtol=1e-2):\n    \"\"\"One adaptive step using Euler-Heun error estimation.\n    \n    Returns:\n        x_next, sigma_actual_next, accepted (bool)\n    \"\"\"\n    h = sigma_next - sigma\n    \n    d_cur = (x - denoiser(x, sigma)) / sigma\n    x_euler = x + h * d_cur\n    \n    if sigma_next > 0:\n        d_next = (x_euler - denoiser(x_euler, sigma_next)) / sigma_next\n        x_heun = x + h * (d_cur + d_next) / 2\n    else:\n        return x_euler, sigma_next, True\n    \n    error = (x_heun - x_euler).abs()\n    tolerance = atol + rtol * x.abs()\n    error_ratio = {{compute_error_ratio}}\n    \n    accepted = error_ratio <= 1.0\n    \n    safety = 0.9\n    factor = safety * error_ratio ** (-1.0 / 3.0)\n    factor = torch.clamp(torch.tensor(factor), 0.25, 4.0).item()\n    \n    if accepted:\n        return x_heun, sigma_next, True\n    else:\n        sigma_adjusted = sigma + h * factor\n        return x, sigma_adjusted, False",
+            "blanks": [
+                {
+                    "id": "compute_error_ratio",
+                    "placeholder": "max ratio of error to tolerance across all elements",
+                    "acceptable": [
+                        "(error / tolerance).max().item()",
+                        "torch.max(error / tolerance).item()",
+                        "(error / (tolerance + 1e-10)).max().item()"
+                    ],
+                    "hint": "Compute the maximum element-wise ratio error / tolerance. If this exceeds 1.0, the step is rejected."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_denoiser_eps_to_x0",
+            "title": "Denoiser Parameterization: Epsilon to x_0 Conversion",
+            "difficulty": "easy",
+            "description": "Implement conversions between the three common denoiser parameterizations: epsilon-prediction, x_0-prediction, and v-prediction. Being able to convert between them is essential for mixing components from different diffusion frameworks.",
+            "info": "Diffusion models can parameterize the denoiser in different ways. Epsilon-prediction: the model predicts the noise added to x_0. x_0-prediction: the model directly predicts the clean data. v-prediction: the model predicts v = sqrt(alpha_bar)*eps - sqrt(1-alpha_bar)*x_0. All three are mathematically equivalent -- given any one output plus x_t and alpha_bar_t, you can derive the other two. The conversions are: x_0 = (x_t - sqrt(1-a)*eps) / sqrt(a), and from v: x_0 = sqrt(a)*x_t - sqrt(1-a)*v, eps = sqrt(1-a)*x_t + sqrt(a)*v.",
+            "code": "import torch\n\ndef eps_to_x0(x_t, eps_pred, alpha_bar_t):\n    \"\"\"Convert epsilon prediction to x_0 prediction.\"\"\"\n    a = alpha_bar_t\n    return {{eps_to_x0_formula}}\n\ndef v_to_x0(x_t, v_pred, alpha_bar_t):\n    \"\"\"Convert v-prediction to x_0 prediction.\"\"\"\n    a = alpha_bar_t\n    return {{v_to_x0_formula}}",
+            "blanks": [
+                {
+                    "id": "eps_to_x0_formula",
+                    "placeholder": "recover x_0 from epsilon prediction",
+                    "acceptable": [
+                        "(x_t - torch.sqrt(1 - a) * eps_pred) / torch.sqrt(a)",
+                        "(x_t - (1 - a).sqrt() * eps_pred) / a.sqrt()",
+                        "(x_t - (1 - a) ** 0.5 * eps_pred) / a ** 0.5"
+                    ],
+                    "hint": "x_0 = (x_t - sqrt(1 - alpha_bar) * eps) / sqrt(alpha_bar)."
+                },
+                {
+                    "id": "v_to_x0_formula",
+                    "placeholder": "recover x_0 from v-prediction",
+                    "acceptable": [
+                        "torch.sqrt(a) * x_t - torch.sqrt(1 - a) * v_pred",
+                        "a.sqrt() * x_t - (1 - a).sqrt() * v_pred",
+                        "a ** 0.5 * x_t - (1 - a) ** 0.5 * v_pred"
+                    ],
+                    "hint": "From v-prediction: x_0 = sqrt(alpha_bar) * x_t - sqrt(1 - alpha_bar) * v."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_snr_timestep_sampling",
+            "title": "SNR-Based Timestep Sampling for Training",
+            "difficulty": "medium",
+            "description": "Implement a timestep sampler that biases training toward timesteps with specific SNR ranges. Instead of uniform timestep sampling, weight the probability of each timestep by the change in SNR.",
+            "info": "Uniform timestep sampling during diffusion training is suboptimal because different timesteps have vastly different learning signals. SNR-based sampling weights each timestep proportionally to the magnitude of the SNR derivative: p(t) proportional to |d(SNR)/dt|. This concentrates samples on timesteps where the SNR changes rapidly, which is where the model must make the sharpest transitions between noise prediction and signal recovery. In practice, this is implemented by computing the absolute differences in SNR between consecutive timesteps, normalizing to a probability distribution, and sampling from this categorical distribution.",
+            "code": "import torch\n\ndef snr_weighted_timestep_sampler(alpha_bar, batch_size):\n    \"\"\"Sample timesteps weighted by SNR change rate.\n    \n    Args:\n        alpha_bar: cumulative product schedule [T]\n        batch_size: number of timesteps to sample\n    Returns:\n        sampled timesteps [batch_size]\n    \"\"\"\n    snr = alpha_bar / (1 - alpha_bar + 1e-8)\n    \n    snr_diff = {{compute_snr_diff}}\n    \n    probs = snr_diff / snr_diff.sum()\n    indices = torch.multinomial(probs, batch_size, replacement=True)\n    return indices",
+            "blanks": [
+                {
+                    "id": "compute_snr_diff",
+                    "placeholder": "absolute differences of consecutive SNR values",
+                    "acceptable": [
+                        "torch.abs(snr[1:] - snr[:-1])",
+                        "(snr[1:] - snr[:-1]).abs()",
+                        "torch.diff(snr).abs()",
+                        "torch.abs(torch.diff(snr))"
+                    ],
+                    "hint": "Compute |SNR(t+1) - SNR(t)| for consecutive timesteps. Use torch.abs(snr[1:] - snr[:-1]) or torch.diff(snr).abs()."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_soft_diffusion",
+            "title": "Soft Diffusion: Linear Degradation Interpolation",
+            "difficulty": "medium",
+            "description": "Implement the forward process for soft diffusion, where the degradation at each timestep is a linear interpolation between the clean image and a fully degraded version.",
+            "info": "Soft diffusion (Daras et al. 2023) generalizes the diffusion framework by defining forward corruption as a linear interpolation: x_t = (1-t/T)*x_0 + (t/T)*x_degraded, where x_degraded is a deterministic corruption of x_0. Optional noise is added with a separate schedule. This formulation unifies several approaches: when x_degraded is Gaussian noise, it recovers standard diffusion. When x_degraded is a blurred version, it creates a blur-denoise process. Soft diffusion enables task-specific corruption schedules while maintaining the iterative refinement framework.",
+            "code": "import torch\n\ndef soft_diffusion_forward(x_0, x_degraded, t, T, noise_scale=0.1):\n    \"\"\"Soft diffusion forward process.\n    \n    Args:\n        x_0: clean images [B, C, H, W]\n        x_degraded: fully degraded target [B, C, H, W]\n        t: current timestep [B]\n        T: total timesteps\n        noise_scale: optional Gaussian noise magnitude\n    Returns:\n        x_t: corrupted images at timestep t\n    \"\"\"\n    alpha = (t.float() / T).view(-1, 1, 1, 1)\n    \n    x_t = {{interpolation}}\n    \n    if noise_scale > 0:\n        noise_std = noise_scale * torch.sin(alpha * 3.14159).squeeze()\n        noise_std = noise_std.view(-1, 1, 1, 1)\n        x_t = x_t + noise_std * torch.randn_like(x_t)\n    \n    return x_t",
+            "blanks": [
+                {
+                    "id": "interpolation",
+                    "placeholder": "linear blend from x_0 to x_degraded controlled by alpha",
+                    "acceptable": [
+                        "(1 - alpha) * x_0 + alpha * x_degraded",
+                        "x_0 * (1 - alpha) + x_degraded * alpha",
+                        "torch.lerp(x_0, x_degraded, alpha)"
+                    ],
+                    "hint": "x_t = (1 - alpha) * x_0 + alpha * x_degraded, where alpha = t/T."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_heat_dissipation_diffusion",
+            "title": "Heat Dissipation Diffusion: PDE-Based Degradation",
+            "difficulty": "hard",
+            "description": "Implement the forward process of heat dissipation diffusion, which uses the heat equation as the degradation operator. The image evolves according to the heat PDE, efficiently computed in the Fourier domain.",
+            "info": "Heat dissipation diffusion (Rissanen et al. 2023) replaces Gaussian noise addition with the solution of the heat equation du/dt = k * nabla^2(u). In the Fourier domain, this has a closed-form solution: each frequency component (kx, ky) is damped by exp(-k*(kx^2+ky^2)*t). Low frequencies persist while high frequencies decay exponentially, creating a physically motivated progressive degradation. The Fourier-domain implementation is efficient: FFT the image, multiply by the frequency-dependent damping factor, then inverse FFT. This creates a natural coarse-to-fine generation process.",
+            "code": "import torch\nimport torch.fft as fft\n\ndef heat_dissipation_forward(x_0, t, k=1.0, T=1000):\n    \"\"\"Heat equation forward process in Fourier domain.\n    \n    Args:\n        x_0: clean images [B, C, H, W]\n        t: diffusion time (scalar)\n        k: diffusion coefficient\n    Returns:\n        x_t: heat-dissipated images\n    \"\"\"\n    B, C, H, W = x_0.shape\n    time = t / T\n    \n    freq_y = torch.fft.fftfreq(H, device=x_0.device).view(1, 1, H, 1)\n    freq_x = torch.fft.fftfreq(W, device=x_0.device).view(1, 1, 1, W)\n    freq_sq = freq_y ** 2 + freq_x ** 2\n    \n    damping = {{heat_damping}}\n    \n    x_freq = fft.fft2(x_0)\n    x_t_freq = x_freq * damping\n    x_t = fft.ifft2(x_t_freq).real\n    \n    return x_t",
+            "blanks": [
+                {
+                    "id": "heat_damping",
+                    "placeholder": "frequency-dependent exponential damping",
+                    "acceptable": [
+                        "torch.exp(-k * freq_sq * time)",
+                        "(-k * freq_sq * time).exp()",
+                        "torch.exp(-k * time * freq_sq)"
+                    ],
+                    "hint": "The heat equation solution damps each frequency by exp(-k * |freq|^2 * t). Use torch.exp(-k * freq_sq * time)."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_variational_score_distillation",
+            "title": "Variational Score Distillation (VSD) Loss",
+            "difficulty": "hard",
+            "description": "Implement the Variational Score Distillation loss that improves upon SDS by using a learned LoRA diffusion model to estimate the score of the rendered image distribution, reducing the over-smoothing artifacts of standard SDS.",
+            "info": "Variational Score Distillation (VSD), from ProlificDreamer, addresses the mode-seeking behavior of SDS by introducing a second (LoRA fine-tuned) diffusion model that approximates the score of the current rendered image distribution. While SDS uses the prior score minus a point estimate, VSD computes the difference between the pretrained model's score and the LoRA model's score. The LoRA model is trained online with the actual rendered images. This yields gradients that encourage the rendered images to match the pretrained model's distribution rather than collapse to a single mode.",
+            "code": "import torch\n\ndef vsd_loss(pretrained_model, lora_model, rendered_image, text_emb,\n            alpha_bar, guidance_scale=7.5):\n    \"\"\"Compute VSD loss.\n    \n    Args:\n        pretrained_model: frozen pretrained diffusion model\n        lora_model: trainable LoRA diffusion model (online updated)\n        rendered_image: differentiable rendering [B, C, H, W]\n        text_emb: text conditioning embeddings\n        alpha_bar: noise schedule\n    Returns:\n        vsd_loss: scalar loss\n    \"\"\"\n    B = rendered_image.shape[0]\n    device = rendered_image.device\n    \n    t = torch.randint(20, 980, (B,), device=device)\n    a_bar_t = alpha_bar[t].view(-1, 1, 1, 1)\n    \n    noise = torch.randn_like(rendered_image)\n    x_t = torch.sqrt(a_bar_t) * rendered_image + torch.sqrt(1 - a_bar_t) * noise\n    \n    with torch.no_grad():\n        eps_pretrained_c = pretrained_model(x_t, t, text_emb)\n        eps_pretrained_u = pretrained_model(x_t, t, None)\n        eps_pretrained = eps_pretrained_u + guidance_scale * (eps_pretrained_c - eps_pretrained_u)\n    \n    with torch.no_grad():\n        eps_lora = lora_model(x_t, t, text_emb)\n    \n    w = (1 - a_bar_t)\n    grad = {{vsd_gradient}}\n    \n    loss = (grad.detach() * rendered_image).sum() * 0.5\n    return loss.mean()",
+            "blanks": [
+                {
+                    "id": "vsd_gradient",
+                    "placeholder": "gradient from difference of pretrained and LoRA scores",
+                    "acceptable": [
+                        "w * (eps_pretrained - eps_lora)",
+                        "(eps_pretrained - eps_lora) * w"
+                    ],
+                    "hint": "VSD gradient = w(t) * (eps_pretrained - eps_lora). The LoRA model replaces the noise baseline used in SDS."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_multistep_consistency",
+            "title": "Multi-Step Consistency Distillation",
+            "difficulty": "hard",
+            "description": "Implement the multi-step consistency training loss where a student model learns to jump multiple ODE steps at once. The target is computed by running the teacher model for k steps, and the student must match this in a single evaluation.",
+            "info": "Multi-step consistency distillation generalizes consistency distillation by requiring the student model to match the output of k teacher steps in a single forward pass. Given a noisy sample x_t, the teacher performs k steps of an ODE solver to produce x_{t-k}, and the student must directly predict this same result. The student parameters are updated using an EMA teacher or stop-gradient. This produces a model that can generate high-quality samples in N/k steps instead of N steps. Multi-step consistency allows trading off between sample quality and inference speed by adjusting k.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef multistep_consistency_loss(student, teacher_ema, x_0, alpha_bar, \n                                k_steps=4, num_ddim_steps=50):\n    \"\"\"Multi-step consistency distillation loss.\"\"\"\n    B = x_0.shape[0]\n    device = x_0.device\n    T = len(alpha_bar)\n    \n    step_indices = torch.linspace(0, T - 1, num_ddim_steps).long()\n    \n    max_idx = num_ddim_steps - k_steps - 1\n    idx = torch.randint(1, max_idx + 1, (B,), device=device)\n    \n    t_start = step_indices[idx]\n    \n    noise = torch.randn_like(x_0)\n    a_bar_start = alpha_bar[t_start].view(-1, 1, 1, 1)\n    x_t = torch.sqrt(a_bar_start) * x_0 + torch.sqrt(1 - a_bar_start) * noise\n    \n    # Teacher: run k DDIM steps\n    x_teacher = x_t.detach()\n    with torch.no_grad():\n        for step in range(k_steps):\n            t_cur = step_indices[idx + step]\n            t_nxt = step_indices[idx + step + 1]\n            a_cur = alpha_bar[t_cur].view(-1, 1, 1, 1)\n            a_nxt = alpha_bar[t_nxt].view(-1, 1, 1, 1)\n            eps = teacher_ema(x_teacher, t_cur)\n            x0_pred = (x_teacher - torch.sqrt(1 - a_cur) * eps) / torch.sqrt(a_cur)\n            x_teacher = torch.sqrt(a_nxt) * x0_pred + torch.sqrt(1 - a_nxt) * eps\n    \n    student_pred = student(x_t, t_start)\n    teacher_target = {{teacher_target}}\n    \n    return F.mse_loss(student_pred, teacher_target)",
+            "blanks": [
+                {
+                    "id": "teacher_target",
+                    "placeholder": "stop gradient on the teacher's multi-step output",
+                    "acceptable": [
+                        "x_teacher.detach()",
+                        "x_teacher.clone().detach()",
+                        "x_teacher.data"
+                    ],
+                    "hint": "The teacher's k-step output must be detached: x_teacher.detach()."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_batched_cfg_sampling",
+            "title": "Batched CFG Sampling (Conditional + Unconditional in One Forward Pass)",
+            "difficulty": "easy",
+            "description": "Implement an efficient batched classifier-free guidance forward pass that evaluates both conditional and unconditional predictions in a single batched model call, rather than two separate forward passes.",
+            "info": "Classifier-free guidance requires evaluating the model twice per step: once with and once without conditioning. A naive implementation makes two separate forward passes, wasting GPU parallelism. The standard optimization is to concatenate the conditional and unconditional inputs into a single batch, run one forward pass, then split the outputs. This doubles the batch dimension but uses only one model call, which is significantly faster due to GPU parallelism. This batched approach is used in virtually all production diffusion sampling pipelines.",
+            "code": "import torch\n\ndef batched_cfg_step(model, x_t, t, cond_emb, uncond_emb, guidance_scale=7.5):\n    \"\"\"Efficient batched CFG: one model call for both branches.\"\"\"\n    x_double = torch.cat([x_t, x_t], dim=0)\n    t_double = torch.cat([t, t], dim=0)\n    emb_double = {{concat_embeddings}}\n    \n    eps_double = model(x_double, t_double, emb_double)\n    \n    eps_cond, eps_uncond = eps_double.chunk(2, dim=0)\n    \n    return eps_uncond + guidance_scale * (eps_cond - eps_uncond)",
+            "blanks": [
+                {
+                    "id": "concat_embeddings",
+                    "placeholder": "concatenate conditional and unconditional embeddings",
+                    "acceptable": [
+                        "torch.cat([cond_emb, uncond_emb], dim=0)",
+                        "torch.cat((cond_emb, uncond_emb), dim=0)"
+                    ],
+                    "hint": "Stack conditional and unconditional embeddings along batch dimension: torch.cat([cond_emb, uncond_emb], dim=0)."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_sigma_to_timestep",
+            "title": "Sigma-to-Timestep Mapping for Continuous Schedules",
+            "difficulty": "easy",
+            "description": "Implement a function that maps from continuous sigma values (used in EDM/Karras framework) to discrete timesteps (used in DDPM framework) by finding the closest alpha_bar value.",
+            "info": "Different diffusion frameworks parameterize noise differently. DDPM uses discrete integer timesteps t with alpha_bar schedule, while EDM uses continuous sigma values where sigma = sqrt((1 - alpha_bar) / alpha_bar). Converting between them is essential for compatibility. Given a sigma, the corresponding alpha_bar is 1 / (1 + sigma^2), and we find the closest discrete timestep. This mapping enables using advanced ODE solvers (like Karras/Heun samplers) with models trained in the DDPM framework.",
+            "code": "import torch\n\ndef sigma_to_timestep(sigma, alpha_bar):\n    \"\"\"Map continuous sigma values to nearest discrete timesteps.\n    \n    Args:\n        sigma: continuous noise levels [B]\n        alpha_bar: discrete DDPM schedule [T]\n    Returns:\n        timesteps: nearest integer timesteps [B]\n    \"\"\"\n    alpha_bar_target = {{sigma_to_alpha_bar}}\n    \n    diffs = (alpha_bar.unsqueeze(0) - alpha_bar_target.unsqueeze(1)).abs()\n    timesteps = diffs.argmin(dim=1)\n    return timesteps",
+            "blanks": [
+                {
+                    "id": "sigma_to_alpha_bar",
+                    "placeholder": "convert sigma to alpha_bar",
+                    "acceptable": [
+                        "1.0 / (1.0 + sigma ** 2)",
+                        "1 / (1 + sigma ** 2)",
+                        "1.0 / (sigma ** 2 + 1.0)"
+                    ],
+                    "hint": "alpha_bar = 1 / (1 + sigma^2). This comes from sigma = sqrt((1-alpha_bar)/alpha_bar)."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_blurring_diffusion",
+            "title": "Blurring Diffusion: Combined Noise and Blur Forward Process",
+            "difficulty": "hard",
+            "description": "Implement the forward process for blurring diffusion models that simultaneously add Gaussian noise and apply Gaussian blur, with both degradations increasing with timestep. The blur is applied efficiently in Fourier space.",
+            "info": "Blurring diffusion (Hoogeboom & Salimans 2023) combines Gaussian noise addition with progressive blurring in a single forward process. In Fourier space, the forward process is: X_t(f) = D(f,t) * X_0(f) + sigma(f,t) * N(f), where D(f,t) = exp(-f^2 * t) is frequency-dependent damping and sigma(f,t) = sqrt(1 - D(f,t)^2) ensures variance preservation. This creates a natural coarse-to-fine generation process where the reverse process first resolves global structure (low frequencies) and then adds fine detail (high frequencies).",
+            "code": "import torch\nimport torch.fft as fft\n\ndef blurring_diffusion_forward(x_0, t, T=1000):\n    \"\"\"Forward process combining blur and noise in Fourier domain.\"\"\"\n    B, C, H, W = x_0.shape\n    time = (t.float() / T).view(-1, 1, 1, 1)\n    \n    fy = torch.fft.fftfreq(H, device=x_0.device).view(1, 1, H, 1)\n    fx = torch.fft.fftfreq(W, device=x_0.device).view(1, 1, 1, W)\n    freq_sq = fy ** 2 + fx ** 2\n    \n    D = torch.exp(-freq_sq * time * 50.0)\n    \n    noise_std = {{noise_std_formula}}\n    \n    X_0 = fft.fft2(x_0)\n    noise = torch.randn_like(x_0)\n    N = fft.fft2(noise)\n    \n    X_t = D * X_0 + noise_std * N\n    x_t = fft.ifft2(X_t).real\n    return x_t",
+            "blanks": [
+                {
+                    "id": "noise_std_formula",
+                    "placeholder": "variance-preserving noise std from damping D",
+                    "acceptable": [
+                        "torch.sqrt(1 - D ** 2)",
+                        "(1 - D ** 2).sqrt()",
+                        "(1 - D.pow(2)).sqrt()",
+                        "torch.sqrt(1.0 - D ** 2)"
+                    ],
+                    "hint": "For variance preservation: noise_std = sqrt(1 - D^2). This ensures total variance equals 1."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_euler_maruyama_sde",
+            "title": "Euler-Maruyama SDE Sampler",
+            "difficulty": "medium",
+            "description": "Implement one step of the Euler-Maruyama method for sampling from the reverse-time SDE of a diffusion model. Unlike ODE-based samplers, this includes a stochastic (Brownian motion) term.",
+            "info": "The reverse-time SDE for diffusion models is dx = [f(x,t) - g(t)^2 * score(x,t)] dt + g(t) dw, where f and g come from the forward SDE, score is the learned score function, and dw is Brownian motion. The Euler-Maruyama method discretizes this: x_{t-dt} = x_t + [f - g^2 * score] * dt + g * sqrt(|dt|) * z. For the variance-exploding SDE, f=0 and g(t)=sqrt(d[sigma^2]/dt). SDE samplers typically produce higher diversity than ODE samplers but require more steps.",
+            "code": "import torch\n\ndef euler_maruyama_step(score_model, x, t, t_prev, sigma_schedule):\n    \"\"\"One Euler-Maruyama step for VE-SDE reverse sampling.\"\"\"\n    dt = t_prev - t  # Negative since t_prev < t\n    sigma_t = sigma_schedule(t)\n    \n    score = score_model(x, sigma_t)\n    \n    eps = 1e-5\n    g_sq = (sigma_schedule(t + eps) ** 2 - sigma_schedule(t) ** 2) / eps\n    \n    drift = -g_sq * score * dt\n    \n    noise = torch.randn_like(x)\n    diffusion = {{stochastic_term}}\n    \n    return x + drift + diffusion",
+            "blanks": [
+                {
+                    "id": "stochastic_term",
+                    "placeholder": "Brownian motion term with correct scaling",
+                    "acceptable": [
+                        "torch.sqrt(g_sq * torch.abs(torch.tensor(dt))) * noise",
+                        "(g_sq * abs(dt)) ** 0.5 * noise",
+                        "torch.sqrt(torch.tensor(g_sq * abs(dt))) * noise"
+                    ],
+                    "hint": "The stochastic term is g(t)*sqrt(|dt|)*noise = sqrt(g^2*|dt|)*noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_inference_tiling",
+            "title": "Tiled Inference for High-Resolution Diffusion Sampling",
+            "difficulty": "medium",
+            "description": "Implement a tiled sampling approach that allows generating images larger than the model's training resolution by processing overlapping tiles and blending them.",
+            "info": "Diffusion models are typically trained at a fixed resolution, but users often need higher-resolution outputs. Tiled inference splits the latent/pixel space into overlapping tiles, denoises each tile independently, then blends overlapping regions using a weighting mask. The blend mask typically uses a cosine or linear ramp in the overlap region so that transitions are smooth. Without overlapping and blending, visible seams appear at tile boundaries. With proper overlap (e.g., 25% of tile size), the results are nearly seamless. This approach trades compute time for memory.",
+            "code": "import torch\n\ndef create_tile_blend_mask(tile_h, tile_w, overlap, device='cpu'):\n    \"\"\"Create a blending mask for tiled inference.\"\"\"\n    mask_h = torch.ones(tile_h, device=device)\n    if overlap > 0:\n        ramp = torch.linspace(0, 1, overlap, device=device)\n        mask_h[:overlap] = ramp\n        mask_h[-overlap:] = {{reverse_ramp}}\n    \n    mask_w = torch.ones(tile_w, device=device)\n    if overlap > 0:\n        mask_w[:overlap] = ramp\n        mask_w[-overlap:] = ramp.flip(0)\n    \n    mask = mask_h.unsqueeze(1) * mask_w.unsqueeze(0)\n    return mask.unsqueeze(0).unsqueeze(0)",
+            "blanks": [
+                {
+                    "id": "reverse_ramp",
+                    "placeholder": "reversed ramp for the trailing overlap",
+                    "acceptable": [
+                        "ramp.flip(0)",
+                        "torch.flip(ramp, [0])",
+                        "ramp.flip(dims=[0])",
+                        "1 - ramp"
+                    ],
+                    "hint": "The trailing edge ramp goes from 1 to 0, which is the reverse of the leading ramp. Use ramp.flip(0)."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_ancestral_euler",
+            "title": "Ancestral Euler Sampler (Euler-a)",
+            "difficulty": "medium",
+            "description": "Implement the ancestral Euler sampler (Euler-a), which combines an Euler ODE step with stochastic noise injection at each step.",
+            "info": "The ancestral Euler sampler (commonly called 'Euler a' in Stable Diffusion UIs) modifies the standard Euler ODE step by injecting noise at each step. After computing the Euler update direction, it determines how much noise to add based on the ratio of adjacent sigma values. The key relations are: sigma_down = sqrt(sigma_next^2 - sigma_up^2) and sigma_up = sigma_next * sqrt(1 - (sigma_next/sigma)^2). When sigma_up = 0, this reduces to the deterministic Euler sampler. The stochastic term improves diversity at the cost of slightly more steps for convergence.",
+            "code": "import torch\n\ndef euler_ancestral_step(denoiser, x, sigma, sigma_next):\n    \"\"\"One step of the ancestral Euler sampler.\"\"\"\n    d = (x - denoiser(x, sigma)) / sigma\n    \n    sigma_up = sigma_next * torch.sqrt(torch.tensor(\n        1 - (sigma_next / sigma) ** 2\n    ).clamp(min=0))\n    sigma_down = {{compute_sigma_down}}\n    \n    x_next = x + (sigma_down - sigma) * d\n    \n    if sigma_next > 0:\n        noise = torch.randn_like(x)\n        x_next = x_next + sigma_up * noise\n    \n    return x_next",
+            "blanks": [
+                {
+                    "id": "compute_sigma_down",
+                    "placeholder": "effective sigma after noise injection is accounted for",
+                    "acceptable": [
+                        "torch.sqrt(sigma_next ** 2 - sigma_up ** 2)",
+                        "(sigma_next ** 2 - sigma_up ** 2).sqrt()",
+                        "(sigma_next ** 2 - sigma_up ** 2) ** 0.5"
+                    ],
+                    "hint": "sigma_down = sqrt(sigma_next^2 - sigma_up^2). The deterministic step goes to sigma_down, and noise at sigma_up brings total noise to sigma_next."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_edm_sigma_sampling",
+            "title": "EDM Log-Normal Sigma Sampling for Training",
+            "difficulty": "easy",
+            "description": "Implement the sigma sampling distribution used during EDM training. Sigmas are sampled from a log-normal distribution, which ensures balanced training across the wide range of noise levels.",
+            "info": "The EDM framework samples training noise levels from a log-normal distribution: ln(sigma) ~ N(P_mean, P_std^2), with recommended defaults P_mean = -1.2, P_std = 1.2. This distribution is centered around sigma approximately 0.3 (exp(-1.2)), which is a moderate noise level. The log-normal distribution is heavy-tailed, so extreme noise levels are still sampled occasionally. This is much better than uniform timestep sampling because it naturally spends more training compute on the noise levels that matter most for perceptual quality. The distribution can be tuned for specific datasets by adjusting P_mean and P_std.",
+            "code": "import torch\n\ndef sample_edm_sigmas(batch_size, P_mean=-1.2, P_std=1.2, device='cpu'):\n    \"\"\"Sample noise levels for EDM training.\n    \n    Args:\n        batch_size: number of sigmas to sample\n        P_mean: mean of log-sigma distribution\n        P_std: std of log-sigma distribution\n    Returns:\n        sigmas: [batch_size] tensor of noise levels\n    \"\"\"\n    log_sigma = torch.randn(batch_size, device=device) * P_std + P_mean\n    sigmas = {{convert_to_sigma}}\n    return sigmas",
+            "blanks": [
+                {
+                    "id": "convert_to_sigma",
+                    "placeholder": "exponentiate log-sigma",
+                    "acceptable": [
+                        "log_sigma.exp()",
+                        "torch.exp(log_sigma)"
+                    ],
+                    "hint": "Since log_sigma = ln(sigma), we recover sigma = exp(log_sigma). Use log_sigma.exp() or torch.exp(log_sigma)."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_snr_schedule_analysis",
+            "title": "Analyzing SNR Across Noise Schedules",
+            "difficulty": "easy",
+            "description": "Implement a function that computes the signal-to-noise ratio (SNR) profile for a given alpha_bar schedule and identifies the timestep where SNR equals 1 (equal signal and noise power).",
+            "info": "The signal-to-noise ratio at timestep t is SNR(t) = alpha_bar_t / (1 - alpha_bar_t). For the linear schedule, SNR decreases roughly exponentially. For the cosine schedule, the decrease is more gradual. The point where SNR = 1 (0 dB) is where signal and noise have equal power. Schedules that reach SNR=1 too quickly waste steps on pure noise. Comparing SNR profiles is the recommended way to evaluate and design noise schedules, as it directly relates to the difficulty of the denoising task at each step.",
+            "code": "import torch\n\ndef analyze_snr(alpha_bar):\n    \"\"\"Analyze the SNR profile of a noise schedule.\n    \n    Args:\n        alpha_bar: cumulative product schedule [T]\n    Returns:\n        snr, snr_db, crossing_t\n    \"\"\"\n    snr = alpha_bar / (1.0 - alpha_bar + 1e-8)\n    snr_db = {{snr_to_db}}\n    \n    crossing_mask = snr < 1.0\n    if crossing_mask.any():\n        crossing_t = crossing_mask.long().argmax().item()\n    else:\n        crossing_t = len(alpha_bar) - 1\n    \n    return snr, snr_db, crossing_t",
+            "blanks": [
+                {
+                    "id": "snr_to_db",
+                    "placeholder": "convert SNR to decibels",
+                    "acceptable": [
+                        "10 * torch.log10(snr + 1e-8)",
+                        "10.0 * torch.log10(snr + 1e-8)",
+                        "10 * torch.log10(snr.clamp(min=1e-8))",
+                        "10.0 * (snr + 1e-8).log10()"
+                    ],
+                    "hint": "SNR in decibels is 10 * log10(SNR). Use torch.log10 with a small epsilon for numerical stability."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_sigma_schedule_exponential",
+            "title": "Exponential Sigma Schedule",
+            "difficulty": "easy",
+            "description": "Implement an exponential sigma schedule that spaces noise levels geometrically between sigma_max and sigma_min. This is one of the simplest continuous-time schedules and serves as a baseline for Karras.",
+            "info": "The exponential (geometric) sigma schedule spaces N noise levels such that the ratio between consecutive sigmas is constant: sigma_i = sigma_max * (sigma_min / sigma_max)^(i/(N-1)). Equivalently, log(sigma) is linearly spaced. This simple schedule works surprisingly well and is used as a default in many frameworks. It ensures even coverage in log-space, which is natural since denoising difficulty roughly scales with log(sigma). Compared to the Karras schedule (rho=7), the exponential schedule (equivalent to rho=1) is slightly suboptimal but much simpler.",
+            "code": "import torch\nimport math\n\ndef exponential_sigmas(n_steps, sigma_min=0.002, sigma_max=80.0):\n    \"\"\"Build an exponential (geometric) sigma schedule.\"\"\"\n    log_sigmas = {{log_space_sigmas}}\n    sigmas = torch.exp(log_sigmas)\n    \n    return torch.cat([sigmas, torch.zeros(1)])",
+            "blanks": [
+                {
+                    "id": "log_space_sigmas",
+                    "placeholder": "linearly spaced values from log(sigma_max) to log(sigma_min)",
+                    "acceptable": [
+                        "torch.linspace(math.log(sigma_max), math.log(sigma_min), n_steps)",
+                        "torch.linspace(torch.log(torch.tensor(sigma_max)), torch.log(torch.tensor(sigma_min)), n_steps)"
+                    ],
+                    "hint": "Use torch.linspace from log(sigma_max) to log(sigma_min) with n_steps points."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_edm_denoiser_loss",
+            "title": "EDM Denoiser Training Objective",
+            "difficulty": "medium",
+            "description": "Implement the complete EDM denoiser training objective that combines preconditioning with weighted MSE loss. The denoiser D_theta(x; sigma) should predict clean data x_0 from noisy input.",
+            "info": "The EDM training objective trains the denoiser D_theta to predict x_0 from x_sigma = x_0 + sigma * epsilon. The loss is lambda(sigma) * ||D_theta(x_sigma; sigma) - x_0||^2, where lambda(sigma) = (sigma^2 + sigma_data^2) / (sigma * sigma_data)^2. Combined with the preconditioning (c_skip, c_out, c_in, c_noise), the raw network F_theta always operates on approximately unit-variance inputs and outputs. This formulation is clean and unified, allowing direct comparison across different design choices.",
+            "code": "import torch\n\ndef edm_denoiser_loss(F_theta, x_0, sigma_data=0.5, P_mean=-1.2, P_std=1.2):\n    \"\"\"Complete EDM training loss.\"\"\"\n    B = x_0.shape[0]\n    sd = sigma_data\n    \n    log_sigma = torch.randn(B, device=x_0.device) * P_std + P_mean\n    sigma = log_sigma.exp().view(-1, 1, 1, 1)\n    \n    noise = torch.randn_like(x_0)\n    x_noisy = x_0 + sigma * noise\n    \n    c_skip = sd ** 2 / (sigma ** 2 + sd ** 2)\n    c_out = sigma * sd / (sigma ** 2 + sd ** 2).sqrt()\n    c_in = 1.0 / (sigma ** 2 + sd ** 2).sqrt()\n    c_noise = log_sigma.view(-1) / 4.0\n    \n    F_out = F_theta(c_in * x_noisy, c_noise)\n    D_out = c_skip * x_noisy + c_out * F_out\n    \n    weight = {{edm_weight}}\n    \n    loss = weight * (D_out - x_0) ** 2\n    return loss.mean()",
+            "blanks": [
+                {
+                    "id": "edm_weight",
+                    "placeholder": "EDM sigma-dependent loss weight",
+                    "acceptable": [
+                        "(sigma ** 2 + sd ** 2) / (sigma * sd) ** 2",
+                        "(sigma ** 2 + sd ** 2) / (sigma ** 2 * sd ** 2)",
+                        "(sigma.pow(2) + sd ** 2) / (sigma * sd).pow(2)"
+                    ],
+                    "hint": "lambda(sigma) = (sigma^2 + sigma_data^2) / (sigma * sigma_data)^2."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_cfg_negative_prompt",
+            "title": "Classifier-Free Guidance with Negative Prompts",
+            "difficulty": "easy",
+            "description": "Implement CFG with negative prompt support, where the unconditional prediction is replaced by a prediction conditioned on a negative (undesired) prompt. This steers generation away from undesired attributes.",
+            "info": "Standard CFG uses an unconditional (null text) prediction as the baseline. Negative prompts replace this null baseline with a specific undesired condition. The formula becomes: eps_guided = eps_neg + scale * (eps_pos - eps_neg). This pushes generation away from the negative prompt's characteristics. Common negative prompts include quality degradation terms like 'blurry, low quality, deformed'. The technique is mathematically identical to standard CFG but substitutes the unconditional embedding with the negative prompt's embedding. This is extremely popular in practice.",
+            "code": "import torch\n\ndef cfg_with_negative_prompt(model, x_t, t, pos_emb, neg_emb, \n                             guidance_scale=7.5):\n    \"\"\"CFG using negative prompt instead of null conditioning.\"\"\"\n    x_double = torch.cat([x_t, x_t], dim=0)\n    t_double = torch.cat([t, t], dim=0)\n    emb_double = torch.cat([pos_emb, neg_emb], dim=0)\n    \n    eps_both = model(x_double, t_double, emb_double)\n    eps_pos, eps_neg = eps_both.chunk(2, dim=0)\n    \n    return {{neg_prompt_cfg}}",
+            "blanks": [
+                {
+                    "id": "neg_prompt_cfg",
+                    "placeholder": "guided prediction using negative prompt as baseline",
+                    "acceptable": [
+                        "eps_neg + guidance_scale * (eps_pos - eps_neg)",
+                        "eps_neg + (eps_pos - eps_neg) * guidance_scale"
+                    ],
+                    "hint": "Same as standard CFG but replace unconditional with negative: eps_neg + scale * (eps_pos - eps_neg)."
+                }
+            ]
+        },
+        {
+            "id": "diff_samp_new_lcm_scheduler",
+            "title": "Latent Consistency Model (LCM) Step Schedule",
+            "difficulty": "medium",
+            "description": "Implement the step schedule for Latent Consistency Models that enables few-step inference (1-4 steps) by selecting evenly spaced timesteps from a teacher model's schedule.",
+            "info": "Latent Consistency Models (LCM) achieve high-quality generation in 1-4 steps by distilling a pretrained latent diffusion model. The LCM scheduler selects a small number of timesteps from the original schedule that are evenly spaced in the timestep domain. For each step, the model directly predicts the output at the next timestep rather than making a small incremental update. LCM uses a special w parameter (guidance embedding) instead of runtime CFG, avoiding double forward passes during inference. The boundary condition ensures that at t=0 the model returns its input.",
+            "code": "import torch\n\ndef lcm_get_timesteps(original_steps=1000, num_inference_steps=4, \n                      strength=1.0):\n    \"\"\"Compute LCM timestep schedule.\n    \n    Args:\n        original_steps: training schedule length\n        num_inference_steps: number of LCM steps (1-8)\n        strength: for img2img, fraction of steps to use\n    Returns:\n        timesteps: selected timesteps [num_inference_steps]\n    \"\"\"\n    effective_steps = int(num_inference_steps / strength)\n    \n    skip = original_steps // effective_steps\n    timesteps = {{compute_timesteps}}\n    \n    timesteps = torch.flip(timesteps, [0])\n    timesteps = timesteps[:num_inference_steps]\n    return timesteps",
+            "blanks": [
+                {
+                    "id": "compute_timesteps",
+                    "placeholder": "evenly spaced timesteps using skip interval",
+                    "acceptable": [
+                        "torch.arange(1, effective_steps + 1) * skip - 1",
+                        "(torch.arange(1, effective_steps + 1) * skip) - 1",
+                        "torch.arange(skip - 1, original_steps, skip)"
+                    ],
+                    "hint": "Space timesteps at intervals of skip: for skip=250, timesteps are [249, 499, 749, 999]. Use torch.arange(1, effective_steps+1)*skip - 1."
                 }
             ]
         }

@@ -548,6 +548,846 @@
                     "hint": "Aggregate messages at the destination nodes using index_add."
                 }
             ]
+        },
+        {
+            "id": "prot_dyn_new_rmsd_trajectory",
+            "title": "RMSD Over an MD Trajectory",
+            "difficulty": "easy",
+            "description": "Given a molecular dynamics trajectory stored as a 3D array of shape (T, N, 3) where T is the number of frames and N is the number of CA atoms, compute the RMSD of each frame relative to the first frame (reference). This is a standard trajectory analysis task.",
+            "info": "Tracking RMSD over time is one of the most fundamental analyses performed on molecular dynamics trajectories. It reveals whether a simulation has equilibrated and quantifies how far the protein deviates from a reference structure. MDAnalysis (Michaud-Agrawal et al., J Comput Chem 2011) provides efficient RMSD computation routines for large trajectories. A plateau in the RMSD time series typically indicates that the simulation has reached equilibrium. OpenMM (Eastman et al., PLoS Comput Biol 2017) is a popular engine for running MD simulations that produce such trajectories. Reference: Michaud-Agrawal et al., J Comput Chem 2011; Eastman et al., PLoS Comput Biol 2017.",
+            "code": "import numpy as np\n\ndef rmsd_trajectory(traj, ref_frame=0):\n    \"\"\"Compute RMSD of each frame relative to a reference frame.\n    traj: (T, N, 3) trajectory array\n    Returns: (T,) array of RMSD values\n    \"\"\"\n    ref = traj[ref_frame]  # (N, 3)\n    diff = traj - {{b1}}  # (T, N, 3)\n    sq_dist = np.sum(diff ** 2, axis={{b2}})  # (T, N)\n    return np.sqrt({{b3}})\n\n# Test\nnp.random.seed(42)\nT, N = 500, 100\ntraj = np.cumsum(np.random.randn(T, N, 3) * 0.01, axis=0)  # drifting trajectory\nrmsds = rmsd_trajectory(traj)\nprint('RMSD shape:', rmsds.shape)  # (500,)\nprint('RMSD at frame 0:', rmsds[0])  # Should be 0\nprint('RMSD at last frame:', rmsds[-1])",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "ref[??, ??, ??]",
+                    "acceptable": ["ref[None, :, :]", "ref"],
+                    "hint": "Broadcast the reference frame to match the trajectory shape."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "sum over xyz axis",
+                    "acceptable": ["-1", "2"],
+                    "hint": "Sum the squared differences along the last (xyz) dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.mean(sq_dist, axis=??)",
+                    "acceptable": ["np.mean(sq_dist, axis=1)", "np.mean(sq_dist, axis=-1)"],
+                    "hint": "Average over the atoms (axis 1) to get mean squared deviation per frame."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_rmsf",
+            "title": "Root Mean Square Fluctuation (RMSF)",
+            "difficulty": "easy",
+            "description": "Compute the per-residue Root Mean Square Fluctuation (RMSF) from an MD trajectory. RMSF measures the average deviation of each atom from its mean position over the trajectory and is analogous to crystallographic B-factors.",
+            "info": "RMSF quantifies the flexibility of each residue over the course of an MD simulation and correlates with experimental B-factors from X-ray crystallography. High RMSF values indicate flexible loops or termini, while low values correspond to well-packed core regions. RMSF is computed as sqrt(mean((r_i(t) - <r_i>)^2)) for each atom i, where <r_i> is its time-averaged position. MDAnalysis (Michaud-Agrawal et al., J Comput Chem 2011) provides built-in RMSF calculations. AlphaFold2's pLDDT scores (Jumper et al., Nature 2021) anticorrelate with RMSF, as disordered regions tend to have low pLDDT and high RMSF. Reference: Michaud-Agrawal et al., J Comput Chem 2011; Jumper et al., Nature 2021.",
+            "code": "import numpy as np\n\ndef compute_rmsf(traj):\n    \"\"\"Compute per-residue RMSF from a trajectory.\n    traj: (T, N, 3) trajectory array\n    Returns: (N,) RMSF values\n    \"\"\"\n    mean_pos = {{b1}}  # (N, 3)\n    deviations = traj - mean_pos[None, :, :]  # (T, N, 3)\n    sq_dev = np.sum(deviations ** 2, axis={{b2}})  # (T, N)\n    return np.sqrt({{b3}})\n\nnp.random.seed(0)\nT, N = 1000, 80\n# Simulate trajectory: residues 30-40 are flexible\ntraj = np.random.randn(T, N, 3) * 0.1\ntraj[:, 30:40, :] += np.random.randn(T, 10, 3) * 2.0  # extra flexibility\nrmsf = compute_rmsf(traj)\nprint('RMSF shape:', rmsf.shape)\nprint('Mean RMSF (rigid):', rmsf[:30].mean())\nprint('Mean RMSF (flexible):', rmsf[30:40].mean())",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "traj.mean(axis=??)",
+                    "acceptable": ["traj.mean(axis=0)", "np.mean(traj, axis=0)"],
+                    "hint": "Average over the time axis (axis 0) to get the mean position of each atom."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "sum over xyz",
+                    "acceptable": ["-1", "2"],
+                    "hint": "Sum squared deviations along the last (xyz) dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.mean(??, axis=??)",
+                    "acceptable": ["np.mean(sq_dev, axis=0)", "sq_dev.mean(axis=0)"],
+                    "hint": "Average squared deviations over time (axis 0) then take the square root."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_tica",
+            "title": "Time-Lagged Independent Component Analysis (TICA)",
+            "difficulty": "hard",
+            "description": "Implement the core TICA computation: given a trajectory featurized as a (T, D) matrix, compute the time-lagged covariance matrices C(0) and C(tau), then solve the generalized eigenvalue problem to find the slowest collective motions.",
+            "info": "TICA (Perez-Hernandez et al., J Chem Phys 2013) identifies the slowest relaxation modes in molecular dynamics data by solving a generalized eigenvalue problem on time-lagged covariance matrices. It is a key dimensionality reduction method for constructing Markov state models (MSMs) of protein dynamics. The time-lagged covariance matrix C(tau) captures correlations between features at time t and t+tau, and the eigenvectors with the largest eigenvalues correspond to the slowest processes. TICA is implemented in PyEMMA (Scherer et al., J Chem Theory Comput 2015) and deeptime. Unlike PCA, which finds directions of maximal variance, TICA finds directions that decorrelate most slowly. Reference: Perez-Hernandez et al., J Chem Phys 2013; Scherer et al., J Chem Theory Comput 2015.",
+            "code": "import numpy as np\nfrom scipy.linalg import eigh\n\ndef tica(features, lag=10, n_components=2):\n    \"\"\"Time-lagged Independent Component Analysis.\n    features: (T, D) feature trajectory\n    lag: time lag in frames\n    n_components: number of slow modes to extract\n    Returns: eigenvalues (n_components,), eigenvectors (D, n_components)\n    \"\"\"\n    T, D = features.shape\n    # Center the data\n    features = features - features.mean(axis=0)\n    # Instantaneous covariance C(0)\n    C0 = {{b1}} / (T - 1)\n    # Time-lagged covariance C(tau)\n    X_t = features[:T - lag]\n    X_t_tau = features[{{b2}}:]\n    C_tau = X_t.T @ X_t_tau / (T - lag - 1)\n    # Symmetrize C_tau\n    C_tau = 0.5 * (C_tau + C_tau.T)\n    # Solve generalized eigenvalue problem: C_tau v = lambda C0 v\n    eigenvalues, eigenvectors = eigh(C_tau, {{b3}},\n                                      subset_by_index=[D - n_components, D - 1])\n    # Sort by descending eigenvalue (slowest modes first)\n    idx = np.argsort(eigenvalues)[::-1]\n    return eigenvalues[idx], eigenvectors[:, idx]\n\nnp.random.seed(42)\nT, D = 5000, 20\nfeatures = np.random.randn(T, D)\nevals, evecs = tica(features, lag=10, n_components=2)\nprint('TICA eigenvalues:', evals)\nprint('Eigenvector shape:', evecs.shape)  # (20, 2)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "features.T @ ??",
+                    "acceptable": ["features.T @ features"],
+                    "hint": "The instantaneous covariance is X^T X / (T-1) for centered data."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "starting index for lagged data",
+                    "acceptable": ["lag"],
+                    "hint": "The time-lagged data starts at index 'lag' and goes to the end."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "which matrix on the right side?",
+                    "acceptable": ["C0"],
+                    "hint": "The generalized eigenvalue problem is C_tau v = lambda C0 v, so C0 is the second argument."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_msm_transition_matrix",
+            "title": "Markov State Model Transition Matrix",
+            "difficulty": "medium",
+            "description": "Given a discrete state trajectory (sequence of cluster assignments from an MD trajectory), estimate the row-stochastic transition matrix by counting transitions and normalizing each row. This is the foundation of Markov state models.",
+            "info": "Markov state models (MSMs) discretize the conformational space into metastable states and model dynamics as memoryless transitions between them (Chodera & Noe, Curr Opin Struct Biol 2014). The transition matrix T(tau) is estimated by counting transitions between states at lag time tau and row-normalizing. MSMs enable extraction of kinetic information (relaxation timescales, rate constants) from MD data and are widely used in protein folding studies. PyEMMA (Scherer et al., J Chem Theory Comput 2015) and deeptime provide robust MSM estimation. The implied timescales from the eigenvalues of T should plateau at the chosen lag time for the Markov assumption to hold. Reference: Chodera & Noe, Curr Opin Struct Biol 2014; Scherer et al., J Chem Theory Comput 2015.",
+            "code": "import numpy as np\n\ndef estimate_transition_matrix(dtraj, n_states, lag=1):\n    \"\"\"Estimate MSM transition matrix from a discrete trajectory.\n    dtraj: (T,) array of integer state labels\n    n_states: number of discrete states\n    lag: lag time in frames\n    Returns: (n_states, n_states) row-stochastic transition matrix\n    \"\"\"\n    count_matrix = np.zeros((n_states, n_states))\n    for t in range(len(dtraj) - lag):\n        i = dtraj[t]\n        j = dtraj[{{b1}}]\n        count_matrix[i, j] += 1\n    # Row-normalize to get transition probabilities\n    row_sums = {{b2}}\n    row_sums[row_sums == 0] = 1  # avoid division by zero\n    T_mat = count_matrix / {{b3}}\n    return T_mat\n\nnp.random.seed(0)\n# Simulate a 3-state trajectory\nn_states = 3\ndtraj = np.random.choice(n_states, size=10000)\nT_mat = estimate_transition_matrix(dtraj, n_states, lag=1)\nprint('Transition matrix:\\n', T_mat)\nprint('Row sums:', T_mat.sum(axis=1))  # Should all be 1.0",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "t + ??",
+                    "acceptable": ["t + lag"],
+                    "hint": "The destination state is the state at time t + lag."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "count_matrix.sum(axis=??)",
+                    "acceptable": ["count_matrix.sum(axis=1)", "count_matrix.sum(axis=1, keepdims=True)"],
+                    "hint": "Sum each row to get the total outgoing transitions from each state."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "row_sums reshaped",
+                    "acceptable": ["row_sums[:, None]", "row_sums.reshape(-1, 1)", "row_sums[:, np.newaxis]"],
+                    "hint": "Reshape row_sums to (n_states, 1) for broadcasting during division."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_msm_implied_timescales",
+            "title": "MSM Implied Timescales from Eigenvalues",
+            "difficulty": "medium",
+            "description": "Compute the implied timescales of a Markov state model from the eigenvalues of its transition matrix. The implied timescales characterize the relaxation rates of the slowest dynamical processes.",
+            "info": "The implied timescales of an MSM are computed as t_i = -tau / ln(lambda_i) where lambda_i are the eigenvalues of the transition matrix and tau is the lag time (Chodera & Noe, Curr Opin Struct Biol 2014). The largest eigenvalue is always 1 (corresponding to the stationary distribution), and the remaining eigenvalues encode relaxation timescales. These timescales should be independent of the lag time if the Markov assumption is satisfied, providing a validation criterion for MSMs. PyEMMA (Scherer et al., J Chem Theory Comput 2015) uses implied timescale plots as a primary diagnostic. The slowest timescale corresponds to the rate-limiting conformational change. Reference: Chodera & Noe, Curr Opin Struct Biol 2014; Scherer et al., J Chem Theory Comput 2015.",
+            "code": "import numpy as np\n\ndef implied_timescales(T_mat, lag_time=1.0):\n    \"\"\"Compute implied timescales from transition matrix.\n    T_mat: (K, K) row-stochastic transition matrix\n    lag_time: lag time in physical units\n    Returns: sorted array of implied timescales (excluding stationary)\n    \"\"\"\n    eigenvalues = np.linalg.eigvals(T_mat)\n    eigenvalues = np.real(eigenvalues)\n    # Sort descending\n    eigenvalues = np.sort(eigenvalues)[::-1]\n    # Exclude the stationary eigenvalue (lambda ~= 1)\n    lambdas = eigenvalues[{{b1}}:]\n    # Filter out non-positive eigenvalues\n    lambdas = lambdas[lambdas > 0]\n    timescales = {{b2}}\n    return np.sort(timescales)[::-1]\n\n# Test with a simple 3-state transition matrix\nT = np.array([[0.9, 0.05, 0.05],\n              [0.05, 0.85, 0.10],\n              [0.05, 0.10, 0.85]])\nlag = 1.0  # 1 ns\nts = implied_timescales(T, lag_time=lag)\nprint('Implied timescales (ns):', ts)\nprint('Number of timescales:', len(ts))  # Should be {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "skip how many eigenvalues?",
+                    "acceptable": ["1"],
+                    "hint": "Skip the first (largest) eigenvalue which is ~1 for the stationary distribution."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-lag_time / np.log(??)",
+                    "acceptable": ["-lag_time / np.log(lambdas)"],
+                    "hint": "Implied timescale is t = -tau / ln(lambda) for each eigenvalue."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "K - ??",
+                    "acceptable": ["2", "T.shape[0] - 1"],
+                    "hint": "For a K-state MSM, there are K-1 implied timescales (excluding the stationary mode)."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_diffusion_map",
+            "title": "Diffusion Map Embedding",
+            "difficulty": "hard",
+            "description": "Implement the diffusion map algorithm: given pairwise distances between conformations, construct a Gaussian kernel, normalize it to form a diffusion operator, and extract the leading eigenvectors as a low-dimensional embedding.",
+            "info": "Diffusion maps (Coifman & Lafon, Appl Comput Harmon Anal 2006) provide a nonlinear dimensionality reduction that captures the intrinsic geometry of data manifolds and is widely used for MD trajectory analysis. The algorithm constructs a Gaussian kernel from pairwise distances, normalizes it to approximate the Laplace-Beltrami operator, and uses the leading eigenvectors as coordinates. Unlike PCA, diffusion maps capture nonlinear slow modes and are related to the transfer operator of the dynamics. Rohrdanz et al. (J Chem Phys 2011) applied diffusion maps to protein folding trajectories. The bandwidth parameter epsilon controls the locality of the kernel and should be chosen relative to the data scale. Reference: Coifman & Lafon, Appl Comput Harmon Anal 2006; Rohrdanz et al., J Chem Phys 2011.",
+            "code": "import numpy as np\n\ndef diffusion_map(dist_matrix, epsilon=1.0, n_components=2):\n    \"\"\"Compute diffusion map embedding.\n    dist_matrix: (N, N) pairwise distance matrix\n    epsilon: Gaussian kernel bandwidth\n    n_components: number of embedding dimensions\n    Returns: (N, n_components) embedding coordinates\n    \"\"\"\n    # Gaussian kernel\n    K = np.exp(-dist_matrix ** 2 / {{b1}})\n    # Normalize: form the diffusion operator\n    D = np.diag({{b2}})\n    D_inv = np.diag(1.0 / np.diag(D))\n    P = D_inv @ K  # row-stochastic diffusion matrix\n    # Eigendecomposition\n    eigenvalues, eigenvectors = np.linalg.eigh(P)\n    # Sort descending\n    idx = np.argsort(eigenvalues)[::-1]\n    eigenvalues = eigenvalues[idx]\n    eigenvectors = eigenvectors[:, idx]\n    # Skip the trivial first eigenvector, take next n_components\n    embedding = eigenvectors[:, {{b3}}]\n    return embedding\n\nnp.random.seed(42)\nN = 200\n# Simulate 2D manifold data\nt = np.linspace(0, 2 * np.pi, N)\ndata = np.column_stack([np.cos(t), np.sin(t), 0.1 * np.random.randn(N)])\ndist_mat = np.linalg.norm(data[:, None] - data[None, :], axis=-1)\nembed = diffusion_map(dist_mat, epsilon=0.5, n_components=2)\nprint('Embedding shape:', embed.shape)  # (200, 2)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "normalization with epsilon",
+                    "acceptable": ["(2 * epsilon)", "2 * epsilon"],
+                    "hint": "The Gaussian kernel uses exp(-d^2 / (2 * epsilon)) as the bandwidth normalization."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "K.sum(axis=??)",
+                    "acceptable": ["K.sum(axis=1)"],
+                    "hint": "The degree matrix D has diagonal entries equal to the row sums of K."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "1:n_components + ??",
+                    "acceptable": ["1:n_components + 1"],
+                    "hint": "Skip the first trivial eigenvector and take the next n_components eigenvectors."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_free_energy_surface",
+            "title": "Free Energy Surface from Histogram",
+            "difficulty": "easy",
+            "description": "Compute a 2D free energy surface from projected trajectory data (e.g., TICA or PCA coordinates) using the Boltzmann inversion: F = -kT * ln(P), where P is the probability density estimated via a 2D histogram.",
+            "info": "Free energy surfaces (FES) provide a thermodynamic landscape of molecular conformations and are routinely computed from MD simulation data projected onto collective variables. The Boltzmann inversion F = -kT * ln(P(x)) converts a probability density P(x) into a free energy, revealing metastable states as minima and transition states as barriers. Histogram-based estimation is the simplest approach, though kernel density estimation is often more accurate (Noe et al., Science 2019). Free energy surfaces projected onto TICA coordinates (Perez-Hernandez et al., J Chem Phys 2013) are widely used in MSM workflows. Bins with zero counts are typically assigned infinite free energy or masked out. Reference: Noe et al., Science 2019; Perez-Hernandez et al., J Chem Phys 2013.",
+            "code": "import numpy as np\n\ndef free_energy_surface(x, y, bins=50, temperature=300.0, kB=0.001987):\n    \"\"\"Compute 2D free energy surface via histogram.\n    x, y: (T,) projected coordinates\n    Returns: free_energy (bins, bins), xedges, yedges\n    \"\"\"\n    kT = kB * temperature\n    hist, xedges, yedges = np.histogram2d(x, y, bins=bins, density=True)\n    # Avoid log(0) by masking zero-count bins\n    hist[hist == 0] = {{b1}}\n    free_energy = {{b2}} * np.log(hist)\n    # Shift so minimum free energy is zero\n    free_energy -= {{b3}}\n    return free_energy, xedges, yedges\n\nnp.random.seed(42)\n# Simulate bimodal distribution (two metastable states)\nT = 50000\nstate = np.random.choice([0, 1], size=T, p=[0.6, 0.4])\nx = np.random.randn(T) + 3 * state\ny = np.random.randn(T) + 2 * state\nFE, xe, ye = free_energy_surface(x, y, bins=40)\nprint('FE shape:', FE.shape)\nprint('Min FE:', FE.min())  # Should be ~0",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "small positive value",
+                    "acceptable": ["np.finfo(float).tiny", "1e-300", "np.nan"],
+                    "hint": "Replace zero counts with a tiny positive number to avoid log(0)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-??",
+                    "acceptable": ["-kT"],
+                    "hint": "The Boltzmann inversion is F = -kT * ln(P)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "free_energy.??()",
+                    "acceptable": ["free_energy.min()", "np.nanmin(free_energy)"],
+                    "hint": "Shift the surface so that the global minimum is at zero free energy."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_metadynamics_bias",
+            "title": "Metadynamics Gaussian Bias Potential",
+            "difficulty": "medium",
+            "description": "Implement the bias potential accumulation step of metadynamics: deposit Gaussian hills along a 1D collective variable to discourage revisiting previously sampled states, thereby enhancing sampling of rare events.",
+            "info": "Metadynamics (Laio & Parrinello, Proc Natl Acad Sci 2002) enhances sampling by periodically adding Gaussian bias potentials along collective variables (CVs), filling free energy minima and encouraging the system to explore new conformations. The accumulated bias V(s, t) = sum of Gaussians centered at previously visited CV values converges to the negative of the free energy surface. Well-tempered metadynamics (Barducci et al., Phys Rev Lett 2008) reduces the Gaussian height over time for better convergence. PLUMED (Tribello et al., Comput Phys Commun 2014) is the standard software for running metadynamics with various MD engines. The method is widely used to study protein folding, ligand binding, and conformational transitions. Reference: Laio & Parrinello, Proc Natl Acad Sci 2002; Barducci et al., Phys Rev Lett 2008.",
+            "code": "import numpy as np\n\ndef accumulate_metad_bias(cv_values, height=1.0, sigma=0.5):\n    \"\"\"Compute the metadynamics bias from deposited Gaussians.\n    cv_values: (T,) collective variable values at each deposition step\n    Returns: function that evaluates the bias at any CV value\n    \"\"\"\n    centers = cv_values.copy()  # Gaussian centers\n\n    def bias_potential(s):\n        \"\"\"Evaluate bias at collective variable value(s) s.\"\"\"\n        s = np.atleast_1d(s)\n        V = np.zeros_like(s, dtype=float)\n        for c in centers:\n            V += height * np.exp(-0.5 * ((s - c) / {{b1}}) ** 2)\n        return V\n\n    return bias_potential\n\n# Simulate CV values deposited during metadynamics\nnp.random.seed(42)\ncv_traj = np.concatenate([np.random.randn(50) - 2, np.random.randn(50) + 2])\nbias_fn = accumulate_metad_bias(cv_traj, height=0.5, sigma=0.3)\n\n# Evaluate bias on a grid\ns_grid = np.linspace(-5, 5, 200)\nbias_values = bias_fn(s_grid)\nprint('Bias shape:', bias_values.shape)\nprint('Max bias at:', s_grid[{{b2}}])  # Should be near the most visited CV value\nprint('Bias is non-negative:', np.all(bias_values >= {{b3}}))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "Gaussian width",
+                    "acceptable": ["sigma"],
+                    "hint": "The Gaussian width parameter sigma controls the spread of each deposited hill."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.argmax(??)",
+                    "acceptable": ["np.argmax(bias_values)"],
+                    "hint": "Find the grid point with the highest accumulated bias."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "minimum possible bias",
+                    "acceptable": ["0", "0.0"],
+                    "hint": "Gaussian hills are always non-negative, so the total bias is always >= 0."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_normal_mode_analysis",
+            "title": "Normal Mode Analysis - Hessian Eigendecomposition",
+            "difficulty": "hard",
+            "description": "Given a simplified Hessian matrix (second derivative of the potential energy with respect to atomic displacements), compute the normal modes and their frequencies via eigendecomposition. Normal modes describe the collective vibrational motions of a protein.",
+            "info": "Normal mode analysis (NMA) computes the harmonic vibrational modes of a protein around its energy minimum by diagonalizing the mass-weighted Hessian matrix (Go et al., Proc Natl Acad Sci 1983). The lowest-frequency non-trivial modes (after removing 6 rigid-body modes) often correspond to functionally relevant large-scale motions like domain opening/closing. The eigenvalues give squared frequencies (omega^2) and the eigenvectors give displacement patterns. ProDy (Bakan et al., Bioinformatics 2011) provides efficient NMA implementations for proteins. NMA is computationally much cheaper than MD and provides insight into the softest deformation modes accessible to the protein. Reference: Go et al., Proc Natl Acad Sci 1983; Bakan et al., Bioinformatics 2011.",
+            "code": "import numpy as np\n\ndef normal_mode_analysis(hessian, n_modes=10):\n    \"\"\"Compute normal modes from the Hessian matrix.\n    hessian: (3N, 3N) second derivative matrix\n    n_modes: number of non-trivial modes to return\n    Returns: frequencies (n_modes,), mode_vectors (3N, n_modes)\n    \"\"\"\n    eigenvalues, eigenvectors = {{b1}}\n    # Sort by ascending eigenvalue\n    idx = np.argsort(eigenvalues)\n    eigenvalues = eigenvalues[idx]\n    eigenvectors = eigenvectors[:, idx]\n    # Skip the first 6 trivial modes (3 translation + 3 rotation)\n    nontrivial_evals = eigenvalues[{{b2}}:6 + n_modes]\n    nontrivial_evecs = eigenvectors[:, 6:6 + n_modes]\n    # Frequencies: omega = sqrt(|eigenvalue|)\n    frequencies = np.sqrt(np.abs(nontrivial_evals))\n    return frequencies, nontrivial_evecs\n\n# Create a simple test Hessian (spring network)\nN_atoms = 20\ndim = 3 * N_atoms\nnp.random.seed(42)\nA = np.random.randn(dim, dim)\nhessian = {{b3}}  # Ensure symmetric positive semi-definite\nfreqs, modes = normal_mode_analysis(hessian, n_modes=10)\nprint('Frequencies:', freqs[:5])\nprint('Mode shapes:', modes.shape)  # (60, 10)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.eigh(??)",
+                    "acceptable": ["np.linalg.eigh(hessian)"],
+                    "hint": "Use eigh for symmetric matrices to get eigenvalues and eigenvectors."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "skip trivial modes",
+                    "acceptable": ["6"],
+                    "hint": "The first 6 eigenvalues correspond to rigid-body translation and rotation."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "make symmetric PSD",
+                    "acceptable": ["A.T @ A", "A @ A.T"],
+                    "hint": "A^T A is guaranteed to be symmetric positive semi-definite."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_gnm_kirchhoff",
+            "title": "Gaussian Network Model - Kirchhoff Matrix",
+            "difficulty": "medium",
+            "description": "Construct the Kirchhoff (connectivity) matrix for a Gaussian Network Model (GNM) from CA coordinates. The GNM uses a simple distance cutoff to define contacts and models protein dynamics with a single-parameter elastic network.",
+            "info": "The Gaussian Network Model (Bahar et al., Fold Des 1997) is a coarse-grained elastic network model that represents each residue as a node connected by harmonic springs to neighbors within a cutoff distance (typically 7-10 Angstroms). The Kirchhoff matrix Gamma has off-diagonal elements of -1 for contacts and diagonal elements equal to the node's degree. The pseudo-inverse of Gamma gives the covariance matrix of residue fluctuations, and the slowest modes predict experimental B-factors remarkably well. ProDy (Bakan et al., Bioinformatics 2011) implements GNM and the related Anisotropic Network Model (ANM). GNM captures the topology-dependent aspects of protein dynamics without detailed force field parameters. Reference: Bahar et al., Fold Des 1997; Bakan et al., Bioinformatics 2011.",
+            "code": "import numpy as np\n\ndef gnm_kirchhoff(ca_coords, cutoff=7.5):\n    \"\"\"Build the GNM Kirchhoff matrix.\n    ca_coords: (N, 3) CA coordinates\n    cutoff: distance cutoff in Angstroms\n    Returns: (N, N) Kirchhoff matrix\n    \"\"\"\n    N = ca_coords.shape[0]\n    dist = np.linalg.norm(ca_coords[:, None] - ca_coords[None, :], axis=-1)\n    # Contact matrix (exclude self)\n    contacts = (dist < cutoff) & ({{b1}})\n    # Build Kirchhoff matrix\n    Gamma = -contacts.astype(float)\n    np.fill_diagonal(Gamma, {{b2}})\n    return Gamma\n\nnp.random.seed(42)\nca = np.random.randn(50, 3) * 5\nGamma = gnm_kirchhoff(ca, cutoff=7.5)\nprint('Kirchhoff shape:', Gamma.shape)\nprint('Row sums (should be ~0):', np.allclose(Gamma.sum(axis=1), {{b3}}))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "exclude self-contacts",
+                    "acceptable": ["dist > 0", "np.eye(N) == 0", "~np.eye(N, dtype=bool)"],
+                    "hint": "Exclude the diagonal (self-contacts) from the contact matrix."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "degree of each node",
+                    "acceptable": ["contacts.sum(axis=1)", "-Gamma.sum(axis=1)"],
+                    "hint": "Each diagonal element equals the number of contacts (degree) of that node."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "expected row sum",
+                    "acceptable": ["0", "0.0"],
+                    "hint": "Each row of the Kirchhoff matrix sums to zero by construction."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_anm_hessian",
+            "title": "Anisotropic Network Model - Hessian Construction",
+            "difficulty": "hard",
+            "description": "Construct the 3Nx3N Hessian matrix for the Anisotropic Network Model (ANM). Unlike GNM which only models fluctuation magnitudes, ANM captures the directionality of motions by using 3D displacement vectors.",
+            "info": "The Anisotropic Network Model (Atilgan et al., Biophys J 2001) extends the GNM by accounting for the directionality of fluctuations. The ANM Hessian is a 3Nx3N matrix where each 3x3 block between contacting residues i and j is proportional to the outer product of the unit vector connecting them. The eigenvectors of the Hessian (after removing 6 rigid-body modes) give anisotropic displacement patterns that predict crystallographic B-factors and functional motions. ProDy (Bakan et al., Bioinformatics 2011) implements ANM with various options for spring constants. ANM has been applied to study allosteric communication, domain motions, and conformational transitions in proteins. Reference: Atilgan et al., Biophys J 2001; Bakan et al., Bioinformatics 2011.",
+            "code": "import numpy as np\n\ndef anm_hessian(ca_coords, cutoff=15.0, gamma=1.0):\n    \"\"\"Build the ANM Hessian matrix.\n    ca_coords: (N, 3) CA coordinates\n    cutoff: distance cutoff in Angstroms\n    gamma: spring constant\n    Returns: (3N, 3N) Hessian matrix\n    \"\"\"\n    N = ca_coords.shape[0]\n    H = np.zeros((3 * N, 3 * N))\n    for i in range(N):\n        for j in range(i + 1, N):\n            diff = ca_coords[j] - ca_coords[i]\n            dist = np.linalg.norm(diff)\n            if dist < cutoff:\n                # Unit direction vector outer product\n                e = diff / dist\n                block = -gamma * {{b1}}  # 3x3 block\n                # Off-diagonal blocks\n                H[3*i:3*i+3, 3*j:3*j+3] = block\n                H[3*j:3*j+3, {{b2}}] = block\n                # Diagonal blocks\n                H[3*i:3*i+3, 3*i:3*i+3] -= block\n                H[3*j:3*j+3, 3*j:3*j+3] -= {{b3}}\n    return H\n\nnp.random.seed(42)\nca = np.random.randn(20, 3) * 5\nH = anm_hessian(ca, cutoff=10.0)\nprint('Hessian shape:', H.shape)  # (60, 60)\nprint('Symmetric:', np.allclose(H, H.T))\nevals = np.linalg.eigvalsh(H)\nprint('Num zero eigenvalues (rigid body):', np.sum(np.abs(evals) < 1e-6))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.outer(??, ??)",
+                    "acceptable": ["np.outer(e, e)"],
+                    "hint": "The 3x3 interaction block is the outer product of the unit direction vector with itself."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "3*i:3*i+3",
+                    "acceptable": ["3*i:3*i+3"],
+                    "hint": "The (j, i) block is the same as the (i, j) block for this symmetric Hessian."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "same off-diagonal block",
+                    "acceptable": ["block"],
+                    "hint": "The diagonal blocks accumulate the negative sum of all off-diagonal blocks."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_bfactor_from_gnm",
+            "title": "B-Factors from GNM Pseudo-Inverse",
+            "difficulty": "medium",
+            "description": "Predict crystallographic B-factors from a Gaussian Network Model. B-factors are proportional to the diagonal of the pseudo-inverse of the Kirchhoff matrix, which gives the mean-square fluctuations.",
+            "info": "Crystallographic B-factors (or temperature factors) quantify the mean-square displacement of atoms from their average positions and are recorded in PDB files. The GNM predicts B-factors as B_i = (8 * pi^2 / 3) * (kT / gamma) * [Gamma^{-1}]_ii, where Gamma is the Kirchhoff matrix (Bahar et al., Fold Des 1997). The pseudo-inverse is used because Gamma has a zero eigenvalue corresponding to overall translation. GNM B-factor predictions correlate remarkably well (r ~ 0.5-0.8) with experimental values despite the model's simplicity. AlphaFold2's pLDDT (Jumper et al., Nature 2021) also correlates with flexibility, providing a complementary prediction. Reference: Bahar et al., Fold Des 1997; Yang et al., Proc Natl Acad Sci 2009.",
+            "code": "import numpy as np\n\ndef predict_bfactors(kirchhoff, temperature=300.0, gamma=1.0, kB=0.001987):\n    \"\"\"Predict B-factors from GNM Kirchhoff matrix.\n    kirchhoff: (N, N) Kirchhoff matrix\n    Returns: (N,) predicted B-factors\n    \"\"\"\n    eigenvalues, eigenvectors = np.linalg.eigh(kirchhoff)\n    # Use pseudo-inverse: skip the zero eigenvalue mode\n    # Gamma_pinv = sum over non-zero modes: (1/lambda_k) * v_k @ v_k^T\n    nonzero = np.abs(eigenvalues) > {{b1}}\n    Gamma_pinv_diag = np.zeros(kirchhoff.shape[0])\n    for k in range(len(eigenvalues)):\n        if nonzero[k]:\n            Gamma_pinv_diag += {{b2}} / eigenvalues[k]\n    kT = kB * temperature\n    bfactors = (8 * np.pi ** 2 / 3) * (kT / gamma) * {{b3}}\n    return bfactors\n\nnp.random.seed(42)\nca = np.random.randn(40, 3) * 5\nfrom numpy.linalg import norm\ndist = norm(ca[:, None] - ca[None, :], axis=-1)\ncontacts = (dist < 7.5) & (dist > 0)\nGamma = -contacts.astype(float)\nnp.fill_diagonal(Gamma, contacts.sum(axis=1))\nbfactors = predict_bfactors(Gamma)\nprint('B-factors shape:', bfactors.shape)\nprint('Mean B-factor:', bfactors.mean())",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "threshold for zero",
+                    "acceptable": ["1e-6", "1e-8", "1e-10"],
+                    "hint": "Use a small threshold to identify non-zero eigenvalues for the pseudo-inverse."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "eigenvectors[:, k] ** ??",
+                    "acceptable": ["eigenvectors[:, k] ** 2"],
+                    "hint": "The diagonal of v_k @ v_k^T is simply v_k^2 (element-wise square)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "diagonal of pseudo-inverse",
+                    "acceptable": ["Gamma_pinv_diag"],
+                    "hint": "Multiply the prefactor by the diagonal of the pseudo-inverse of Gamma."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_coarse_grain_mapping",
+            "title": "Coarse-Grained Mapping Operator",
+            "difficulty": "easy",
+            "description": "Implement a coarse-graining operator that maps all-atom protein coordinates to a reduced representation by averaging atom positions within each residue to produce a single bead per residue (center of mass mapping).",
+            "info": "Coarse-grained (CG) representations reduce the number of degrees of freedom in molecular simulations by grouping multiple atoms into single interaction sites (beads). The MARTINI force field (Marrink et al., J Phys Chem B 2007) uses roughly a 4:1 heavy-atom-to-bead mapping. The simplest CG mapping assigns one bead per residue at the center of mass. CG models enable simulation of larger systems over longer timescales while retaining essential physics. Machine learning has been used to learn optimal CG mappings and force fields (Wang et al., ACS Cent Sci 2019). The mapping operator M transforms all-atom coordinates to CG coordinates: R = M * r. Reference: Marrink et al., J Phys Chem B 2007; Wang et al., ACS Cent Sci 2019.",
+            "code": "import numpy as np\n\ndef coarse_grain_com(all_atom_coords, residue_indices, masses=None):\n    \"\"\"Map all-atom coords to one bead per residue (center of mass).\n    all_atom_coords: (N_atoms, 3)\n    residue_indices: (N_atoms,) integer residue assignment for each atom\n    masses: (N_atoms,) atomic masses (uniform if None)\n    Returns: (N_residues, 3) CG bead positions\n    \"\"\"\n    if masses is None:\n        masses = np.ones(len(all_atom_coords))\n    n_residues = {{b1}}\n    cg_coords = np.zeros((n_residues, 3))\n    for res_id in range(n_residues):\n        mask = residue_indices == res_id\n        w = masses[mask]\n        cg_coords[res_id] = {{b2}} / {{b3}}\n    return cg_coords\n\nnp.random.seed(42)\nN_atoms = 500\nN_res = 50\nall_atom = np.random.randn(N_atoms, 3) * 10\nres_idx = np.repeat(np.arange(N_res), N_atoms // N_res)\ncg = coarse_grain_com(all_atom, res_idx)\nprint('CG coords shape:', cg.shape)  # (50, 3)\nprint('Reduction ratio:', N_atoms / N_res)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "number of unique residues",
+                    "acceptable": ["residue_indices.max() + 1", "len(np.unique(residue_indices))", "np.max(residue_indices) + 1"],
+                    "hint": "The number of CG beads equals the number of unique residue indices."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "mass-weighted sum of coords",
+                    "acceptable": ["(w[:, None] * all_atom_coords[mask]).sum(axis=0)", "np.sum(w[:, None] * all_atom_coords[mask], axis=0)"],
+                    "hint": "Sum the mass-weighted coordinates for atoms in this residue."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "total mass",
+                    "acceptable": ["w.sum()", "np.sum(w)"],
+                    "hint": "Divide by the total mass of the residue to get the center of mass."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_martini_bead_types",
+            "title": "MARTINI-Style Bead Assignment",
+            "difficulty": "medium",
+            "description": "Implement a simplified MARTINI-like coarse-graining that assigns bead types based on amino acid chemical properties. Each amino acid is mapped to a backbone bead plus zero or more sidechain beads with polarity types (polar, nonpolar, charged, etc.).",
+            "info": "The MARTINI force field (Marrink et al., J Phys Chem B 2007) maps roughly four heavy atoms to one CG bead and assigns each bead a type reflecting its chemical nature: polar (P), nonpolar (N), apolar (C), or charged (Q). MARTINI has been widely used for lipid membrane simulations and protein-membrane interactions. MARTINI 3 (Souza et al., Nat Methods 2021) introduced refined bead types and improved protein secondary structure handling. The mapping of amino acids to bead types encodes essential chemistry: charged residues (Lys, Arg, Asp, Glu) get Q-type beads, hydrophobic residues (Ala, Val, Leu) get C-type beads. This enables simulation of systems with millions of effective atoms. Reference: Marrink et al., J Phys Chem B 2007; Souza et al., Nat Methods 2021.",
+            "code": "import numpy as np\n\n# Simplified MARTINI-like bead type mapping\nBEAD_TYPES = {\n    'ALA': ['BB', 'C1'], 'VAL': ['BB', 'C1'], 'LEU': ['BB', 'C1'],\n    'ILE': ['BB', 'C1'], 'PHE': ['BB', 'C1', 'C1'],\n    'GLY': ['BB'], 'PRO': ['BB', 'C1'],\n    'SER': ['BB', 'P1'], 'THR': ['BB', 'P1'],\n    'ASN': ['BB', 'P1'], 'GLN': ['BB', 'P1'],\n    'ASP': ['BB', 'Q1'], 'GLU': ['BB', 'Q1'],\n    'LYS': ['BB', 'Q1', 'C1'], 'ARG': ['BB', 'Q1'],\n}\n\ndef count_cg_beads(sequence):\n    \"\"\"Count total CG beads for a protein sequence.\n    sequence: list of 3-letter amino acid codes\n    Returns: total number of CG beads\n    \"\"\"\n    total = 0\n    for aa in sequence:\n        total += {{b1}}\n    return total\n\ndef get_bead_type_counts(sequence):\n    \"\"\"Count bead types across the whole protein.\"\"\"\n    counts = {}\n    for aa in sequence:\n        for bead in BEAD_TYPES.get(aa, ['BB']):\n            counts[bead] = counts.get(bead, 0) + {{b2}}\n    return counts\n\nsequence = ['ALA', 'GLY', 'LYS', 'ASP', 'PHE', 'SER', 'VAL', 'GLU', 'LEU', 'ARG']\nn_beads = count_cg_beads(sequence)\nn_atoms_approx = len(sequence) * {{b3}}  # rough all-atom count\nprint(f'Sequence length: {len(sequence)}')\nprint(f'CG beads: {n_beads}')\nprint(f'Approx all-atom: {n_atoms_approx}')\nprint(f'Reduction: {n_atoms_approx / n_beads:.1f}x')\nprint('Bead type counts:', get_bead_type_counts(sequence))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "len(BEAD_TYPES.get(??, ??))",
+                    "acceptable": ["len(BEAD_TYPES.get(aa, ['BB']))"],
+                    "hint": "Look up the amino acid in BEAD_TYPES and count its beads, defaulting to just backbone."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "increment by",
+                    "acceptable": ["1"],
+                    "hint": "Increment the count for each bead type by 1."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "avg atoms per residue",
+                    "acceptable": ["10", "14", "12"],
+                    "hint": "A typical amino acid has roughly 10-14 heavy atoms on average."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_schnet_energy_force",
+            "title": "SchNet-Style Energy and Force Prediction",
+            "difficulty": "hard",
+            "description": "Build a minimal SchNet-inspired model that predicts total energy from atomic positions and types, then obtains forces as the negative gradient of the energy with respect to positions using PyTorch autograd.",
+            "info": "SchNet (Schutt et al., NeurIPS 2017) predicts molecular energies as a sum of atomic contributions learned via continuous-filter convolutions on interatomic distances. Forces are computed as the negative gradient of the energy with respect to atomic positions, ensuring energy conservation by construction. This approach is central to ML force fields used in MD simulations. PaiNN (Schutt et al., ICML 2021) extended SchNet with equivariant message passing for improved accuracy. ML force fields achieve near-DFT accuracy at a fraction of the computational cost, enabling long-timescale simulations of proteins and materials. The energy-conserving force computation via autograd is a key architectural design principle. Reference: Schutt et al., NeurIPS 2017; Schutt et al., ICML 2021.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SimpleMLForceField(nn.Module):\n    def __init__(self, n_atom_types=10, hidden_dim=64):\n        super().__init__()\n        self.embed = nn.Embedding(n_atom_types, hidden_dim)\n        self.interaction = nn.Sequential(\n            nn.Linear(hidden_dim + 16, hidden_dim),\n            nn.SiLU(),\n            nn.Linear(hidden_dim, hidden_dim)\n        )\n        self.output = nn.Linear(hidden_dim, 1)  # per-atom energy\n\n    def rbf(self, dist, n=16, cutoff=5.0):\n        centers = torch.linspace(0, cutoff, n, device=dist.device)\n        return torch.exp(-0.5 * ((dist.unsqueeze(-1) - centers) / (cutoff / n)) ** 2)\n\n    def forward(self, positions, atom_types):\n        \"\"\"positions: (N, 3), atom_types: (N,) LongTensor\"\"\"\n        h = self.embed(atom_types)  # (N, hidden_dim)\n        # Pairwise distances\n        diff = positions.unsqueeze(0) - positions.unsqueeze(1)\n        dist = torch.norm(diff, dim=-1)  # (N, N)\n        rbf_feat = self.rbf(dist)  # (N, N, 16)\n        # Simple aggregation\n        rbf_sum = rbf_feat.mean(dim=1)  # (N, 16)\n        h = self.interaction(torch.cat([h, rbf_sum], dim=-1))\n        atomic_energies = self.output(h).squeeze(-1)  # (N,)\n        total_energy = {{b1}}\n        return total_energy\n\nmodel = SimpleMLForceField()\npositions = torch.randn(20, 3, requires_grad={{b2}})\natom_types = torch.randint(0, 10, (20,))\nenergy = model(positions, atom_types)\nprint('Energy:', energy.item())\n# Forces = -dE/dr\nforces = {{b3}}\nprint('Forces shape:', forces.shape)  # (20, 3)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "atomic_energies.??()",
+                    "acceptable": ["atomic_energies.sum()"],
+                    "hint": "Total energy is the sum of all atomic energy contributions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "enable gradient tracking",
+                    "acceptable": ["True"],
+                    "hint": "Positions must have requires_grad=True to compute forces via autograd."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "-torch.autograd.grad(??, ??, ??)[0]",
+                    "acceptable": ["-torch.autograd.grad(energy, positions, create_graph=True)[0]", "-torch.autograd.grad(energy, positions, retain_graph=True)[0]"],
+                    "hint": "Forces are the negative gradient of energy with respect to positions."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_dimenet_angle",
+            "title": "DimeNet-Style Angular Features",
+            "difficulty": "medium",
+            "description": "Compute angular features for triplets of atoms as used in DimeNet. Given edges (i->j) and (j->k), compute the angle at atom j using the dot product of direction vectors, then expand with spherical Bessel functions.",
+            "info": "DimeNet (Gasteiger et al., ICLR 2020) introduced directional message passing that incorporates bond angles between triplets of atoms, going beyond the purely distance-based messages of SchNet. The angle at the central atom j between bonds j->i and j->k is computed via the dot product of unit direction vectors. These angles are expanded using spherical Bessel functions and spherical harmonics to create rich angular features. DimeNet++ (Gasteiger et al., NeurIPS 2020 Workshop) improved efficiency with faster interaction blocks. GemNet (Gasteiger et al., NeurIPS 2021) further extended this to include dihedral angles for four-body interactions. Reference: Gasteiger et al., ICLR 2020; Gasteiger et al., NeurIPS 2021.",
+            "code": "import numpy as np\n\ndef compute_angles(positions, triplets):\n    \"\"\"Compute angles for atom triplets (i, j, k) at central atom j.\n    positions: (N, 3) atom coordinates\n    triplets: (M, 3) array of [i, j, k] atom index triplets\n    Returns: (M,) angles in radians\n    \"\"\"\n    i_idx, j_idx, k_idx = triplets[:, 0], triplets[:, 1], triplets[:, 2]\n    # Vectors from central atom j\n    v_ji = positions[i_idx] - positions[j_idx]  # (M, 3)\n    v_jk = positions[k_idx] - positions[j_idx]  # (M, 3)\n    # Normalize\n    v_ji_norm = v_ji / np.linalg.norm(v_ji, axis=-1, keepdims=True)\n    v_jk_norm = v_jk / np.linalg.norm(v_jk, axis=-1, keepdims=True)\n    # Angle via dot product\n    cos_angle = np.sum({{b1}}, axis=-1)\n    cos_angle = np.clip(cos_angle, {{b2}}, 1.0)\n    return np.arccos(cos_angle)\n\ndef bessel_expansion(angles, n_basis=8):\n    \"\"\"Expand angles with sinusoidal basis functions.\"\"\"\n    n = np.arange(1, n_basis + 1)\n    return {{b3}}\n\nnp.random.seed(42)\npositions = np.random.randn(30, 3) * 5\ntriplets = np.array([[0, 1, 2], [1, 2, 3], [5, 6, 7], [10, 11, 12]])\nangles = compute_angles(positions, triplets)\nprint('Angles (degrees):', np.degrees(angles))\nbasis = bessel_expansion(angles, n_basis=8)\nprint('Bessel features shape:', basis.shape)  # (4, 8)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "element-wise product",
+                    "acceptable": ["v_ji_norm * v_jk_norm"],
+                    "hint": "The cosine of the angle is the sum of element-wise products of the unit vectors."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "lower clamp value",
+                    "acceptable": ["-1.0"],
+                    "hint": "Clamp cosine values to [-1, 1] to avoid numerical issues with arccos."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.sin(n * angles[:, None])",
+                    "acceptable": ["np.sin(n * angles[:, None])", "np.sin(angles[:, None] * n)"],
+                    "hint": "Expand each angle into sinusoidal basis functions: sin(n * theta) for n = 1, 2, ..."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_nequip_tensor_product",
+            "title": "NequIP-Style Equivariant Tensor Product (Simplified)",
+            "difficulty": "hard",
+            "description": "Implement a simplified version of the equivariant tensor product used in NequIP. Given scalar (l=0) and vector (l=1) features on each atom, combine them via a learnable tensor product that preserves equivariance.",
+            "info": "NequIP (Batzner et al., Nat Commun 2022) builds an equivariant interatomic potential using tensor products of irreducible representations (irreps) of O(3). The model passes messages composed of spherical harmonics weighted by learned radial functions. The tensor product of two irreps of angular momentum l1 and l2 produces irreps of angular momentum |l1-l2| to l1+l2, controlled by Clebsch-Gordan coefficients. NequIP achieves state-of-the-art accuracy on MD17 and other benchmarks with remarkable data efficiency. MACE (Batatia et al., NeurIPS 2022) extends this with higher-order equivariant message passing for even better performance. The e3nn library provides efficient implementations of equivariant tensor products. Reference: Batzner et al., Nat Commun 2022; Batatia et al., NeurIPS 2022.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SimpleTensorProduct(nn.Module):\n    \"\"\"Simplified tensor product: scalar (l=0) x vector (l=1) -> vector (l=1).\"\"\"\n    def __init__(self, scalar_dim, vector_dim, out_vector_dim):\n        super().__init__()\n        self.weight = nn.Linear(scalar_dim, out_vector_dim * vector_dim, bias=False)\n        self.out_vector_dim = out_vector_dim\n        self.vector_dim = vector_dim\n\n    def forward(self, scalars, vectors):\n        \"\"\"scalars: (N, scalar_dim), vectors: (N, vector_dim, 3)\n        Returns: (N, out_vector_dim, 3)\n        \"\"\"\n        N = scalars.shape[0]\n        # Learn mixing weights from scalars\n        W = self.weight(scalars)  # (N, out_vector_dim * vector_dim)\n        W = W.view(N, self.out_vector_dim, {{b1}})  # (N, out_vector_dim, vector_dim)\n        # Contract over input vector channels\n        out_vectors = {{b2}}  # (N, out_vector_dim, 3)\n        return out_vectors\n\nN, s_dim, v_in, v_out = 32, 16, 8, 4\ntp = SimpleTensorProduct(s_dim, v_in, v_out)\nscalars = torch.randn(N, s_dim)\nvectors = torch.randn(N, v_in, 3)\nout = tp(scalars, vectors)\nprint('Output shape:', out.shape)  # (32, 4, 3)\n# Verify equivariance: rotating input vectors should rotate output\nR = torch.tensor([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]], dtype=torch.float32)\nrotated_in = torch.einsum('ij, nvj -> nvi', R, vectors)\nrotated_out = tp(scalars, rotated_in)\nexpected = torch.einsum('ij, nvj -> nvi', R, out)\nprint('Equivariant:', torch.allclose(rotated_out, expected, atol={{b3}}))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "input vector channels",
+                    "acceptable": ["self.vector_dim"],
+                    "hint": "Reshape the weight matrix to (N, out_vector_dim, vector_dim) for contraction."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.einsum('nov, nvd -> nod', W, vectors)",
+                    "acceptable": ["torch.einsum('nov, nvd -> nod', W, vectors)", "torch.bmm(W, vectors)"],
+                    "hint": "Contract W over the input vector channels with the vectors to produce output vectors."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "tolerance for float comparison",
+                    "acceptable": ["1e-4", "1e-5", "1e-3"],
+                    "hint": "Use a small tolerance for floating point comparison in the equivariance check."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_mace_body_order",
+            "title": "MACE Higher-Order Message Construction",
+            "difficulty": "hard",
+            "description": "Implement the key idea behind MACE: constructing higher body-order features by taking symmetric tensor products of two-body messages. Given edge features on a graph, compute three-body features by combining pairs of edges at each node.",
+            "info": "MACE (Batatia et al., NeurIPS 2022) achieves state-of-the-art accuracy on molecular property prediction by constructing many-body interaction features through symmetric contractions of equivariant messages. While two-body interactions capture pairwise distances, three-body and higher-order terms encode angular and dihedral information essential for accurate force fields. MACE efficiently constructs these via products of edge features aggregated at each node, avoiding explicit enumeration of all triplets. The symmetric contraction ensures the output transforms correctly under rotations. MACE has been applied to build universal ML force fields (Batatia et al., arXiv 2023) trained on diverse chemical data. Reference: Batatia et al., NeurIPS 2022; Batatia et al., arXiv 2023.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef aggregate_edge_features(edge_features, edge_index, n_nodes):\n    \"\"\"Aggregate edge features at destination nodes.\n    edge_features: (E, D) features per edge\n    edge_index: (2, E) source-destination\n    Returns: (N, D) aggregated features\n    \"\"\"\n    dst = edge_index[1]\n    agg = torch.zeros(n_nodes, edge_features.shape[1], device=edge_features.device)\n    agg.index_add_(0, dst, edge_features)\n    return agg\n\ndef three_body_features(node_features_from_edges, method='outer_diagonal'):\n    \"\"\"Compute three-body features from aggregated two-body messages.\n    node_features_from_edges: (N, D)\n    Returns: (N, D) three-body features (simplified symmetric contraction)\n    \"\"\"\n    # Simplified: element-wise square captures self-correlation\n    # Full MACE uses Clebsch-Gordan tensor products\n    return {{b1}}\n\nN, E, D = 50, 300, 64\nedge_features = torch.randn(E, D)\nedge_index = torch.randint(0, N, (2, E))\n# Two-body aggregation\ntwo_body = aggregate_edge_features(edge_features, edge_index, N)\nprint('Two-body shape:', two_body.shape)\n# Three-body features\nthree_body = three_body_features(two_body)\nprint('Three-body shape:', three_body.shape)\n# The squared aggregation encodes correlations between pairs of edges\n# For node i: sum_j(m_ij)^2 = sum_j sum_k m_ij * m_ik (all triplet info)\nmanual = {{b2}}\nprint('Equivalence check:', torch.allclose(three_body, manual, atol={{b3}}))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "node_features_from_edges ** ??",
+                    "acceptable": ["node_features_from_edges ** 2", "node_features_from_edges * node_features_from_edges"],
+                    "hint": "The element-wise square of aggregated messages encodes pairwise correlations (three-body terms)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "two_body ** ??",
+                    "acceptable": ["two_body ** 2", "two_body * two_body"],
+                    "hint": "Verify by computing the same squared aggregation directly."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "numerical tolerance",
+                    "acceptable": ["1e-5", "1e-6", "1e-4"],
+                    "hint": "Use a small tolerance for floating point comparison."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_diffdock_score_head",
+            "title": "DiffDock Confidence Score Head",
+            "difficulty": "medium",
+            "description": "Implement a simplified confidence scoring head similar to DiffDock's approach. Given features from a protein-ligand complex graph, predict a confidence score that estimates the RMSD of the predicted pose to the true binding pose.",
+            "info": "DiffDock (Corso et al., ICLR 2023) frames molecular docking as a generative diffusion process over the product space of translations, rotations, and torsion angles. A key innovation is the confidence model that ranks generated poses by predicting their RMSD to the true binding mode without access to the ground truth. The confidence score is trained on samples with known RMSD labels and uses the same SE(3)-equivariant graph neural network architecture as the score model. DiffDock significantly outperforms traditional docking methods (AutoDock Vina, GLIDE) on the PDBBind benchmark. The confidence model enables selection of the best pose from multiple diffusion samples. Reference: Corso et al., ICLR 2023; Trott & Olson, J Comput Chem 2010.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DockingConfidenceHead(nn.Module):\n    def __init__(self, node_dim=128, hidden_dim=64):\n        super().__init__()\n        # Pool protein and ligand features separately, then combine\n        self.protein_pool = nn.Linear(node_dim, hidden_dim)\n        self.ligand_pool = nn.Linear(node_dim, hidden_dim)\n        self.confidence_mlp = nn.Sequential(\n            nn.Linear({{b1}}, hidden_dim),\n            nn.ReLU(),\n            nn.Linear(hidden_dim, 1),\n            nn.Sigmoid()  # Output between 0 and 1\n        )\n\n    def forward(self, protein_features, ligand_features):\n        \"\"\"protein_features: (Np, node_dim), ligand_features: (Nl, node_dim)\n        Returns: confidence score (scalar between 0 and 1)\n        \"\"\"\n        # Global pooling\n        prot_global = self.protein_pool(protein_features.{{b2}})  # (hidden_dim,)\n        lig_global = self.ligand_pool(ligand_features.mean(dim=0))\n        # Concatenate and predict confidence\n        combined = torch.cat([prot_global, lig_global], dim=-1)\n        confidence = {{b3}}\n        return confidence\n\nmodel = DockingConfidenceHead(node_dim=128, hidden_dim=64)\nprot_feat = torch.randn(200, 128)  # 200 protein nodes\nlig_feat = torch.randn(30, 128)    # 30 ligand nodes\nconf = model(prot_feat, lig_feat)\nprint(f'Confidence score: {conf.item():.4f}')\nprint(f'Score in [0, 1]: {0 <= conf.item() <= 1}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "input dim to MLP",
+                    "acceptable": ["2 * hidden_dim", "hidden_dim * 2"],
+                    "hint": "The confidence MLP takes the concatenation of protein and ligand pooled features (2 * hidden_dim)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "mean(dim=??)",
+                    "acceptable": ["mean(dim=0)"],
+                    "hint": "Global mean pooling over the node dimension to get a single feature vector."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.confidence_mlp(??)",
+                    "acceptable": ["self.confidence_mlp(combined)"],
+                    "hint": "Pass the combined protein-ligand features through the confidence MLP."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_ensemble_diversity",
+            "title": "Conformational Ensemble Diversity Metrics",
+            "difficulty": "easy",
+            "description": "Given a conformational ensemble (multiple predicted structures for the same protein), compute pairwise RMSD to assess ensemble diversity and identify the most representative (medoid) structure.",
+            "info": "Conformational ensemble prediction captures the inherent flexibility of proteins beyond a single static structure. AlphaFold-latest (Abramson et al., Nature 2024) can generate diverse conformational samples by using diffusion-based approaches. The pairwise RMSD matrix between ensemble members quantifies structural diversity, and the medoid (structure with minimum average RMSD to all others) serves as the most representative conformation. Ensemble methods are critical for studying intrinsically disordered proteins and allosteric mechanisms. SPEACH_AF (Monteiro da Silva et al., eLife 2023) uses modified AlphaFold inputs to sample alternative conformations. Evaluating ensemble quality requires comparing predicted diversity to experimental NMR or cryo-EM data. Reference: Abramson et al., Nature 2024; Monteiro da Silva et al., eLife 2023.",
+            "code": "import numpy as np\n\ndef ensemble_pairwise_rmsd(ensemble):\n    \"\"\"Compute pairwise RMSD matrix for a conformational ensemble.\n    ensemble: (M, N, 3) array of M structures with N atoms each\n    Returns: (M, M) pairwise RMSD matrix\n    \"\"\"\n    M = ensemble.shape[0]\n    rmsd_matrix = np.zeros((M, M))\n    for i in range(M):\n        for j in range(i + 1, M):\n            diff = ensemble[i] - ensemble[j]\n            rmsd = np.sqrt(np.mean(np.sum(diff ** 2, axis=-1)))\n            rmsd_matrix[i, j] = rmsd\n            rmsd_matrix[j, i] = {{b1}}\n    return rmsd_matrix\n\ndef find_medoid(rmsd_matrix):\n    \"\"\"Find the medoid (most representative structure).\"\"\"\n    mean_rmsds = {{b2}}\n    return np.argmin(mean_rmsds)\n\nnp.random.seed(42)\nM, N = 10, 100  # 10 conformations, 100 CA atoms\nbase = np.random.randn(N, 3) * 10\nensemble = np.array([base + np.random.randn(N, 3) * s for s in np.linspace(0.1, 3.0, M)])\nrmsd_mat = ensemble_pairwise_rmsd(ensemble)\nmedoid = find_medoid(rmsd_mat)\nprint('RMSD matrix shape:', rmsd_mat.shape)\nprint('Max pairwise RMSD:', rmsd_mat.max())\nprint('Medoid index:', medoid)\nprint('Symmetric:', np.allclose(rmsd_mat, rmsd_mat.{{b3}}))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "symmetry value",
+                    "acceptable": ["rmsd"],
+                    "hint": "RMSD is symmetric: RMSD(i,j) = RMSD(j,i)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "rmsd_matrix.mean(axis=??)",
+                    "acceptable": ["rmsd_matrix.mean(axis=1)", "rmsd_matrix.mean(axis=0)"],
+                    "hint": "The medoid has the lowest average RMSD to all other structures."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "transpose",
+                    "acceptable": ["T"],
+                    "hint": "Check symmetry by comparing with the transpose."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_plddt_flexibility",
+            "title": "pLDDT as a Proxy for Protein Flexibility",
+            "difficulty": "easy",
+            "description": "Given per-residue pLDDT confidence scores from AlphaFold, classify regions as ordered (high pLDDT) or disordered/flexible (low pLDDT). Apply a sliding window smoothing and identify flexible segments.",
+            "info": "AlphaFold2's predicted lDDT (pLDDT) score serves as a per-residue confidence estimate, but it also strongly anticorrelates with protein disorder and flexibility (Jumper et al., Nature 2021). Regions with pLDDT < 50 are often intrinsically disordered, while pLDDT > 90 indicates well-structured regions. Ruff & Pappu (J Mol Biol 2021) showed that AlphaFold pLDDT can predict intrinsically disordered regions comparably to dedicated disorder predictors. Smoothing pLDDT with a sliding window reduces per-residue noise and highlights domain-level flexibility patterns. The relationship between pLDDT and B-factors provides a bridge between static structure prediction and dynamics. Reference: Jumper et al., Nature 2021; Ruff & Pappu, J Mol Biol 2021.",
+            "code": "import numpy as np\n\ndef classify_flexibility(plddt, window=5, disorder_threshold=50, order_threshold=90):\n    \"\"\"Classify residues based on smoothed pLDDT.\n    plddt: (L,) per-residue pLDDT scores\n    Returns: smoothed_plddt (L,), labels (L,) string array\n    \"\"\"\n    # Sliding window average\n    kernel = np.ones(window) / window\n    smoothed = np.convolve(plddt, kernel, mode={{b1}})\n    # Classify\n    labels = np.array(['intermediate'] * len(smoothed))\n    labels[smoothed < disorder_threshold] = {{b2}}\n    labels[smoothed > order_threshold] = 'ordered'\n    return smoothed, labels\n\nnp.random.seed(42)\nL = 200\n# Simulate pLDDT: structured core with disordered termini and a loop\nplddt = np.concatenate([\n    np.random.uniform(20, 50, 20),   # disordered N-term\n    np.random.uniform(80, 98, 60),   # structured domain\n    np.random.uniform(30, 60, 15),   # flexible loop\n    np.random.uniform(85, 99, 85),   # structured domain\n    np.random.uniform(25, 45, 20),   # disordered C-term\n])\nsmoothed, labels = classify_flexibility(plddt)\nprint(f'Disordered residues: {(labels == \"disordered\").sum()}')\nprint(f'Ordered residues: {{{b3}}}')\nprint(f'Intermediate residues: {(labels == \"intermediate\").sum()}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "'same' or 'valid'",
+                    "acceptable": ["'same'"],
+                    "hint": "Use 'same' mode to keep the output the same length as the input."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "label for low pLDDT",
+                    "acceptable": ["'disordered'"],
+                    "hint": "Residues with pLDDT below the disorder threshold are labeled 'disordered'."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "(labels == '??').sum()",
+                    "acceptable": ["(labels == 'ordered').sum()", "(labels == \"ordered\").sum()"],
+                    "hint": "Count residues classified as 'ordered' (high pLDDT)."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_collective_variable_dihedral",
+            "title": "Collective Variable: Ramachandran Featurization",
+            "difficulty": "medium",
+            "description": "Featurize an MD trajectory by computing the backbone phi/psi dihedral angles at each frame, then transform them to sine/cosine pairs. This creates a periodicity-aware collective variable representation used for dimensionality reduction.",
+            "info": "Backbone dihedral angles (phi, psi) are natural collective variables for describing protein conformational states. Since angles are periodic, using raw angle values can create artificial discontinuities; the standard solution is to represent each angle as its sine and cosine pair (sin(phi), cos(phi), sin(psi), cos(psi)). This featurization is widely used as input to TICA and MSM construction in PyEMMA (Scherer et al., J Chem Theory Comput 2015). The Ramachandran plot of (phi, psi) pairs distinguishes secondary structure elements: alpha-helices cluster near (-60, -47) and beta-sheets near (-120, 120). Boltzmann generators (Noe et al., Science 2019) also operate on internal coordinate representations including dihedrals. Reference: Scherer et al., J Chem Theory Comput 2015; Noe et al., Science 2019.",
+            "code": "import numpy as np\n\ndef dihedral_featurize(phi_traj, psi_traj):\n    \"\"\"Convert phi/psi angle trajectories to sin/cos features.\n    phi_traj: (T, N_residues) phi angles in radians\n    psi_traj: (T, N_residues) psi angles in radians\n    Returns: (T, 4 * N_residues) feature array\n    \"\"\"\n    sin_phi = np.sin(phi_traj)\n    cos_phi = {{b1}}\n    sin_psi = np.sin(psi_traj)\n    cos_psi = np.cos(psi_traj)\n    return np.concatenate([sin_phi, cos_phi, sin_psi, cos_psi], axis={{b2}})\n\n# Simulate trajectory with alpha-helix and beta-sheet regions\nnp.random.seed(42)\nT, N_res = 1000, 50\n# Alpha-helix: phi ~ -60 deg, psi ~ -47 deg\nphi = np.random.vonmises(np.radians(-60), 5, (T, N_res))\npsi = np.random.vonmises(np.radians(-47), 5, (T, N_res))\nfeatures = dihedral_featurize(phi, psi)\nprint('Feature shape:', features.shape)  # (1000, 200)\nprint('Feature dim per residue:', features.shape[1] // N_res)  # {{b3}}\nprint('All features in [-1, 1]:', np.all(np.abs(features) <= 1.0))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.cos(??)",
+                    "acceptable": ["np.cos(phi_traj)"],
+                    "hint": "Compute the cosine of the phi angles."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "concatenate axis",
+                    "acceptable": ["1", "-1"],
+                    "hint": "Concatenate along the feature (last) axis to combine all sin/cos components."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "features per residue",
+                    "acceptable": ["4"],
+                    "hint": "Each residue contributes 4 features: sin(phi), cos(phi), sin(psi), cos(psi)."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_replica_exchange_swap",
+            "title": "Replica Exchange Monte Carlo Swap Criterion",
+            "difficulty": "medium",
+            "description": "Implement the Metropolis swap criterion for replica exchange molecular dynamics (REMD). Given energies and temperatures of two replicas, compute the swap acceptance probability based on the detailed balance condition.",
+            "info": "Replica exchange molecular dynamics (REMD), also called parallel tempering, enhances sampling by running multiple replicas of a system at different temperatures and periodically attempting to swap configurations between adjacent replicas (Sugita & Okamoto, Chem Phys Lett 1999). The swap acceptance probability ensures detailed balance: P_swap = min(1, exp(Delta)), where Delta = (beta_i - beta_j) * (E_i - E_j) and beta = 1/(kT). REMD overcomes energy barriers by allowing high-temperature replicas to explore broadly and passing conformations to lower temperatures. OpenMM (Eastman et al., PLoS Comput Biol 2017) supports REMD simulations. The method has been widely used for protein folding studies and free energy calculations. Reference: Sugita & Okamoto, Chem Phys Lett 1999; Eastman et al., PLoS Comput Biol 2017.",
+            "code": "import numpy as np\n\ndef replica_exchange_swap(E_i, E_j, T_i, T_j, kB=0.001987):\n    \"\"\"Compute swap acceptance probability for REMD.\n    E_i, E_j: energies of replicas i and j (kcal/mol)\n    T_i, T_j: temperatures of replicas i and j (K)\n    Returns: acceptance probability, whether to swap (bool)\n    \"\"\"\n    beta_i = 1.0 / (kB * T_i)\n    beta_j = 1.0 / (kB * T_j)\n    delta = (beta_i - beta_j) * ({{b1}})\n    acceptance_prob = min(1.0, {{b2}})\n    swap = np.random.random() < acceptance_prob\n    return acceptance_prob, swap\n\n# Test: adjacent temperatures\nnp.random.seed(42)\ntemps = [300, 330, 363, 400, 440]  # geometric spacing\nenergies = [-100, -95, -88, -80, -70]  # typical: higher T -> higher E\nswap_rates = []\nfor trial in range(1000):\n    for k in range(len(temps) - 1):\n        prob, _ = replica_exchange_swap(energies[k], energies[k+1],\n                                         temps[k], temps[k+1])\n        if trial == 0:\n            swap_rates.append(prob)\nprint('Swap probabilities:', [f'{p:.3f}' for p in swap_rates])\n# Favorable swap: lower energy at higher temp\nprob_favorable, _ = replica_exchange_swap(-100, -80, 300, 400)\nprint(f'Favorable swap prob: {prob_favorable:.4f}')  # Should be {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "E_? - E_?",
+                    "acceptable": ["E_i - E_j"],
+                    "hint": "Delta = (beta_i - beta_j) * (E_i - E_j) from the detailed balance condition."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.exp(??)",
+                    "acceptable": ["np.exp(delta)"],
+                    "hint": "The Metropolis criterion: acceptance = min(1, exp(delta))."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "1.0 if favorable",
+                    "acceptable": ["1.0", "1"],
+                    "hint": "When the lower energy is at the higher temperature, the swap is always accepted (prob = 1.0)."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_umbrella_sampling_wham",
+            "title": "Umbrella Sampling: Biased Histogram Combination",
+            "difficulty": "hard",
+            "description": "Implement a simplified weighted histogram analysis method (WHAM) step. Given biased histograms from umbrella sampling windows along a collective variable, unbias them by subtracting the known harmonic bias potential to reconstruct the unbiased free energy.",
+            "info": "Umbrella sampling (Torrie & Valleau, J Comput Phys 1977) enhances sampling along a collective variable by applying harmonic biasing potentials centered at different positions (windows). WHAM (Kumar et al., J Comput Chem 1992) combines data from all windows to reconstruct the unbiased free energy surface by solving self-consistent equations that account for the overlap between windows. Each window i applies a bias V_i(s) = 0.5 * k * (s - s_i)^2 where s_i is the window center and k is the spring constant. The method requires sufficient overlap between adjacent windows for reliable results. Modern alternatives include MBAR (Shirts & Chodera, J Chem Phys 2008) which provides statistically optimal estimates. Reference: Kumar et al., J Comput Chem 1992; Shirts & Chodera, J Chem Phys 2008.",
+            "code": "import numpy as np\n\ndef simplified_wham(cv_samples, centers, k_spring, bins=50, temperature=300.0, kB=0.001987):\n    \"\"\"Simplified WHAM-like unbiasing for umbrella sampling.\n    cv_samples: list of arrays, CV samples from each window\n    centers: (N_windows,) window centers\n    k_spring: spring constant for all windows\n    Returns: bin_centers, free_energy\n    \"\"\"\n    kT = kB * temperature\n    all_samples = np.concatenate(cv_samples)\n    bin_edges = np.linspace(all_samples.min(), all_samples.max(), bins + 1)\n    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])\n\n    # Compute unbiased probability (simplified: weight each sample by exp(+bias/kT))\n    unbiased_hist = np.zeros(bins)\n    for w, (samples, center) in enumerate(zip(cv_samples, centers)):\n        bias = {{b1}}  # harmonic bias at each sample\n        weights = np.exp(bias / kT)  # unbias by reweighting\n        hist, _ = np.histogram(samples, bins=bin_edges, weights={{b2}})\n        unbiased_hist += hist\n\n    unbiased_hist[unbiased_hist == 0] = 1e-300\n    free_energy = -kT * np.log(unbiased_hist)\n    free_energy -= {{b3}}\n    return bin_centers, free_energy\n\nnp.random.seed(42)\ncenters = np.linspace(-3, 3, 7)\nk = 10.0\ncv_samples = [np.random.normal(c, np.sqrt(0.001987 * 300 / k), 500) for c in centers]\nbin_c, fe = simplified_wham(cv_samples, centers, k)\nprint('Free energy shape:', fe.shape)\nprint('Min FE:', fe.min())",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * k_spring * (??) ** 2",
+                    "acceptable": ["0.5 * k_spring * (samples - center) ** 2"],
+                    "hint": "The harmonic bias potential is V = 0.5 * k * (s - s_center)^2."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "reweighting factor",
+                    "acceptable": ["weights"],
+                    "hint": "Use the computed exponential weights to unbias the histogram."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "free_energy.??()",
+                    "acceptable": ["free_energy.min()", "np.min(free_energy)"],
+                    "hint": "Shift so the minimum free energy is zero."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_vamp_score",
+            "title": "VAMP Score for MSM Validation",
+            "difficulty": "hard",
+            "description": "Compute the VAMP-2 score, a variational measure of how well a featurization or model captures the slow dynamics of a molecular system. The VAMP score is based on the singular values of the time-lagged covariance matrix.",
+            "info": "The Variational Approach for Markov Processes (VAMP) score (Wu & Noe, J Nonlinear Sci 2020) provides a rigorous variational principle for evaluating and optimizing models of molecular kinetics. The VAMP-2 score equals the sum of squared singular values of the Koopman operator approximation and is maximized by the true slow modes. It serves as an objective function for training deep learning models like VAMPnets (Mardt et al., Nat Commun 2018) that learn optimal reaction coordinates directly from simulation data. Unlike the MSM implied timescales, the VAMP score provides a single scalar metric for model comparison. Higher VAMP-2 scores indicate better capture of the slow dynamical processes. Reference: Wu & Noe, J Nonlinear Sci 2020; Mardt et al., Nat Commun 2018.",
+            "code": "import numpy as np\n\ndef vamp2_score(features, lag=10):\n    \"\"\"Compute the VAMP-2 score from a feature trajectory.\n    features: (T, D) feature trajectory\n    lag: time lag in frames\n    Returns: VAMP-2 score (scalar)\n    \"\"\"\n    T, D = features.shape\n    # Split into time-lagged pairs\n    X = features[:T - lag]  # (T-lag, D)\n    Y = features[{{b1}}:]   # (T-lag, D)\n    # Center\n    X = X - X.mean(axis=0)\n    Y = Y - Y.mean(axis=0)\n    n = X.shape[0]\n    # Covariance matrices\n    C00 = X.T @ X / n\n    C11 = Y.T @ Y / n\n    C01 = X.T @ Y / n\n    # Regularize\n    C00 += 1e-6 * np.eye(D)\n    C11 += 1e-6 * np.eye(D)\n    # VAMP-2 score: ||C00^{-1/2} C01 C11^{-1/2}||_F^2\n    C00_inv_sqrt = np.linalg.inv({{b2}})\n    C11_inv_sqrt = np.linalg.inv(np.linalg.cholesky(C11))\n    M = C00_inv_sqrt @ C01 @ C11_inv_sqrt.T\n    singular_values = np.linalg.svd(M, compute_uv=False)\n    return np.sum({{b3}})\n\nnp.random.seed(42)\nT, D = 10000, 10\n# Create features with one slow mode\nt = np.arange(T)\nslow = np.sin(2 * np.pi * t / 1000)[:, None]  # slow oscillation\nfast = np.random.randn(T, D - 1) * 0.5\nfeatures = np.hstack([slow, fast])\nscore = vamp2_score(features, lag=50)\nprint(f'VAMP-2 score: {score:.4f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "time lag offset",
+                    "acceptable": ["lag"],
+                    "hint": "The time-lagged data starts at index 'lag'."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.linalg.cholesky(??)",
+                    "acceptable": ["np.linalg.cholesky(C00)"],
+                    "hint": "Use Cholesky decomposition of C00 to compute its inverse square root."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "singular_values ** ??",
+                    "acceptable": ["singular_values ** 2"],
+                    "hint": "The VAMP-2 score is the sum of squared singular values."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_pca_trajectory",
+            "title": "PCA of MD Trajectory (Essential Dynamics)",
+            "difficulty": "easy",
+            "description": "Perform PCA on an MD trajectory to identify the dominant modes of motion (essential dynamics). Center the trajectory, compute the covariance matrix, and project onto the top principal components.",
+            "info": "Principal Component Analysis (PCA) of MD trajectories, also called Essential Dynamics (Amadei et al., Proteins 1993), identifies the dominant collective motions by diagonalizing the covariance matrix of atomic fluctuations. The top principal components typically capture large-amplitude functional motions in only a few degrees of freedom. Unlike NMA which assumes a harmonic potential, PCA captures anharmonic motions present in the simulation. PCA is often used as a preprocessing step before MSM construction, though TICA (Perez-Hernandez et al., J Chem Phys 2013) is preferred when slow modes are the target. MDAnalysis (Michaud-Agrawal et al., J Comput Chem 2011) implements trajectory PCA. The explained variance ratio indicates how many PCs are needed to capture the essential motions. Reference: Amadei et al., Proteins 1993; Michaud-Agrawal et al., J Comput Chem 2011.",
+            "code": "import numpy as np\n\ndef trajectory_pca(traj, n_components=3):\n    \"\"\"PCA of an MD trajectory.\n    traj: (T, N, 3) trajectory array\n    n_components: number of PCs to retain\n    Returns: projections (T, n_components), explained_variance_ratio\n    \"\"\"\n    T, N, _ = traj.shape\n    # Flatten spatial dimensions\n    X = traj.reshape(T, {{b1}})  # (T, 3N)\n    # Center\n    X_centered = X - X.mean(axis=0)\n    # Covariance matrix\n    cov = X_centered.T @ X_centered / (T - 1)\n    # Eigendecomposition\n    eigenvalues, eigenvectors = np.linalg.eigh(cov)\n    # Sort descending\n    idx = np.argsort(eigenvalues)[::-1]\n    eigenvalues = eigenvalues[idx]\n    eigenvectors = eigenvectors[:, idx]\n    # Project onto top PCs\n    projections = X_centered @ eigenvectors[:, {{b2}}]\n    explained = eigenvalues[:n_components] / {{b3}}\n    return projections, explained\n\nnp.random.seed(42)\nT, N = 2000, 50\ntraj = np.random.randn(T, N, 3) * 0.1\n# Add a dominant mode\ntraj += np.sin(np.linspace(0, 4*np.pi, T))[:, None, None] * np.random.randn(N, 3)\nproj, var_ratio = trajectory_pca(traj, n_components=3)\nprint('Projection shape:', proj.shape)\nprint('Explained variance ratios:', var_ratio)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "flattened dimension",
+                    "acceptable": ["N * 3", "3 * N", "-1"],
+                    "hint": "Flatten each frame from (N, 3) to a single vector of length 3N."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": ":n_components",
+                    "acceptable": [":n_components"],
+                    "hint": "Select the first n_components eigenvectors for projection."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "total variance",
+                    "acceptable": ["eigenvalues.sum()", "np.sum(eigenvalues)"],
+                    "hint": "Divide by the sum of all eigenvalues to get the fraction of variance explained."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_equivariant_linear",
+            "title": "SO(3)-Equivariant Linear Layer for Spherical Harmonics",
+            "difficulty": "hard",
+            "description": "Implement an SO(3)-equivariant linear layer that mixes features of the same angular momentum order l. For equivariance, the learnable weight matrix can only mix channels within the same l, not across different l values.",
+            "info": "Equivariant neural networks for molecular property prediction use spherical harmonics as basis functions for representing geometric features. An SO(3)-equivariant linear layer can only mix features within the same irreducible representation (same angular momentum l), because cross-l mixing would break equivariance (Thomas et al., arXiv 2018). For each l, the layer applies an independent learnable weight matrix to the channel dimension while leaving the 2l+1 magnetic quantum number dimension untouched. This is a core building block of TFN (Thomas et al., arXiv 2018), NequIP (Batzner et al., Nat Commun 2022), and MACE. The e3nn library (Geiger & Smidt, arXiv 2022) provides production-ready implementations of these equivariant layers. Reference: Thomas et al., arXiv 2018; Geiger & Smidt, arXiv 2022.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass EquivariantLinear(nn.Module):\n    \"\"\"SO(3)-equivariant linear layer for multi-l features.\"\"\"\n    def __init__(self, l_max, channels_in, channels_out):\n        super().__init__()\n        self.l_max = l_max\n        # One weight matrix per angular momentum order\n        self.weights = nn.ParameterList([\n            nn.Parameter(torch.randn(channels_out, channels_in) * 0.01)\n            for _ in range({{b1}})\n        ])\n\n    def forward(self, features_by_l):\n        \"\"\"features_by_l: list of tensors, one per l.\n        features_by_l[l] has shape (N, channels_in, 2*l+1)\n        Returns: list of (N, channels_out, 2*l+1)\n        \"\"\"\n        outputs = []\n        for l, (feat, W) in enumerate(zip(features_by_l, self.weights)):\n            # feat: (N, channels_in, 2l+1), W: (channels_out, channels_in)\n            # Mix channels only, preserve the 2l+1 dimension\n            out = torch.einsum('oi, nim -> {{b2}}', W, feat)\n            outputs.append(out)\n        return outputs\n\nN, c_in, c_out, l_max = 32, 16, 8, 2\nmodel = EquivariantLinear(l_max, c_in, c_out)\n# l=0: scalars (2*0+1=1), l=1: vectors (3), l=2: rank-2 (5)\nfeatures = [torch.randn(N, c_in, 2*l+1) for l in range(l_max + 1)]\noutputs = model(features)\nfor l, out in enumerate(outputs):\n    expected_m = {{b3}}\n    print(f'l={l}: shape {out.shape}, expected m-dim: {expected_m}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "number of l values",
+                    "acceptable": ["l_max + 1"],
+                    "hint": "We need one weight matrix for each l from 0 to l_max inclusive."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "einsum output indices",
+                    "acceptable": ["nom"],
+                    "hint": "The output has shape (N, channels_out, 2l+1): contract over input channels i."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "2 * l + ??",
+                    "acceptable": ["2 * l + 1"],
+                    "hint": "The magnetic quantum number dimension for angular momentum l has size 2l+1."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_af_multimer_confidence",
+            "title": "AlphaFold Confidence: pLDDT and PAE Matrix",
+            "difficulty": "medium",
+            "description": "Given AlphaFold's raw logits for pLDDT bins and Predicted Aligned Error (PAE) bins, convert them to the actual pLDDT score and PAE distance matrix. These confidence metrics guide interpretation of AlphaFold predictions.",
+            "info": "AlphaFold2 (Jumper et al., Nature 2021) outputs per-residue pLDDT as a confidence score and the Predicted Aligned Error (PAE) matrix for assessing inter-domain accuracy. pLDDT is predicted as a distribution over distance bins and converted to a score by computing the expected lDDT. The PAE matrix element (i,j) estimates the error in residue j's position when aligning on residue i's frame. PAE is especially valuable for AlphaFold-Multimer (Evans et al., bioRxiv 2022) predictions, where low inter-chain PAE indicates confident interface prediction. pLDDT > 90 and PAE < 5 Angstroms generally indicate reliable predictions. These metrics are critical for filtering and interpreting structural models. Reference: Jumper et al., Nature 2021; Evans et al., bioRxiv 2022.",
+            "code": "import numpy as np\nfrom scipy.special import softmax\n\ndef compute_plddt(plddt_logits):\n    \"\"\"Convert pLDDT logits to scores.\n    plddt_logits: (L, 50) logits over 50 lDDT bins\n    Returns: (L,) pLDDT scores in [0, 100]\n    \"\"\"\n    # Bin centers: 0.5, 1.5, ..., 49.5 mapped to 0-100\n    bin_centers = np.arange(0.5, 50.0, 1.0) * {{b1}}  # scale to 0-100\n    probs = softmax(plddt_logits, axis=-1)  # (L, 50)\n    plddt = np.sum(probs * bin_centers, axis=-1)  # expected value\n    return plddt\n\ndef compute_pae(pae_logits, max_dist=31.75):\n    \"\"\"Convert PAE logits to distance matrix.\n    pae_logits: (L, L, 64) logits over 64 distance bins\n    Returns: (L, L) predicted aligned error in Angstroms\n    \"\"\"\n    bin_centers = np.linspace(0.25, max_dist, 64)\n    probs = softmax(pae_logits, axis={{b2}})\n    pae = np.sum(probs * bin_centers, axis=-1)\n    return pae\n\nnp.random.seed(42)\nL = 100\nplddt_logits = np.random.randn(L, 50)\npae_logits = np.random.randn(L, L, 64)\nplddt = compute_plddt(plddt_logits)\npae = compute_pae(pae_logits)\nprint('pLDDT shape:', plddt.shape, 'range:', plddt.min(), '-', plddt.max())\nprint('PAE shape:', pae.shape, 'mean:', pae.mean())\nprint('PAE is not symmetric:', not np.allclose(pae, pae.{{b3}}))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "scaling factor",
+                    "acceptable": ["2", "2.0", "(100 / 50)"],
+                    "hint": "Scale 50 bins to cover 0-100: multiply by 2 (or 100/50)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "softmax axis",
+                    "acceptable": ["-1"],
+                    "hint": "Apply softmax over the last axis (the bin dimension)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "transpose",
+                    "acceptable": ["T"],
+                    "hint": "PAE is generally not symmetric because the alignment frame differs for (i,j) vs (j,i)."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_diffusion_translation",
+            "title": "DiffDock Translation Diffusion Step",
+            "difficulty": "hard",
+            "description": "Implement the forward diffusion step for the translational component of DiffDock. The ligand center of mass undergoes Brownian motion on R^3, adding Gaussian noise at each diffusion timestep with a variance schedule.",
+            "info": "DiffDock (Corso et al., ICLR 2023) models molecular docking as a generative diffusion process over the product space SE(3) x Torsion, decomposed into translation (R^3), rotation (SO(3)), and torsion angle components. The translational diffusion follows a standard variance-preserving schedule where Gaussian noise is added to the ligand center of mass. The score model learns to reverse this diffusion to generate binding poses from noise. The noise schedule is critical for training stability and is typically parameterized by a monotonically increasing sigma(t). During inference, the reverse diffusion iteratively denoises random poses into predicted binding configurations. The decomposition into independent diffusion processes for each degree of freedom simplifies the score matching objective. Reference: Corso et al., ICLR 2023; Ho et al., NeurIPS 2020.",
+            "code": "import torch\nimport numpy as np\n\ndef translation_diffusion_forward(ligand_coords, t, sigma_schedule):\n    \"\"\"Apply forward translational diffusion to ligand.\n    ligand_coords: (N_atoms, 3) ligand atom coordinates\n    t: diffusion timestep (0 to 1)\n    sigma_schedule: function mapping t -> noise level sigma\n    Returns: noisy_coords (N_atoms, 3), noise (3,) applied to center of mass\n    \"\"\"\n    sigma = sigma_schedule(t)\n    # Sample translation noise\n    tr_noise = torch.randn(3) * {{b1}}\n    # Apply same translation to all atoms (rigid body)\n    noisy_coords = ligand_coords + {{b2}}\n    return noisy_coords, tr_noise\n\ndef sigma_schedule(t, sigma_min=0.1, sigma_max=10.0):\n    \"\"\"Log-linear noise schedule.\"\"\"\n    return sigma_min * (sigma_max / sigma_min) ** t\n\n# Test\ntorch.manual_seed(42)\nligand = torch.randn(15, 3)  # 15-atom ligand\norig_com = ligand.mean(dim=0)\nnoisy, noise = translation_diffusion_forward(ligand, t=0.5, sigma_schedule=sigma_schedule)\nnew_com = noisy.mean(dim=0)\n# All atoms should be shifted by the same amount\natom_shifts = noisy - ligand\nprint('All atoms shifted equally:', torch.allclose(atom_shifts[0], atom_shifts[{{b3}}]))\nprint('COM shift:', (new_com - orig_com).numpy())\nprint('Sigma at t=0.5:', sigma_schedule(0.5))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "noise scaling",
+                    "acceptable": ["sigma"],
+                    "hint": "Scale the random noise by sigma to control the noise level at this timestep."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "broadcast noise",
+                    "acceptable": ["tr_noise.unsqueeze(0)", "tr_noise[None, :]", "tr_noise"],
+                    "hint": "Add the same translational noise to all atoms (broadcast the 3D noise vector)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "any other atom index",
+                    "acceptable": ["-1", "1", "5"],
+                    "hint": "Pick any other atom index to verify all atoms received the same rigid-body translation."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_new_contact_order",
+            "title": "Contact Order: Topological Complexity of a Fold",
+            "difficulty": "easy",
+            "description": "Compute the relative contact order of a protein from its contact map. Contact order measures the average sequence separation of contacting residue pairs and correlates with protein folding rate.",
+            "info": "Relative contact order (Plaxco et al., J Mol Biol 1998) is defined as the average sequence separation of all residue pairs in contact, divided by the protein length. It is one of the strongest predictors of two-state protein folding rates: proteins with lower contact order (more local contacts, like helical proteins) fold faster than those with higher contact order (more non-local contacts, like beta-sheet proteins). Contact order can be computed from either experimental structures or predicted structures from AlphaFold2 (Jumper et al., Nature 2021). The metric ranges from ~5% for simple helical bundles to ~20% for complex beta-sheet topologies. It provides a simple topological descriptor of protein architecture. Reference: Plaxco et al., J Mol Biol 1998; Ivankov et al., Protein Sci 2003.",
+            "code": "import numpy as np\n\ndef relative_contact_order(contact_map):\n    \"\"\"Compute relative contact order from a binary contact map.\n    contact_map: (L, L) binary contact matrix\n    Returns: relative contact order (scalar)\n    \"\"\"\n    L = contact_map.shape[0]\n    # Get indices of contacting pairs (upper triangle only)\n    i_idx, j_idx = np.where(np.triu(contact_map, k={{b1}}))\n    if len(i_idx) == 0:\n        return 0.0\n    # Sequence separations\n    seq_seps = {{b2}}\n    # Relative contact order\n    co = np.mean(seq_seps) / {{b3}}\n    return co\n\nnp.random.seed(42)\nL = 100\nca_coords = np.random.randn(L, 3) * 10\ndist = np.linalg.norm(ca_coords[:, None] - ca_coords[None, :], axis=-1)\ncontact_map = (dist < 8.0).astype(float)\nnp.fill_diagonal(contact_map, 0)\nco = relative_contact_order(contact_map)\nprint(f'Relative contact order: {co:.4f}')\nprint(f'Number of contacts: {int(np.triu(contact_map, k=1).sum())}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "exclude trivial neighbors",
+                    "acceptable": ["1"],
+                    "hint": "Use k=1 to exclude the diagonal (self-contacts) and get only upper triangle."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.abs(j_idx - ??)",
+                    "acceptable": ["np.abs(j_idx - i_idx)", "j_idx - i_idx"],
+                    "hint": "Sequence separation is the absolute difference between residue indices."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "normalization factor",
+                    "acceptable": ["L"],
+                    "hint": "Divide by the protein length L to get the relative (normalized) contact order."
+                }
+            ]
         }
     ]
 }

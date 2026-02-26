@@ -12,13 +12,18 @@
                 {
                     "id": "prot_struct_msa_enc_b1",
                     "placeholder": "nn.???(vocab_size, d_msa)",
-                    "acceptable": ["nn.Embedding(vocab_size, d_msa)", "nn.Embedding(22, 256)"],
+                    "acceptable": [
+                        "nn.Embedding(vocab_size, d_msa)",
+                        "nn.Embedding(22, 256)"
+                    ],
                     "hint": "Use nn.Embedding to map discrete tokens to dense vectors."
                 },
                 {
                     "id": "prot_struct_msa_enc_b2",
                     "placeholder": "self.???(msa_tokens)",
-                    "acceptable": ["self.embed(msa_tokens)"],
+                    "acceptable": [
+                        "self.embed(msa_tokens)"
+                    ],
                     "hint": "Pass the integer token tensor through the embedding layer."
                 }
             ]
@@ -34,13 +39,17 @@
                 {
                     "id": "prot_struct_pair_b1",
                     "placeholder": "msa_repr.mean(dim=???)",
-                    "acceptable": ["msa_repr.mean(dim=0)"],
+                    "acceptable": [
+                        "msa_repr.mean(dim=0)"
+                    ],
                     "hint": "Average over the MSA sequence dimension (dim=0) to get per-residue features."
                 },
                 {
                     "id": "prot_struct_pair_b2",
                     "placeholder": "left[???, None, :] * right[None, ???, :]",
-                    "acceptable": ["left[:, None, :] * right[None, :, :]"],
+                    "acceptable": [
+                        "left[:, None, :] * right[None, :, :]"
+                    ],
                     "hint": "Broadcast left over dimension 1 and right over dimension 0 to form the (L, L, d_pair) outer product."
                 }
             ]
@@ -56,13 +65,19 @@
                 {
                     "id": "prot_struct_disto_b1",
                     "placeholder": "nn.???(d_pair, num_bins)",
-                    "acceptable": ["nn.Linear(d_pair, num_bins)", "nn.Linear(128, 64)"],
+                    "acceptable": [
+                        "nn.Linear(d_pair, num_bins)",
+                        "nn.Linear(128, 64)"
+                    ],
                     "hint": "A linear layer projects pair features to the number of distance bins."
                 },
                 {
                     "id": "prot_struct_disto_b2",
                     "placeholder": "logits.???(0, 1)",
-                    "acceptable": ["logits.transpose(0, 1)", "logits.permute(1, 0, 2)"],
+                    "acceptable": [
+                        "logits.transpose(0, 1)",
+                        "logits.permute(1, 0, 2)"
+                    ],
                     "hint": "Transpose the first two dimensions (i, j) -> (j, i) for symmetrization."
                 }
             ]
@@ -78,13 +93,18 @@
                 {
                     "id": "prot_struct_plddt_b1",
                     "placeholder": "torch.???(logits, dim=-1)",
-                    "acceptable": ["torch.softmax(logits, dim=-1)", "torch.nn.functional.softmax(logits, dim=-1)"],
+                    "acceptable": [
+                        "torch.softmax(logits, dim=-1)",
+                        "torch.nn.functional.softmax(logits, dim=-1)"
+                    ],
                     "hint": "Apply softmax over the bin dimension to get probabilities."
                 },
                 {
                     "id": "prot_struct_plddt_b2",
                     "placeholder": "(probs * self.???).sum(dim=-1)",
-                    "acceptable": ["(probs * self.bin_centers).sum(dim=-1)"],
+                    "acceptable": [
+                        "(probs * self.bin_centers).sum(dim=-1)"
+                    ],
                     "hint": "Compute the expected value by multiplying probabilities with bin centers and summing."
                 }
             ]
@@ -100,19 +120,29 @@
                 {
                     "id": "prot_struct_gdt_b1",
                     "placeholder": "torch.???(pred_coords - true_coords, ???)",
-                    "acceptable": ["torch.norm(pred_coords - true_coords, dim=-1)", "torch.norm(pred_coords - true_coords, dim=1)"],
+                    "acceptable": [
+                        "torch.norm(pred_coords - true_coords, dim=-1)",
+                        "torch.norm(pred_coords - true_coords, dim=1)"
+                    ],
                     "hint": "Compute the L2 norm of the difference along the coordinate dimension."
                 },
                 {
                     "id": "prot_struct_gdt_b2",
                     "placeholder": "(distances < t).???.item() / L * 100",
-                    "acceptable": ["(distances < t).sum().item() / L * 100", "(distances < t).float().sum().item() / L * 100"],
+                    "acceptable": [
+                        "(distances < t).sum().item() / L * 100",
+                        "(distances < t).float().sum().item() / L * 100"
+                    ],
                     "hint": "Count how many distances are below the threshold and express as a percentage."
                 },
                 {
                     "id": "prot_struct_gdt_b3",
                     "placeholder": "score / ???",
-                    "acceptable": ["score / 4", "score / len(thresholds)", "score / 4.0"],
+                    "acceptable": [
+                        "score / 4",
+                        "score / len(thresholds)",
+                        "score / 4.0"
+                    ],
                     "hint": "Average over the 4 distance thresholds."
                 }
             ]
@@ -128,13 +158,19 @@
                 {
                     "id": "prot_struct_tm_b1",
                     "placeholder": "1.24 * (L - 15) ** (1/3) - ???",
-                    "acceptable": ["1.24 * (L - 15) ** (1/3) - 1.8", "1.24 * (L - 15) ** (1.0/3) - 1.8", "1.24 * (L - 15) ** (1.0/3.0) - 1.8"],
+                    "acceptable": [
+                        "1.24 * (L - 15) ** (1/3) - 1.8",
+                        "1.24 * (L - 15) ** (1.0/3) - 1.8",
+                        "1.24 * (L - 15) ** (1.0/3.0) - 1.8"
+                    ],
                     "hint": "d0 = 1.24 * cbrt(L - 15) - 1.8, the length-dependent normalization factor."
                 },
                 {
                     "id": "prot_struct_tm_b2",
                     "placeholder": "1.0 / (1.0 + (distances / d0) ** ???)",
-                    "acceptable": ["1.0 / (1.0 + (distances / d0) ** 2)"],
+                    "acceptable": [
+                        "1.0 / (1.0 + (distances / d0) ** 2)"
+                    ],
                     "hint": "Each residue contributes 1 / (1 + (di/d0)^2) to the TM-score."
                 }
             ]
@@ -150,19 +186,25 @@
                 {
                     "id": "prot_struct_evo_row_b1",
                     "placeholder": "torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(???)",
-                    "acceptable": ["torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)"],
+                    "acceptable": [
+                        "torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)"
+                    ],
                     "hint": "Scaled dot-product: Q @ K^T / sqrt(head_dim)."
                 },
                 {
                     "id": "prot_struct_evo_row_b2",
                     "placeholder": "bias.???(0)",
-                    "acceptable": ["bias.unsqueeze(0)"],
+                    "acceptable": [
+                        "bias.unsqueeze(0)"
+                    ],
                     "hint": "Unsqueeze the pair bias to broadcast over the N_seq batch dimension."
                 },
                 {
                     "id": "prot_struct_evo_row_b3",
                     "placeholder": "torch.matmul(attn, ???)",
-                    "acceptable": ["torch.matmul(attn, v)"],
+                    "acceptable": [
+                        "torch.matmul(attn, v)"
+                    ],
                     "hint": "Multiply attention weights with values V."
                 }
             ]
@@ -178,13 +220,17 @@
                 {
                     "id": "prot_struct_tri_b1",
                     "placeholder": "torch.sigmoid(self.???(p))",
-                    "acceptable": ["torch.sigmoid(self.gate_left(p))"],
+                    "acceptable": [
+                        "torch.sigmoid(self.gate_left(p))"
+                    ],
                     "hint": "Apply sigmoid gating using gate_left projection."
                 },
                 {
                     "id": "prot_struct_tri_b2",
                     "placeholder": "torch.einsum('ikd,jkd->ijd', ???, right)",
-                    "acceptable": ["torch.einsum('ikd,jkd->ijd', left, right)"],
+                    "acceptable": [
+                        "torch.einsum('ikd,jkd->ijd', left, right)"
+                    ],
                     "hint": "Use einsum to contract over the shared k dimension: left[i,k,d] * right[j,k,d] -> out[i,j,d]."
                 }
             ]
@@ -200,13 +246,17 @@
                 {
                     "id": "prot_struct_ipa_b1",
                     "placeholder": "nn.Linear(d_single, num_heads * num_points * ???)",
-                    "acceptable": ["nn.Linear(d_single, num_heads * num_points * 3)"],
+                    "acceptable": [
+                        "nn.Linear(d_single, num_heads * num_points * 3)"
+                    ],
                     "hint": "Each point has 3 spatial coordinates (x, y, z)."
                 },
                 {
                     "id": "prot_struct_ipa_b2",
                     "placeholder": "??? (the last dimension size)",
-                    "acceptable": ["3"],
+                    "acceptable": [
+                        "3"
+                    ],
                     "hint": "Points live in 3D space, so the last dimension is 3."
                 }
             ]
@@ -222,13 +272,17 @@
                 {
                     "id": "prot_struct_ipa_attn_b1",
                     "placeholder": "math.???(head_dim)",
-                    "acceptable": ["math.sqrt(head_dim)"],
+                    "acceptable": [
+                        "math.sqrt(head_dim)"
+                    ],
                     "hint": "Standard scaled attention divides by sqrt(head_dim)."
                 },
                 {
                     "id": "prot_struct_ipa_attn_b2",
                     "placeholder": "-gamma.view(1, 1, H) * sq_dist  # then permute to (H, L, L)",
-                    "acceptable": ["(-gamma.view(1, 1, H) * sq_dist).permute(2, 0, 1)"],
+                    "acceptable": [
+                        "(-gamma.view(1, 1, H) * sq_dist).permute(2, 0, 1)"
+                    ],
                     "hint": "Weight squared distances by -gamma (negative because closer points should have higher attention) and permute to (H, L, L)."
                 }
             ]
@@ -244,13 +298,18 @@
                 {
                     "id": "prot_struct_frame_b1",
                     "placeholder": "n_pos - ???",
-                    "acceptable": ["n_pos - ca_pos"],
+                    "acceptable": [
+                        "n_pos - ca_pos"
+                    ],
                     "hint": "The first vector points from C-alpha to the nitrogen atom."
                 },
                 {
                     "id": "prot_struct_frame_b2",
                     "placeholder": "torch.???(e1, e2, dim=-1)",
-                    "acceptable": ["torch.cross(e1, e2, dim=-1)", "torch.linalg.cross(e1, e2, dim=-1)"],
+                    "acceptable": [
+                        "torch.cross(e1, e2, dim=-1)",
+                        "torch.linalg.cross(e1, e2, dim=-1)"
+                    ],
                     "hint": "The third orthonormal basis vector is the cross product of the first two."
                 }
             ]
@@ -266,13 +325,18 @@
                 {
                     "id": "prot_struct_recycle_b1",
                     "placeholder": "torch.norm(diff, dim=???)",
-                    "acceptable": ["torch.norm(diff, dim=-1)", "torch.norm(diff, dim=2)"],
+                    "acceptable": [
+                        "torch.norm(diff, dim=-1)",
+                        "torch.norm(diff, dim=2)"
+                    ],
                     "hint": "Compute pairwise Euclidean distances by taking the norm along the coordinate dimension."
                 },
                 {
                     "id": "prot_struct_recycle_b2",
                     "placeholder": "self.???(prev_msa)",
-                    "acceptable": ["self.msa_norm(prev_msa)"],
+                    "acceptable": [
+                        "self.msa_norm(prev_msa)"
+                    ],
                     "hint": "Apply layer normalization to the recycled MSA representation."
                 }
             ]
@@ -288,13 +352,18 @@
                 {
                     "id": "prot_struct_templ_b1",
                     "placeholder": "nn.Linear(num_dist_bins, ???)",
-                    "acceptable": ["nn.Linear(num_dist_bins, d_template)", "nn.Linear(39, 64)"],
+                    "acceptable": [
+                        "nn.Linear(num_dist_bins, d_template)",
+                        "nn.Linear(39, 64)"
+                    ],
                     "hint": "Project binned distances to the template hidden dimension d_template."
                 },
                 {
                     "id": "prot_struct_templ_b2",
                     "placeholder": "template_pair.mean(dim=???)",
-                    "acceptable": ["template_pair.mean(dim=0)"],
+                    "acceptable": [
+                        "template_pair.mean(dim=0)"
+                    ],
                     "hint": "Average the template pair representations over the template dimension (dim=0)."
                 }
             ]
@@ -310,13 +379,18 @@
                 {
                     "id": "prot_struct_col_b1",
                     "placeholder": "x.transpose(???, ???)",
-                    "acceptable": ["x.transpose(0, 1)", "x.permute(1, 0, 2)"],
+                    "acceptable": [
+                        "x.transpose(0, 1)",
+                        "x.permute(1, 0, 2)"
+                    ],
                     "hint": "Swap the sequence and residue dimensions so each position processes across sequences."
                 },
                 {
                     "id": "prot_struct_col_b2",
                     "placeholder": "out.???(0, 1)",
-                    "acceptable": ["out.transpose(0, 1)"],
+                    "acceptable": [
+                        "out.transpose(0, 1)"
+                    ],
                     "hint": "Transpose back from (L, N, d) to (N, L, d)."
                 }
             ]
@@ -332,13 +406,18 @@
                 {
                     "id": "prot_struct_fape_b1",
                     "placeholder": "torch.norm(pred_local - ???, dim=-1)",
-                    "acceptable": ["torch.norm(pred_local - true_local, dim=-1)"],
+                    "acceptable": [
+                        "torch.norm(pred_local - true_local, dim=-1)"
+                    ],
                     "hint": "Compute L2 distance between predicted and true positions in the local frame."
                 },
                 {
                     "id": "prot_struct_fape_b2",
                     "placeholder": "torch.???(error, max=clamp)",
-                    "acceptable": ["torch.clamp(error, max=clamp)", "torch.clip(error, max=clamp)"],
+                    "acceptable": [
+                        "torch.clamp(error, max=clamp)",
+                        "torch.clip(error, max=clamp)"
+                    ],
                     "hint": "Clamp errors at the maximum value (10 Angstroms) to reduce sensitivity to outliers."
                 }
             ]
@@ -354,13 +433,18 @@
                 {
                     "id": "prot_struct_dist_b1",
                     "placeholder": "coords.unsqueeze(0) - coords.unsqueeze(???)",
-                    "acceptable": ["coords.unsqueeze(0) - coords.unsqueeze(1)"],
+                    "acceptable": [
+                        "coords.unsqueeze(0) - coords.unsqueeze(1)"
+                    ],
                     "hint": "Broadcast to create (L, L, 3) pairwise differences: unsqueeze one on dim 0 and the other on dim 1."
                 },
                 {
                     "id": "prot_struct_dist_b2",
                     "placeholder": "torch.norm(diff, dim=???)",
-                    "acceptable": ["torch.norm(diff, dim=-1)", "torch.norm(diff, dim=2)"],
+                    "acceptable": [
+                        "torch.norm(diff, dim=-1)",
+                        "torch.norm(diff, dim=2)"
+                    ],
                     "hint": "Take the L2 norm along the last (coordinate) dimension."
                 }
             ]
@@ -376,13 +460,17 @@
                 {
                     "id": "prot_struct_tri_attn_b1",
                     "placeholder": "k.permute(0, 2, 1, ???)",
-                    "acceptable": ["k.permute(0, 2, 1, 3)"],
+                    "acceptable": [
+                        "k.permute(0, 2, 1, 3)"
+                    ],
                     "hint": "Rearrange k from (L, L, H, hd) to (L, H, L, hd), same as q."
                 },
                 {
                     "id": "prot_struct_tri_attn_b2",
                     "placeholder": "bias.unsqueeze(???)",
-                    "acceptable": ["bias.unsqueeze(0)"],
+                    "acceptable": [
+                        "bias.unsqueeze(0)"
+                    ],
                     "hint": "Unsqueeze the bias at dim 0 to broadcast over the starting node (i) dimension."
                 }
             ]
@@ -398,13 +486,18 @@
                 {
                     "id": "prot_struct_esm_b1",
                     "placeholder": "nn.TransformerEncoder(encoder_layer, num_layers=???)",
-                    "acceptable": ["nn.TransformerEncoder(encoder_layer, num_layers=num_layers)", "nn.TransformerEncoder(encoder_layer, num_layers=6)"],
+                    "acceptable": [
+                        "nn.TransformerEncoder(encoder_layer, num_layers=num_layers)",
+                        "nn.TransformerEncoder(encoder_layer, num_layers=6)"
+                    ],
                     "hint": "Stack the encoder layers using nn.TransformerEncoder with the specified number of layers."
                 },
                 {
                     "id": "prot_struct_esm_b2",
                     "placeholder": "torch.arange(L, device=tokens.???).unsqueeze(0)",
-                    "acceptable": ["torch.arange(L, device=tokens.device).unsqueeze(0)"],
+                    "acceptable": [
+                        "torch.arange(L, device=tokens.device).unsqueeze(0)"
+                    ],
                     "hint": "Create position indices 0..L-1 on the same device as the input tokens."
                 }
             ]
@@ -420,13 +513,18 @@
                 {
                     "id": "prot_struct_struct_b1",
                     "placeholder": "??? (total values: rotation + translation)",
-                    "acceptable": ["6"],
+                    "acceptable": [
+                        "6"
+                    ],
                     "hint": "3 values for rotation (axis-angle) + 3 values for translation = 6 total."
                 },
                 {
                     "id": "prot_struct_struct_b2",
                     "placeholder": "updates[:, ???]",
-                    "acceptable": ["updates[:, 3:]", "updates[:, 3:6]"],
+                    "acceptable": [
+                        "updates[:, 3:]",
+                        "updates[:, 3:6]"
+                    ],
                     "hint": "The translation update is the last 3 values (indices 3 to 6)."
                 }
             ]
@@ -442,14 +540,823 @@
                 {
                     "id": "prot_struct_opm_b1",
                     "placeholder": "outer.mean(dim=???)",
-                    "acceptable": ["outer.mean(dim=0)"],
+                    "acceptable": [
+                        "outer.mean(dim=0)"
+                    ],
                     "hint": "Average the outer products over the MSA sequence dimension (dim=0)."
                 },
                 {
                     "id": "prot_struct_opm_b2",
                     "placeholder": "self.???(outer)",
-                    "acceptable": ["self.out_proj(outer)"],
+                    "acceptable": [
+                        "self.out_proj(outer)"
+                    ],
                     "hint": "Project the flattened outer product to the pair representation dimension using the output projection."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_alphafold3_diffusion",
+            "title": "AlphaFold3 Diffusion Module Denoising Step",
+            "difficulty": "hard",
+            "description": "Implement a simplified denoising step from AlphaFold3's diffusion-based structure generation module. The model predicts noise to remove from noisy atom coordinates conditioned on pair and single representations.",
+            "info": "AlphaFold3 (Abramson et al., Nature 2024) replaced the structure module of AlphaFold2 with a diffusion-based generative model that predicts all-atom coordinates by iteratively denoising from random noise. The diffusion module conditions on trunk representations (single and pair) and uses a transformer architecture to predict the noise vector added at each diffusion timestep. This approach enables joint prediction of protein, nucleic acid, ligand, and ion coordinates in a unified framework. AlphaFold3 uses 200 diffusion steps during inference and achieves state-of-the-art accuracy on PDB benchmarks. The noise schedule follows a cosine schedule similar to that in DDPM (Ho et al., NeurIPS 2020), adapted for 3D molecular structures. AlphaFold3 significantly outperforms docking methods on protein-ligand interactions, achieving 76% success rate on PoseBusters benchmark.",
+            "code": "import torch\nimport torch.nn as nn\nimport math\n\nclass DiffusionDenoisingStep(nn.Module):\n    \"\"\"Simplified AF3-style denoising step.\"\"\"\n    def __init__(self, d_atom=128, d_single=384, d_time=64):\n        super().__init__()\n        self.time_embed = nn.Sequential(\n            nn.Linear(d_time, d_atom),\n            nn.SiLU(),\n            nn.Linear(d_atom, d_atom)\n        )\n        self.coord_proj = nn.Linear(3, d_atom)\n        self.cond_proj = nn.Linear(d_single, d_atom)\n        self.noise_pred = nn.Sequential(\n            nn.LayerNorm(d_atom),\n            nn.Linear(d_atom, d_atom),\n            nn.SiLU(),\n            nn.Linear(d_atom, 3)\n        )\n\n    def sinusoidal_embed(self, t, d):\n        half = d // 2\n        freqs = torch.exp(-math.log(10000) * torch.arange(half, device=t.device) / half)\n        args = t.unsqueeze(-1) * freqs\n        return torch.cat([torch.sin(args), {{prot_struct_new_af3_diff_b1}}], dim=-1)\n\n    def forward(self, noisy_coords, timestep, single_repr):\n        # noisy_coords: (L, 3), timestep: (L,), single_repr: (L, d_single)\n        t_emb = self.time_embed(self.sinusoidal_embed(timestep, 64))\n        x = self.coord_proj(noisy_coords) + t_emb + self.cond_proj(single_repr)\n        predicted_noise = {{prot_struct_new_af3_diff_b2}}\n        return predicted_noise\n\nL = 100\nmodel = DiffusionDenoisingStep()\nnoisy = torch.randn(L, 3)\nt = torch.rand(L) * 1000\nsingle = torch.randn(L, 384)\nnoise_pred = model(noisy, t, single)\nprint(noise_pred.shape)  # (100, 3)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_af3_diff_b1",
+                    "placeholder": "torch.???(args)",
+                    "acceptable": [
+                        "torch.cos(args)"
+                    ],
+                    "hint": "Sinusoidal embeddings concatenate sin and cos components."
+                },
+                {
+                    "id": "prot_struct_new_af3_diff_b2",
+                    "placeholder": "self.???(x)",
+                    "acceptable": [
+                        "self.noise_pred(x)"
+                    ],
+                    "hint": "Pass the combined features through the noise prediction network."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_af3_confidence",
+            "title": "AlphaFold3 Confidence: PAE and pTM",
+            "difficulty": "medium",
+            "description": "Implement the Predicted Aligned Error (PAE) and predicted TM-score (pTM) confidence metrics used in AlphaFold3. PAE estimates the positional error for each residue pair after alignment.",
+            "info": "AlphaFold3 (Abramson et al., Nature 2024) and AlphaFold2 (Jumper et al., Nature 2021) both output Predicted Aligned Error (PAE), a (L, L) matrix where PAE[i,j] estimates the error in residue j's position when the prediction is aligned to residue i's true position. PAE is predicted by classifying pair representation features into 64 distance error bins (0-32 Angstroms). The predicted TM-score (pTM) is derived from the PAE matrix by applying the TM-score formula to the expected aligned errors. High pTM (>0.8) indicates confident overall fold prediction, while PAE reveals domain-level confidence and inter-domain uncertainty. AlphaFold3 additionally introduces predicted interface TM-score (ipTM) for evaluating confidence in multimer interfaces. These metrics are critical for filtering AlphaFold predictions in the AFDB (Varadi et al., Nucleic Acids Research 2022).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PAEHead(nn.Module):\n    def __init__(self, d_pair=128, num_bins=64, max_error=32.0):\n        super().__init__()\n        self.linear = nn.Linear(d_pair, num_bins)\n        self.register_buffer(\n            'bin_centers',\n            torch.linspace(0.5 * max_error / num_bins,\n                           max_error - 0.5 * max_error / num_bins, num_bins)\n        )\n\n    def forward(self, pair_repr):\n        # pair_repr: (L, L, d_pair)\n        logits = self.linear(pair_repr)  # (L, L, num_bins)\n        probs = torch.softmax(logits, dim=-1)\n        # Expected aligned error per pair\n        pae = {{prot_struct_new_pae_b1}}\n        return pae  # (L, L)\n\ndef compute_ptm(pae, length):\n    \"\"\"Derive pTM from PAE matrix using TM-score formula.\"\"\"\n    d0 = 1.24 * (length - 15) ** (1.0/3) - 1.8\n    tm_per_pair = 1.0 / (1.0 + (pae / d0) ** 2)\n    ptm = {{prot_struct_new_pae_b2}}\n    return ptm\n\npair = torch.randn(80, 80, 128)\nhead = PAEHead()\npae = head(pair)\nprint(f\"PAE shape: {pae.shape}\")\nptm = compute_ptm(pae, 80)\nprint(f\"pTM: {ptm:.3f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_pae_b1",
+                    "placeholder": "(probs * self.bin_centers).???(dim=-1)",
+                    "acceptable": [
+                        "(probs * self.bin_centers).sum(dim=-1)"
+                    ],
+                    "hint": "Expected value: multiply probabilities by bin centers and sum over the bin dimension."
+                },
+                {
+                    "id": "prot_struct_new_pae_b2",
+                    "placeholder": "tm_per_pair.???()",
+                    "acceptable": [
+                        "tm_per_pair.mean()",
+                        "tm_per_pair.max()"
+                    ],
+                    "hint": "Average or take the maximum of TM-score contributions across all pairs."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_boltz1_msa_pair",
+            "title": "Boltz-1 MSA-to-Pair Projection",
+            "difficulty": "medium",
+            "description": "Implement Boltz-1's approach to deriving pair features from MSA coevolution statistics. Boltz-1 computes covariance-based features from the MSA and projects them into pair representation space.",
+            "info": "Boltz-1 (Wohlwend et al., 2024) is an open-source biomolecular structure prediction model that achieves accuracy comparable to AlphaFold3 for protein-ligand and protein-nucleic acid complexes. Like AlphaFold2, Boltz-1 derives pair features from MSA coevolution, computing outer product statistics that capture correlated mutations between residue positions. The covariance of amino acid frequencies at pairs of positions has long been used for contact prediction, as demonstrated by EVcouplings (Marks et al., PLoS ONE 2011) and DCA (Morcos et al., PNAS 2011). Boltz-1 processes these MSA-derived pair features through its trunk architecture before passing them to its diffusion-based structure generation module. Boltz-1 is fully open-source with MIT license, making it accessible for academic and commercial use unlike AlphaFold3's restricted code release.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass MSAToPairCovariance(nn.Module):\n    def __init__(self, vocab_size=22, d_pair=128):\n        super().__init__()\n        # Project covariance matrix to pair features\n        self.proj = nn.Linear(vocab_size * vocab_size, d_pair)\n        self.norm = nn.LayerNorm(d_pair)\n\n    def forward(self, msa_tokens):\n        # msa_tokens: (N_seq, L) integer indices\n        N, L = msa_tokens.shape\n        # One-hot encode\n        one_hot = torch.nn.functional.one_hot(msa_tokens, 22).float()  # (N, L, 22)\n        # Compute covariance: outer product of frequencies at each pair\n        freq = one_hot.mean(dim=0)  # (L, 22)\n        # Pair covariance: (L, L, 22, 22)\n        cov = torch.einsum('ia,jb->ijab', freq, freq)\n        cov = cov.reshape(L, L, {{prot_struct_new_boltz_msa_b1}})\n        pair = self.proj(cov)\n        return {{prot_struct_new_boltz_msa_b2}}\n\nmsa = torch.randint(0, 22, (500, 120))\nmodel = MSAToPairCovariance()\nprint(model(msa).shape)  # (120, 120, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_boltz_msa_b1",
+                    "placeholder": "22 * ???",
+                    "acceptable": [
+                        "22 * 22",
+                        "484"
+                    ],
+                    "hint": "The outer product of two 22-dimensional frequency vectors gives 22 * 22 = 484 features."
+                },
+                {
+                    "id": "prot_struct_new_boltz_msa_b2",
+                    "placeholder": "self.???(pair)",
+                    "acceptable": [
+                        "self.norm(pair)"
+                    ],
+                    "hint": "Apply layer normalization to the projected pair features."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_mmseqs2_clustering",
+            "title": "MMseqs2 k-mer Seed Matching",
+            "difficulty": "easy",
+            "description": "Implement a simplified k-mer based seed matching step inspired by MMseqs2. Given protein sequences, extract overlapping k-mers and find shared k-mer hits between a query and database sequences.",
+            "info": "MMseqs2 (Steinegger & Soding, Nature Biotechnology 2017) is an ultra-fast sequence search tool used by ColabFold and AlphaFold2 for MSA generation. It achieves 400x speedup over PSI-BLAST through a three-stage cascaded search: (1) k-mer seed matching with reduced amino acid alphabet, (2) ungapped alignment extension, and (3) gapped alignment of top candidates. The k-mer prefilter stage uses consecutive double k-mer matches (typically k=6 or k=7) to rapidly identify candidate homologs. ColabFold (Mirdita et al., Nature Methods 2022) uses MMseqs2 to search against the ColabFoldDB, enabling MSA generation in seconds instead of hours with HHblits. MMseqs2 also provides clustering capabilities used to create the UniRef30 and UniRef50 databases that AlphaFold2 searches against.",
+            "code": "import torch\nfrom collections import defaultdict\n\ndef extract_kmers(sequence, k=3):\n    \"\"\"Extract overlapping k-mers from a protein sequence string.\"\"\"\n    kmers = []\n    for i in range(len(sequence) - k + 1):\n        kmers.append({{prot_struct_new_mmseqs_b1}})\n    return kmers\n\ndef kmer_seed_match(query, database, k=3, min_hits=2):\n    \"\"\"Find database sequences sharing >= min_hits k-mers with query.\"\"\"\n    query_kmers = set(extract_kmers(query, k))\n    hits = []\n    for idx, db_seq in enumerate(database):\n        db_kmers = set(extract_kmers(db_seq, k))\n        shared = {{prot_struct_new_mmseqs_b2}}\n        if len(shared) >= min_hits:\n            hits.append((idx, len(shared)))\n    return sorted(hits, key=lambda x: -x[1])\n\nquery = \"MVLSPADKTNVKAAWGKVGAHAGEYGAEAL\"\ndatabase = [\n    \"MVLSGEDKSNIKAAWGKIGGHGAEYGAEAL\",\n    \"MGLSDGEWQLVLNAWGKVEADIPGHGQEVL\",\n    \"XYZABCDEFGHIJKLMNOPQRSTUVWXYZA\"\n]\nhits = kmer_seed_match(query, database, k=4, min_hits=2)\nprint(f\"Hits: {hits}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_mmseqs_b1",
+                    "placeholder": "sequence[i:???]",
+                    "acceptable": [
+                        "sequence[i:i+k]",
+                        "sequence[i:i + k]"
+                    ],
+                    "hint": "Extract a substring of length k starting at position i."
+                },
+                {
+                    "id": "prot_struct_new_mmseqs_b2",
+                    "placeholder": "query_kmers.???(db_kmers)",
+                    "acceptable": [
+                        "query_kmers.intersection(db_kmers)",
+                        "query_kmers & db_kmers"
+                    ],
+                    "hint": "Find the set intersection of query and database k-mers."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_colabfold_template_search",
+            "title": "ColabFold Template Feature Extraction",
+            "difficulty": "medium",
+            "description": "Implement simplified template feature extraction as used in ColabFold. Given a template structure with aligned residue mapping, compute pairwise distance and angular features for input to the structure prediction trunk.",
+            "info": "ColabFold (Mirdita et al., Nature Methods 2022) provides a free, accessible interface to AlphaFold2 and other structure predictors via Google Colab notebooks, using MMseqs2 for fast MSA generation against ColabFoldDB. Template features are extracted from PDB structures found by MMseqs2 profile search, including C-beta pairwise distances binned into 39 bins, backbone torsion angles (phi, psi, omega), and unit vectors between C-alpha atoms. These features are processed by the template embedding network and added to the pair representation. ColabFold typically finds templates with higher coverage than HHsearch used by the original AlphaFold2 pipeline. ColabFold has been cited over 10,000 times and democratized structure prediction for labs without large computational resources. Template features are particularly important for modeling conserved structural motifs.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass TemplateFeatureExtractor(nn.Module):\n    def __init__(self, num_dist_bins=39, d_template=64):\n        super().__init__()\n        self.register_buffer(\n            'dist_bin_edges',\n            torch.linspace(3.25, 50.75, num_dist_bins + 1)\n        )\n        self.dist_proj = nn.Linear(num_dist_bins, d_template)\n        self.angle_proj = nn.Linear(4, d_template)  # phi, psi for both residues\n\n    def bin_distances(self, dists):\n        # dists: (L, L)\n        bins = torch.zeros(*dists.shape, len(self.dist_bin_edges) - 1, device=dists.device)\n        for i in range(len(self.dist_bin_edges) - 1):\n            mask = (dists >= self.dist_bin_edges[i]) & (dists < self.dist_bin_edges[i+1])\n            bins[..., i] = mask.float()\n        return bins\n\n    def forward(self, template_ca_coords, template_angles):\n        # template_ca_coords: (L, 3), template_angles: (L, 2) phi/psi\n        L = template_ca_coords.shape[0]\n        diff = template_ca_coords.unsqueeze(0) - template_ca_coords.unsqueeze(1)\n        dists = {{prot_struct_new_colab_b1}}\n        dist_feats = self.dist_proj(self.bin_distances(dists))\n        # Pair angle features: concatenate angles for both residues\n        angle_i = template_angles.unsqueeze(1).expand(-1, L, -1)\n        angle_j = template_angles.unsqueeze(0).expand(L, -1, -1)\n        angle_pairs = {{prot_struct_new_colab_b2}}\n        angle_feats = self.angle_proj(angle_pairs)\n        return dist_feats + angle_feats\n\nL = 60\nmodel = TemplateFeatureExtractor()\ncoords = torch.randn(L, 3) * 15\nangles = torch.randn(L, 2)\nprint(model(coords, angles).shape)  # (60, 60, 64)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_colab_b1",
+                    "placeholder": "torch.norm(diff, dim=???)",
+                    "acceptable": [
+                        "torch.norm(diff, dim=-1)",
+                        "torch.norm(diff, dim=2)"
+                    ],
+                    "hint": "Compute Euclidean distances by taking the norm along the coordinate dimension."
+                },
+                {
+                    "id": "prot_struct_new_colab_b2",
+                    "placeholder": "torch.cat([angle_i, angle_j], dim=???)",
+                    "acceptable": [
+                        "torch.cat([angle_i, angle_j], dim=-1)",
+                        "torch.cat([angle_i, angle_j], dim=2)"
+                    ],
+                    "hint": "Concatenate the angle features along the last dimension to get 4 features per pair."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_openfold_chunk",
+            "title": "OpenFold Memory-Efficient Chunked Attention",
+            "difficulty": "hard",
+            "description": "Implement OpenFold's chunked attention mechanism that processes attention in chunks along the sequence dimension to reduce peak memory usage during inference on long proteins.",
+            "info": "OpenFold (Ahdritz et al., 2022) is an open-source reimplementation of AlphaFold2 in PyTorch that introduced several engineering innovations for memory efficiency. A key technique is chunked attention, which splits the query dimension into chunks and processes each chunk sequentially, reducing peak GPU memory from O(L^2) to O(L * chunk_size) at the cost of increased computation time. This enables inference on proteins with >2000 residues on a single GPU with 16GB memory. OpenFold also introduced low-memory attention using torch.utils.checkpoint for gradient checkpointing during training. The chunking approach is similar to FlashAttention (Dao et al., NeurIPS 2022) in concept but operates at the PyTorch level rather than the CUDA kernel level. OpenFold's codebase has become the foundation for several subsequent projects including OpenFold2 and various fine-tuned models.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport math\n\ndef chunked_attention(q, k, v, chunk_size=64):\n    \"\"\"\n    Memory-efficient attention by processing queries in chunks.\n    q, k, v: (L, H, d) where H = num_heads\n    \"\"\"\n    L, H, d = q.shape\n    outputs = []\n    for start in range(0, L, chunk_size):\n        end = min(start + chunk_size, L)\n        q_chunk = q[start:end]  # (chunk, H, d)\n        # Compute attention for this chunk against all keys\n        attn_logits = torch.einsum('chd,lhd->chl', q_chunk, k) / {{prot_struct_new_chunk_b1}}\n        attn_weights = F.softmax(attn_logits, dim=-1)\n        out_chunk = {{prot_struct_new_chunk_b2}}\n        outputs.append(out_chunk)\n    return torch.cat(outputs, dim=0)  # (L, H, d)\n\nL, H, d = 256, 8, 32\nq = torch.randn(L, H, d)\nk = torch.randn(L, H, d)\nv = torch.randn(L, H, d)\nout = chunked_attention(q, k, v, chunk_size=64)\nprint(out.shape)  # (256, 8, 32)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_chunk_b1",
+                    "placeholder": "math.???(d)",
+                    "acceptable": [
+                        "math.sqrt(d)"
+                    ],
+                    "hint": "Scale attention logits by sqrt of the head dimension."
+                },
+                {
+                    "id": "prot_struct_new_chunk_b2",
+                    "placeholder": "torch.einsum('chl,lhd->???', attn_weights, v)",
+                    "acceptable": [
+                        "torch.einsum('chl,lhd->chd', attn_weights, v)"
+                    ],
+                    "hint": "Contract over the L dimension to produce output of shape (chunk, H, d)."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_multimer_chain_embed",
+            "title": "Multimer Chain ID Embedding",
+            "difficulty": "easy",
+            "description": "Implement chain index embedding for AlphaFold-Multimer. Each residue receives an embedding based on which chain it belongs to, and the pair representation includes a same-chain indicator feature.",
+            "info": "AlphaFold-Multimer (Evans et al., 2022) extends AlphaFold2 to predict protein complexes by introducing chain-level features. Each residue receives a chain index embedding, and the pair representation includes a binary same-chain feature that helps the model distinguish intra-chain from inter-chain contacts. The relative residue position encoding is also modified to only apply within chains, preventing artificial sequence proximity signals between chains. AlphaFold-Multimer uses a modified MSA pairing strategy that aligns sequences from different chains based on shared species labels. AlphaFold3 (Abramson et al., Nature 2024) further extended the multimer approach to handle protein-nucleic acid and protein-ligand complexes. Inter-chain confidence is evaluated using the interface predicted TM-score (ipTM), which specifically measures prediction quality at protein-protein interfaces.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass ChainEmbedding(nn.Module):\n    def __init__(self, max_chains=16, d_single=384, d_pair=128):\n        super().__init__()\n        self.chain_embed = nn.Embedding(max_chains, d_single)\n        self.same_chain_proj = nn.Linear(1, d_pair)\n\n    def forward(self, chain_ids):\n        # chain_ids: (L,) integer chain indices\n        L = chain_ids.shape[0]\n        single_feat = {{prot_struct_new_chain_b1}}\n        # Same-chain indicator for pair representation\n        same_chain = (chain_ids.unsqueeze(0) == chain_ids.unsqueeze(1)).float()\n        pair_feat = self.same_chain_proj({{prot_struct_new_chain_b2}})\n        return single_feat, pair_feat\n\nchain_ids = torch.tensor([0]*50 + [1]*40 + [2]*30)  # 3-chain complex\nmodel = ChainEmbedding()\nsingle, pair = model(chain_ids)\nprint(f\"Single: {single.shape}, Pair: {pair.shape}\")\n# Single: (120, 384), Pair: (120, 120, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_chain_b1",
+                    "placeholder": "self.chain_embed(???)",
+                    "acceptable": [
+                        "self.chain_embed(chain_ids)"
+                    ],
+                    "hint": "Look up chain embeddings for each residue using its chain index."
+                },
+                {
+                    "id": "prot_struct_new_chain_b2",
+                    "placeholder": "same_chain.unsqueeze(???)",
+                    "acceptable": [
+                        "same_chain.unsqueeze(-1)",
+                        "same_chain.unsqueeze(2)"
+                    ],
+                    "hint": "Unsqueeze the same-chain indicator to add a feature dimension for the linear layer."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_protein_ligand_embed",
+            "title": "Protein-Ligand Complex Token Embedding",
+            "difficulty": "medium",
+            "description": "Implement token embedding for a protein-ligand complex where protein residues and ligand atoms use different embedding vocabularies, then are projected into a shared representation space.",
+            "info": "AlphaFold3 (Abramson et al., Nature 2024) represents protein-ligand complexes by tokenizing proteins at the residue level (20 amino acids) and small molecules at the atom level (using element types). Both token types are embedded into a shared representation space using separate embedding layers followed by a shared projection. This unified representation enables the diffusion module to jointly predict all atom coordinates. Boltz-1 (Wohlwend et al., 2024) follows a similar approach with molecule-level tokenization. RDKit is commonly used to featurize ligand atoms with properties such as element type, formal charge, and hybridization. AlphaFold3 achieved a 76% success rate on the PoseBusters benchmark for protein-ligand docking, compared to ~50% for traditional docking tools like AutoDock Vina.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass ComplexTokenEmbedding(nn.Module):\n    def __init__(self, num_aa=21, num_elements=10, d_model=256):\n        super().__init__()\n        self.protein_embed = nn.Embedding(num_aa, d_model)\n        self.ligand_embed = nn.Embedding(num_elements, d_model)\n        self.proj = nn.Linear(d_model, d_model)\n        self.norm = nn.LayerNorm(d_model)\n\n    def forward(self, protein_tokens, ligand_tokens):\n        # protein_tokens: (L_prot,) residue indices\n        # ligand_tokens: (L_lig,) element indices\n        prot_emb = self.protein_embed(protein_tokens)\n        lig_emb = self.ligand_embed(ligand_tokens)\n        combined = {{prot_struct_new_ligand_b1}}\n        combined = self.proj(combined)\n        return {{prot_struct_new_ligand_b2}}\n\nprot_tok = torch.randint(0, 21, (80,))\nlig_tok = torch.randint(0, 10, (25,))\nmodel = ComplexTokenEmbedding()\nprint(model(prot_tok, lig_tok).shape)  # (105, 256)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_ligand_b1",
+                    "placeholder": "torch.cat([prot_emb, lig_emb], dim=???)",
+                    "acceptable": [
+                        "torch.cat([prot_emb, lig_emb], dim=0)"
+                    ],
+                    "hint": "Concatenate protein and ligand embeddings along the sequence (first) dimension."
+                },
+                {
+                    "id": "prot_struct_new_ligand_b2",
+                    "placeholder": "self.???(combined)",
+                    "acceptable": [
+                        "self.norm(combined)"
+                    ],
+                    "hint": "Apply layer normalization to the projected combined embedding."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_nucleic_acid_pair",
+            "title": "Protein-Nucleic Acid Cross-Pair Features",
+            "difficulty": "medium",
+            "description": "Implement cross-pair feature computation between protein residues and nucleic acid nucleotides for structure prediction of protein-DNA/RNA complexes.",
+            "info": "Protein-nucleic acid complex prediction has become a major application of structure prediction methods. AlphaFold3 (Abramson et al., Nature 2024) predicts protein-DNA and protein-RNA complexes by treating nucleotides as additional tokens alongside protein residues. The pair representation captures both intra-molecular and inter-molecular relationships. RoseTTAFold2NA (Baek et al., 2024) was an earlier model specifically designed for protein-nucleic acid structure prediction, using a modified three-track architecture to handle the distinct backbone geometries of proteins and nucleic acids. Nucleotides are typically represented with a vocabulary of 8 tokens (4 DNA bases + 4 RNA bases, or combined with modifications). The cross-pair features between protein residues and nucleic acid nucleotides are critical for predicting binding interfaces, which are often mediated by hydrogen bonds and electrostatic interactions.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass CrossPairFeatures(nn.Module):\n    def __init__(self, d_prot=256, d_na=128, d_pair=128):\n        super().__init__()\n        self.proj_prot = nn.Linear(d_prot, d_pair)\n        self.proj_na = nn.Linear(d_na, d_pair)\n        self.combine = nn.Linear(d_pair, d_pair)\n\n    def forward(self, prot_repr, na_repr):\n        # prot_repr: (L_prot, d_prot), na_repr: (L_na, d_na)\n        prot_proj = self.proj_prot(prot_repr)  # (L_prot, d_pair)\n        na_proj = self.proj_na(na_repr)         # (L_na, d_pair)\n        # Cross outer product for inter-molecular pairs\n        cross_pair = {{prot_struct_new_na_b1}}\n        cross_pair = {{prot_struct_new_na_b2}}\n        return cross_pair\n\nprot = torch.randn(100, 256)\nna = torch.randn(30, 128)\nmodel = CrossPairFeatures()\nprint(model(prot, na).shape)  # (100, 30, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_na_b1",
+                    "placeholder": "prot_proj[:, None, :] * na_proj[None, :, ???]",
+                    "acceptable": [
+                        "prot_proj[:, None, :] * na_proj[None, :, :]"
+                    ],
+                    "hint": "Element-wise multiply with broadcasting: (L_prot, 1, d) * (1, L_na, d) -> (L_prot, L_na, d)."
+                },
+                {
+                    "id": "prot_struct_new_na_b2",
+                    "placeholder": "self.???(cross_pair)",
+                    "acceptable": [
+                        "self.combine(cross_pair)"
+                    ],
+                    "hint": "Pass the cross-pair features through the combination projection layer."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_structure_alignment_kabsch",
+            "title": "Kabsch Algorithm for Structure Alignment",
+            "difficulty": "hard",
+            "description": "Implement the Kabsch algorithm to optimally superimpose two protein structures by finding the rotation matrix that minimizes RMSD between corresponding atoms using SVD.",
+            "info": "The Kabsch algorithm (Kabsch, Acta Crystallographica 1976) finds the optimal rotation matrix to superimpose two sets of paired points by minimizing RMSD. It computes the cross-covariance matrix H = P^T * Q of centered coordinate sets, then uses SVD to extract the optimal rotation R = V * diag(1,1,det(VU^T)) * U^T. This algorithm is fundamental to structural bioinformatics and is used in TM-align (Zhang & Skolnick, Nucleic Acids Research 2005), FAPE loss computation in AlphaFold2 (Jumper et al., Nature 2021), and all structural comparison tools. The sign correction using det(VU^T) handles reflection cases where the naive SVD solution would produce an improper rotation. PyTorch's torch.linalg.svd provides efficient GPU-accelerated SVD computation suitable for batch processing of structural alignments.",
+            "code": "import torch\n\ndef kabsch_align(P, Q):\n    \"\"\"\n    Find optimal rotation to align P onto Q.\n    P, Q: (L, 3) coordinate matrices\n    Returns: R (3, 3) rotation matrix, aligned_P (L, 3)\n    \"\"\"\n    # Center both structures\n    P_centered = P - P.mean(dim=0)\n    Q_centered = Q - Q.mean(dim=0)\n    # Cross-covariance matrix\n    H = {{prot_struct_new_kabsch_b1}}\n    # SVD\n    U, S, Vh = torch.linalg.svd(H)\n    # Handle reflection: ensure proper rotation (det = +1)\n    d = torch.det(Vh.T @ U.T)\n    sign_matrix = torch.diag(torch.tensor([1.0, 1.0, d.sign()]))\n    R = {{prot_struct_new_kabsch_b2}}\n    # Apply rotation and translate\n    aligned_P = (R @ P_centered.T).T + Q.mean(dim=0)\n    return R, aligned_P\n\nP = torch.randn(80, 3)\nR_true = torch.linalg.qr(torch.randn(3, 3))[0]\nQ = (R_true @ P.T).T + torch.randn(1, 3)\nR_pred, aligned = kabsch_align(P, Q)\nrmsd = (aligned - Q).norm(dim=-1).mean()\nprint(f\"RMSD after alignment: {rmsd:.4f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_kabsch_b1",
+                    "placeholder": "P_centered.T @ ???",
+                    "acceptable": [
+                        "P_centered.T @ Q_centered"
+                    ],
+                    "hint": "Cross-covariance: H = P^T @ Q (both centered)."
+                },
+                {
+                    "id": "prot_struct_new_kabsch_b2",
+                    "placeholder": "Vh.T @ sign_matrix @ ???",
+                    "acceptable": [
+                        "Vh.T @ sign_matrix @ U.T"
+                    ],
+                    "hint": "Optimal rotation R = V * sign_correction * U^T from the SVD of H."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_dssp_secondary_structure",
+            "title": "DSSP Secondary Structure Assignment",
+            "difficulty": "medium",
+            "description": "Implement a simplified DSSP-inspired secondary structure classifier that assigns helix, sheet, or coil based on backbone dihedral angles (phi, psi) using characteristic Ramachandran regions.",
+            "info": "DSSP (Kabsch & Sander, Biopolymers 1983) is the gold-standard algorithm for assigning secondary structure from 3D coordinates, using hydrogen bond patterns to identify helices, sheets, turns, and coils. A simplified approximation uses backbone dihedral angles: alpha-helices have (phi, psi) near (-60, -45), beta-sheets near (-120, 130). Modern deep learning methods like NetSurfP-3.0 (Hoie et al., Nucleic Acids Research 2022) and s4pred (Moffat et al., Bioinformatics 2022) predict 3-state (H/E/C) and 8-state secondary structure from sequence alone with ~85% accuracy. AlphaFold2 (Jumper et al., Nature 2021) implicitly captures secondary structure through its predicted backbone frames. DSSP assignments are used as training labels for secondary structure prediction and as validation metrics for predicted structures.",
+            "code": "import torch\nimport torch.nn as nn\nimport math\n\nclass DSSPSimplified(nn.Module):\n    \"\"\"Assign secondary structure from phi/psi angles using angular distance.\"\"\"\n    def __init__(self):\n        super().__init__()\n        # Reference angles in degrees: helix (-60, -45), sheet (-120, 130)\n        self.register_buffer('helix_ref', torch.tensor([-60.0, -45.0]) * math.pi / 180)\n        self.register_buffer('sheet_ref', torch.tensor([-120.0, 130.0]) * math.pi / 180)\n\n    def angular_distance(self, angles, ref):\n        \"\"\"Circular distance between angle pairs.\"\"\"\n        diff = angles - ref\n        return {{prot_struct_new_dssp_b1}}\n\n    def forward(self, phi, psi):\n        # phi, psi: (L,) in radians\n        angles = torch.stack([phi, psi], dim=-1)  # (L, 2)\n        d_helix = self.angular_distance(angles, self.helix_ref)\n        d_sheet = self.angular_distance(angles, self.sheet_ref)\n        # Assign: 0=helix, 1=sheet, 2=coil (if neither is close)\n        threshold = 0.7  # radians\n        is_helix = d_helix < threshold\n        is_sheet = d_sheet < threshold\n        assignment = {{prot_struct_new_dssp_b2}}\n        return assignment\n\nL = 100\nphi = torch.randn(L) * 0.5 - 1.0  # roughly helix-like\npsi = torch.randn(L) * 0.5 - 0.8\nmodel = DSSPSimplified()\nss = model(phi, psi)\nprint(f\"SS distribution: H={(ss==0).sum()}, E={(ss==1).sum()}, C={(ss==2).sum()}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_dssp_b1",
+                    "placeholder": "torch.norm(torch.???(diff), dim=-1)",
+                    "acceptable": [
+                        "torch.norm(torch.remainder(diff + math.pi, 2 * math.pi) - math.pi, dim=-1)",
+                        "torch.norm(torch.atan2(torch.sin(diff), torch.cos(diff)), dim=-1)"
+                    ],
+                    "hint": "Wrap the angular difference to [-pi, pi] range using atan2(sin, cos) or remainder, then take norm."
+                },
+                {
+                    "id": "prot_struct_new_dssp_b2",
+                    "placeholder": "torch.where(is_helix, 0, torch.where(is_sheet, 1, ???))",
+                    "acceptable": [
+                        "torch.where(is_helix, 0, torch.where(is_sheet, 1, 2))",
+                        "torch.where(is_helix, torch.tensor(0), torch.where(is_sheet, torch.tensor(1), torch.tensor(2)))"
+                    ],
+                    "hint": "Nested where: helix -> 0, sheet -> 1, else coil -> 2."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_ramachandran_validation",
+            "title": "Ramachandran Plot Validation",
+            "difficulty": "easy",
+            "description": "Implement Ramachandran plot validation that checks whether predicted backbone dihedral angles (phi, psi) fall within allowed regions. Compute the fraction of residues in favored, allowed, and outlier regions.",
+            "info": "The Ramachandran plot (Ramachandran et al., Journal of Molecular Biology 1963) maps backbone dihedral angles phi and psi, revealing that steric constraints restrict most residues to specific regions. Favored regions include alpha-helix (~-60, -45), beta-sheet (~-120, 130), and left-handed helix (~60, 45). MolProbity (Williams et al., Protein Science 2018) uses Ramachandran analysis as a key validation metric: >98% of residues should be in favored regions for high-quality structures. AlphaFold2 (Jumper et al., Nature 2021) predictions typically achieve >97% Ramachandran-favored residues. Glycine and proline have distinct allowed regions due to their unique backbone properties. Ramachandran validation is routinely used in X-ray crystallography and cryo-EM structure determination to assess model quality.",
+            "code": "import torch\nimport math\n\ndef ramachandran_validate(phi, psi):\n    \"\"\"\n    Validate backbone angles against Ramachandran allowed regions.\n    phi, psi: (L,) tensors in radians\n    Returns dict with fraction favored, allowed, outlier.\n    \"\"\"\n    L = phi.shape[0]\n    # Convert to degrees for easier region checking\n    phi_deg = phi * 180 / math.pi\n    psi_deg = psi * 180 / math.pi\n\n    # Simplified favored regions (elliptical approximation)\n    # Alpha helix: center (-60, -45), semi-axes (25, 25)\n    helix_dist = ((phi_deg + 60) / 25) ** 2 + ((psi_deg + 45) / 25) ** 2\n    # Beta sheet: center (-120, 130), semi-axes (25, 25)\n    sheet_dist = ((phi_deg + 120) / 25) ** 2 + ((psi_deg - 130) / 25) ** 2\n\n    favored = {{prot_struct_new_rama_b1}}\n    allowed_threshold = 4.0  # larger ellipse for allowed\n    allowed = (helix_dist < allowed_threshold) | (sheet_dist < allowed_threshold)\n    outlier = {{prot_struct_new_rama_b2}}\n\n    return {\n        'favored': favored.float().mean().item(),\n        'allowed': (allowed & ~favored).float().mean().item(),\n        'outlier': outlier.float().mean().item()\n    }\n\nphi = torch.randn(200) - 1.0  # roughly in helix region\npsi = torch.randn(200) - 0.8\nresult = ramachandran_validate(phi, psi)\nprint(f\"Favored: {result['favored']:.1%}, Allowed: {result['allowed']:.1%}, Outlier: {result['outlier']:.1%}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_rama_b1",
+                    "placeholder": "(helix_dist < 1.0) | (sheet_dist < ???)",
+                    "acceptable": [
+                        "(helix_dist < 1.0) | (sheet_dist < 1.0)"
+                    ],
+                    "hint": "Favored region: inside the unit ellipse (distance < 1.0) for either helix or sheet."
+                },
+                {
+                    "id": "prot_struct_new_rama_b2",
+                    "placeholder": "~???",
+                    "acceptable": [
+                        "~allowed"
+                    ],
+                    "hint": "Outlier residues are those NOT in the allowed region."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_sidechain_torsion",
+            "title": "Side Chain Torsion Angle Prediction",
+            "difficulty": "medium",
+            "description": "Implement a side chain torsion angle (chi angle) prediction head that predicts rotamer angles from single residue representations. Chi angles are predicted as sin/cos pairs to handle angular periodicity.",
+            "info": "Side chain conformations are defined by torsion angles (chi1, chi2, chi3, chi4), with the number varying by amino acid type. AlphaFold2 (Jumper et al., Nature 2021) predicts chi angles as sin/cos pairs rather than raw angles to avoid discontinuity at +/-180 degrees, outputting 2 values (sin, cos) for each of up to 4 chi angles per residue. The actual angle is recovered using atan2(sin, cos). Side chain prediction has historically been a separate post-processing step using tools like SCWRL4 (Krivov et al., Proteins 2009) or rotamer libraries like Dunbrack (Shapovalov & Dunbrack, Structure 2011). AlphaFold2 integrates side chain prediction directly into its structure module using an 8-layer ResNet that takes the final single representation as input. Accurate side chain placement is critical for drug design and protein-protein interaction modeling.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SideChainAngleHead(nn.Module):\n    def __init__(self, d_single=384, num_chi=4):\n        super().__init__()\n        self.num_chi = num_chi\n        self.net = nn.Sequential(\n            nn.Linear(d_single, 256),\n            nn.ReLU(),\n            nn.Linear(256, 128),\n            nn.ReLU(),\n            nn.Linear(128, num_chi * 2)  # sin, cos for each chi\n        )\n\n    def forward(self, single_repr):\n        # single_repr: (L, d_single)\n        raw = self.net(single_repr)  # (L, num_chi * 2)\n        raw = raw.reshape(-1, self.num_chi, 2)\n        # Normalize to unit circle\n        sin_cos = {{prot_struct_new_chi_b1}}\n        return sin_cos  # (L, num_chi, 2)\n\n    def to_angles(self, sin_cos):\n        \"\"\"Convert sin/cos pairs to angles in radians.\"\"\"\n        return {{prot_struct_new_chi_b2}}\n\nsingle = torch.randn(100, 384)\nmodel = SideChainAngleHead()\nsc = model(single)\nprint(f\"Sin/cos: {sc.shape}\")\nangles = model.to_angles(sc)\nprint(f\"Angles: {angles.shape}, range: [{angles.min():.2f}, {angles.max():.2f}]\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_chi_b1",
+                    "placeholder": "torch.nn.functional.???(raw, dim=-1)",
+                    "acceptable": [
+                        "torch.nn.functional.normalize(raw, dim=-1)",
+                        "F.normalize(raw, dim=-1)"
+                    ],
+                    "hint": "Normalize the (sin, cos) pair to lie on the unit circle."
+                },
+                {
+                    "id": "prot_struct_new_chi_b2",
+                    "placeholder": "torch.???(sin_cos[..., 0], sin_cos[..., 1])",
+                    "acceptable": [
+                        "torch.atan2(sin_cos[..., 0], sin_cos[..., 1])"
+                    ],
+                    "hint": "Use atan2(sin, cos) to recover the angle in radians."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_sasa",
+            "title": "Solvent Accessible Surface Area Approximation",
+            "difficulty": "medium",
+            "description": "Implement an approximate Solvent Accessible Surface Area (SASA) computation using neighbor counting. For each atom, estimate burial based on the number of nearby atoms within a shell radius.",
+            "info": "Solvent Accessible Surface Area (SASA) measures how much of a protein's surface is exposed to solvent, computed by rolling a probe sphere (radius 1.4 Angstroms for water) over the van der Waals surface (Lee & Richards, Journal of Molecular Biology 1971). SASA is critical for predicting protein stability, folding, and binding. FreeSASA (Mitternacht, F1000Research 2016) provides efficient analytical SASA computation. Approximate methods estimate burial by counting neighbors: residues with many nearby atoms are buried (low SASA), while those with few neighbors are exposed. NetSurfP-3.0 (Hoie et al., Nucleic Acids Research 2022) predicts relative SASA from sequence alone with correlation >0.8 to experimental values. AlphaFold2-predicted structures have SASA values highly consistent with experimental structures, enabling proteome-scale surface accessibility analysis.",
+            "code": "import torch\n\ndef approximate_sasa(coords, radii, probe_radius=1.4, shell_radius=10.0):\n    \"\"\"\n    Approximate per-atom SASA by neighbor counting.\n    coords: (N, 3) atom coordinates\n    radii: (N,) van der Waals radii\n    Returns: (N,) approximate relative SASA [0, 1]\n    \"\"\"\n    N = coords.shape[0]\n    # Pairwise distances\n    diff = coords.unsqueeze(0) - coords.unsqueeze(1)\n    dists = torch.norm(diff, dim=-1)  # (N, N)\n\n    # Count neighbors within shell radius (excluding self)\n    contact_radius = radii.unsqueeze(0) + radii.unsqueeze(1) + 2 * probe_radius\n    is_neighbor = (dists < shell_radius) & (dists > {{prot_struct_new_sasa_b1}})\n    neighbor_count = is_neighbor.float().sum(dim=-1)  # (N,)\n\n    # Convert to approximate relative SASA\n    max_neighbors = 25.0\n    relative_sasa = {{prot_struct_new_sasa_b2}}\n    return relative_sasa\n\nN = 500\ncoords = torch.randn(N, 3) * 15\nradii = torch.ones(N) * 1.8  # approximate vdW radius\nsasa = approximate_sasa(coords, radii)\nprint(f\"SASA shape: {sasa.shape}, mean: {sasa.mean():.3f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_sasa_b1",
+                    "placeholder": "??? (minimum distance to exclude self-contact)",
+                    "acceptable": [
+                        "0.0",
+                        "0",
+                        "1e-6",
+                        "0.001"
+                    ],
+                    "hint": "Exclude self-contact by requiring distance > 0."
+                },
+                {
+                    "id": "prot_struct_new_sasa_b2",
+                    "placeholder": "1.0 - torch.clamp(neighbor_count / max_neighbors, ???, 1.0)",
+                    "acceptable": [
+                        "1.0 - torch.clamp(neighbor_count / max_neighbors, 0.0, 1.0)",
+                        "1.0 - torch.clamp(neighbor_count / max_neighbors, min=0.0, max=1.0)"
+                    ],
+                    "hint": "More neighbors means more buried (lower SASA). Clamp the ratio between 0 and 1."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_hydrogen_bond",
+            "title": "Hydrogen Bond Detection",
+            "difficulty": "easy",
+            "description": "Implement a geometric criterion for detecting backbone hydrogen bonds between amide N-H donors and carbonyl C=O acceptors. Hydrogen bonds are identified by distance and angle thresholds.",
+            "info": "Hydrogen bonds are the primary stabilizing interactions in protein secondary structure: alpha-helices form i to i+4 backbone H-bonds, while beta-sheets form inter-strand H-bonds. DSSP (Kabsch & Sander, Biopolymers 1983) uses an electrostatic energy criterion for H-bond detection: E = 0.084 * (1/r_ON + 1/r_CH - 1/r_OH - 1/r_CN) * 332 kcal/mol, with H-bonds having E < -0.5 kcal/mol. A simpler geometric criterion uses donor-acceptor distance < 3.5 Angstroms and D-H-A angle > 120 degrees. Hydrogen bond networks are critical for AlphaFold2 (Jumper et al., Nature 2021) to correctly predict protein folds, as they define secondary structure elements. Tools like HBplus (McDonald & Thornton, Journal of Molecular Biology 1994) provide systematic H-bond analysis. Accurate H-bond detection is essential for validating predicted structures.",
+            "code": "import torch\n\ndef detect_hbonds(n_coords, o_coords, h_coords, max_dist=3.5, min_angle_deg=120.0):\n    \"\"\"\n    Detect backbone N-H...O=C hydrogen bonds.\n    n_coords: (L, 3) nitrogen positions (donors)\n    o_coords: (L, 3) oxygen positions (acceptors)\n    h_coords: (L, 3) amide hydrogen positions\n    Returns: (L, L) boolean H-bond matrix\n    \"\"\"\n    L = n_coords.shape[0]\n    # Donor-acceptor distances: N to O\n    diff_no = n_coords.unsqueeze(1) - o_coords.unsqueeze(0)\n    dist_no = {{prot_struct_new_hbond_b1}}\n\n    # H-bond angle: N-H...O\n    vec_hn = n_coords - h_coords  # (L, 3)\n    vec_ho = o_coords.unsqueeze(0) - h_coords.unsqueeze(1)  # (L, L, 3)\n    vec_hn_exp = vec_hn.unsqueeze(1).expand_as(vec_ho)\n    cos_angle = torch.nn.functional.cosine_similarity(vec_hn_exp, vec_ho, dim=-1)\n    min_cos = torch.cos(torch.tensor(min_angle_deg * 3.14159 / 180.0))\n\n    hbond_mask = (dist_no < max_dist) & {{prot_struct_new_hbond_b2}}\n    return hbond_mask\n\nL = 50\nn = torch.randn(L, 3) * 5\no = torch.randn(L, 3) * 5\nh = n + 0.1 * torch.randn(L, 3)\nhbonds = detect_hbonds(n, o, h)\nprint(f\"H-bonds detected: {hbonds.sum().item()} out of {L*L} pairs\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_hbond_b1",
+                    "placeholder": "torch.norm(diff_no, dim=???)",
+                    "acceptable": [
+                        "torch.norm(diff_no, dim=-1)",
+                        "torch.norm(diff_no, dim=2)"
+                    ],
+                    "hint": "Compute Euclidean distances along the coordinate dimension."
+                },
+                {
+                    "id": "prot_struct_new_hbond_b2",
+                    "placeholder": "(cos_angle > ???)",
+                    "acceptable": [
+                        "(cos_angle > min_cos)"
+                    ],
+                    "hint": "H-bond angle criterion: cosine of angle must exceed cosine of minimum angle threshold."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_structural_motif",
+            "title": "Structural Motif Detection via Distance Pattern Matching",
+            "difficulty": "hard",
+            "description": "Implement structural motif detection by matching a query distance pattern against all possible residue subsets in a target protein. Find occurrences of a small structural motif (e.g., catalytic triad) within a protein.",
+            "info": "Structural motif detection identifies recurring 3D arrangements of residues in protein structures, such as catalytic triads (Ser-His-Asp) in serine proteases. Tools like DALI (Holm, Nucleic Acids Research 2022) and mTM-align (Dong et al., Nature Methods 2024) perform structural comparison at different scales. Motif detection typically involves matching inter-residue distance patterns: given a query motif with known distances between key residues, find combinations in the target that match within tolerance. ProFunc (Laskowski et al., Nucleic Acids Research 2005) detects enzyme active sites using 3D templates. AlphaFold2-predicted structures (Jumper et al., Nature 2021) can be searched for structural motifs, enabling functional annotation of predicted proteomes. The combinatorial search over all possible residue subsets is NP-hard in general but tractable for small motifs (3-5 residues) using distance filtering.",
+            "code": "import torch\nfrom itertools import combinations\n\ndef detect_motif(target_coords, motif_dists, tolerance=2.0):\n    \"\"\"\n    Find residue combinations matching a structural motif.\n    target_coords: (L, 3) C-alpha coordinates\n    motif_dists: (M, M) pairwise distances of motif residues\n    tolerance: distance matching tolerance in Angstroms\n    Returns: list of matching residue index tuples\n    \"\"\"\n    L = target_coords.shape[0]\n    M = motif_dists.shape[0]\n    # Precompute full distance matrix\n    diff = target_coords.unsqueeze(0) - target_coords.unsqueeze(1)\n    all_dists = torch.norm(diff, dim=-1)  # (L, L)\n\n    matches = []\n    for combo in combinations(range(L), M):\n        indices = {{prot_struct_new_motif_b1}}\n        # Extract sub-distance matrix\n        sub_dists = all_dists[indices][:, indices]  # (M, M)\n        # Check if distances match within tolerance\n        error = {{prot_struct_new_motif_b2}}\n        if error < tolerance:\n            matches.append(combo)\n    return matches\n\n# Example: detect a triangle motif\nL = 30\ncoords = torch.randn(L, 3) * 10\n# Define a triangular motif with known distances\nmotif_d = torch.tensor([[0.0, 5.0, 8.0],\n                         [5.0, 0.0, 6.0],\n                         [8.0, 6.0, 0.0]])\nmatches = detect_motif(coords, motif_d, tolerance=2.5)\nprint(f\"Found {len(matches)} motif matches\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_motif_b1",
+                    "placeholder": "torch.tensor(???)",
+                    "acceptable": [
+                        "torch.tensor(list(combo))",
+                        "torch.tensor(combo)"
+                    ],
+                    "hint": "Convert the combination tuple to a tensor for indexing."
+                },
+                {
+                    "id": "prot_struct_new_motif_b2",
+                    "placeholder": "(sub_dists - motif_dists).???.item()",
+                    "acceptable": [
+                        "(sub_dists - motif_dists).abs().max().item()",
+                        "(sub_dists - motif_dists).abs().mean().item()"
+                    ],
+                    "hint": "Compute the maximum or mean absolute difference between sub-distances and motif distances."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_domain_decomposition",
+            "title": "Domain Decomposition from Contact Map",
+            "difficulty": "hard",
+            "description": "Implement a simple domain decomposition algorithm that identifies structural domains from a protein contact map using spectral clustering on the contact adjacency matrix.",
+            "info": "Domain decomposition partitions a protein into independently folding structural units. CATH (Sillitoe et al., Nucleic Acids Research 2021) and SCOP (Andreeva et al., Nucleic Acids Research 2020) databases classify protein domains hierarchically. Spectral clustering on contact maps provides an automated decomposition by finding blocks of dense contacts: eigenvalues of the graph Laplacian reveal the number of domains, and the Fiedler vector (second-smallest eigenvector) defines the domain boundary. AlphaFold2's PAE matrix (Jumper et al., Nature 2021) can also be used for domain parsing, as inter-domain PAE values are typically higher than intra-domain values. ChainSaw (Sheridan et al., 2024) uses deep learning on AlphaFold PAE matrices for domain decomposition. Traditional methods like PDP (Alexandrov & Shindyalov, Proteins 2003) use a combination of contact density and geometric criteria.",
+            "code": "import torch\n\ndef domain_decomposition(contact_map, num_domains=2):\n    \"\"\"\n    Spectral clustering-based domain decomposition.\n    contact_map: (L, L) binary contact adjacency matrix\n    num_domains: number of domains to identify\n    Returns: (L,) domain assignments\n    \"\"\"\n    L = contact_map.shape[0]\n    # Compute graph Laplacian: L = D - A\n    degree = contact_map.sum(dim=-1)\n    D = torch.diag(degree)\n    laplacian = {{prot_struct_new_domain_b1}}\n\n    # Eigendecomposition (use symmetric normalized Laplacian for stability)\n    D_inv_sqrt = torch.diag(1.0 / (degree.sqrt() + 1e-8))\n    L_norm = D_inv_sqrt @ laplacian @ D_inv_sqrt\n    eigenvalues, eigenvectors = torch.linalg.eigh(L_norm)\n\n    # Use first num_domains eigenvectors (smallest eigenvalues) for clustering\n    features = eigenvectors[:, :num_domains]  # (L, num_domains)\n    # Simple threshold on Fiedler vector for 2 domains\n    fiedler = eigenvectors[:, 1]\n    assignments = {{prot_struct_new_domain_b2}}\n    return assignments\n\nL = 100\n# Create a block-diagonal contact map (2 domains)\ncmap = torch.zeros(L, L)\ncmap[:50, :50] = (torch.rand(50, 50) > 0.7).float()\ncmap[50:, 50:] = (torch.rand(50, 50) > 0.7).float()\ncmap = (cmap + cmap.T).clamp(max=1)\nassign = domain_decomposition(cmap)\nprint(f\"Domain 0: {(assign==0).sum()}, Domain 1: {(assign==1).sum()}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_domain_b1",
+                    "placeholder": "D - ???",
+                    "acceptable": [
+                        "D - contact_map"
+                    ],
+                    "hint": "The graph Laplacian is L = D - A, where D is degree matrix and A is adjacency matrix."
+                },
+                {
+                    "id": "prot_struct_new_domain_b2",
+                    "placeholder": "(fiedler > ???).long()",
+                    "acceptable": [
+                        "(fiedler > 0).long()",
+                        "(fiedler > fiedler.median()).long()"
+                    ],
+                    "hint": "Threshold the Fiedler vector at 0 (or median) to split into two domains."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_homology_model_build",
+            "title": "Homology Modeling: Template-Based Coordinate Transfer",
+            "difficulty": "easy",
+            "description": "Implement the core step of homology modeling: transferring C-alpha coordinates from a template structure to a query sequence based on sequence alignment. Aligned positions copy template coordinates; insertions are interpolated.",
+            "info": "Homology modeling (also called comparative modeling) builds a 3D model of a protein using a homologous template structure. SWISS-MODEL (Waterhouse et al., Nucleic Acids Research 2018) and Modeller (Sali & Blundell, Journal of Molecular Biology 1993) are classic tools for this task. The key steps are: (1) template identification, (2) sequence alignment, (3) coordinate transfer from aligned template residues, (4) loop modeling for insertions, and (5) side chain placement. For aligned positions, backbone coordinates are directly copied; for insertions/deletions, coordinates must be built or interpolated. While AlphaFold2 (Jumper et al., Nature 2021) has largely superseded homology modeling in accuracy, the conceptual framework remains important for understanding structure prediction. Template quality is measured by sequence identity to the query: >50% identity typically yields models within 1 Angstrom RMSD.",
+            "code": "import torch\n\ndef build_homology_model(template_coords, alignment):\n    \"\"\"\n    Transfer coordinates from template to query based on alignment.\n    template_coords: (L_templ, 3) template C-alpha positions\n    alignment: list of (query_idx, template_idx) pairs, None for insertions\n    Returns: (L_query, 3) model coordinates\n    \"\"\"\n    L_query = max(a[0] for a in alignment if a is not None) + 1\n    model_coords = torch.zeros(L_query, 3)\n    assigned = torch.zeros(L_query, dtype=torch.bool)\n\n    for mapping in alignment:\n        if mapping is not None:\n            q_idx, t_idx = mapping\n            model_coords[q_idx] = {{prot_struct_new_homology_b1}}\n            assigned[q_idx] = True\n\n    # Interpolate unassigned positions (simple linear)\n    for i in range(L_query):\n        if not assigned[i]:\n            left = i - 1\n            while left >= 0 and not assigned[left]:\n                left -= 1\n            right = i + 1\n            while right < L_query and not assigned[right]:\n                right += 1\n            if left >= 0 and right < L_query:\n                frac = (i - left) / (right - left)\n                model_coords[i] = {{prot_struct_new_homology_b2}}\n    return model_coords\n\ntemplate = torch.randn(50, 3) * 10\nalignment = [(i, i) if i % 5 != 3 else None for i in range(50)]\nalignment = [a for a in alignment if a is not None]\nmodel = build_homology_model(template, alignment)\nprint(f\"Model shape: {model.shape}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_homology_b1",
+                    "placeholder": "template_coords[???]",
+                    "acceptable": [
+                        "template_coords[t_idx]"
+                    ],
+                    "hint": "Copy the template coordinates at the aligned template index."
+                },
+                {
+                    "id": "prot_struct_new_homology_b2",
+                    "placeholder": "(1 - frac) * model_coords[left] + frac * model_coords[???]",
+                    "acceptable": [
+                        "(1 - frac) * model_coords[left] + frac * model_coords[right]"
+                    ],
+                    "hint": "Linear interpolation between the nearest assigned positions on each side."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_ab_initio_fragment",
+            "title": "Ab Initio Fragment Assembly Scoring",
+            "difficulty": "medium",
+            "description": "Implement a fragment-based scoring function for ab initio protein modeling. Score candidate fragments by comparing their predicted distance distributions against the model's current inter-residue distances.",
+            "info": "Ab initio (or de novo) structure prediction builds protein models without templates, historically using fragment assembly from known structures. Rosetta (Simons et al., Journal of Molecular Biology 1997) pioneered this approach, assembling proteins from 3-mer and 9-mer fragments drawn from a fragment library. The scoring function combines physics-based energy terms with knowledge-based statistical potentials. Fragment insertion moves are evaluated using Metropolis-Hastings sampling. While AlphaFold2 (Jumper et al., Nature 2021) and related deep learning methods have largely replaced fragment assembly for structure prediction, Rosetta remains important for protein design (Dauparas et al., Science 2022). The trRosetta method (Yang et al., PNAS 2020) combined deep learning-predicted distance distributions with Rosetta's energy minimization, serving as a bridge between traditional and modern approaches.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef score_fragment(current_coords, fragment_coords, position,\n                   predicted_dist_probs, dist_bins):\n    \"\"\"\n    Score a fragment insertion at given position.\n    current_coords: (L, 3) current model coordinates\n    fragment_coords: (frag_len, 3) fragment coordinates\n    position: start position for insertion\n    predicted_dist_probs: (L, L, num_bins) predicted distance distributions\n    dist_bins: (num_bins,) bin centers\n    \"\"\"\n    frag_len = fragment_coords.shape[0]\n    # Create candidate model with fragment inserted\n    candidate = current_coords.clone()\n    candidate[position:position + frag_len] = fragment_coords\n\n    # Compute distances from fragment residues to all others\n    frag_idx = torch.arange(position, position + frag_len)\n    frag_dists = torch.norm(\n        candidate[frag_idx].unsqueeze(1) - candidate.unsqueeze(0),\n        dim=-1\n    )  # (frag_len, L)\n\n    # Score against predicted distributions\n    score = 0.0\n    for fi, gi in enumerate(range(position, position + frag_len)):\n        for j in range(current_coords.shape[0]):\n            dist = frag_dists[fi, j]\n            # Find closest bin\n            bin_idx = {{prot_struct_new_frag_b1}}\n            score += {{prot_struct_new_frag_b2}}\n    return score\n\nL = 50\ncoords = torch.randn(L, 3) * 10\nfrag = torch.randn(9, 3) * 2\ndist_probs = torch.softmax(torch.randn(L, L, 32), dim=-1)\nbins = torch.linspace(2, 22, 32)\ns = score_fragment(coords, frag, 10, dist_probs, bins)\nprint(f\"Fragment score: {s:.2f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_frag_b1",
+                    "placeholder": "(dist - dist_bins).abs().???()",
+                    "acceptable": [
+                        "(dist - dist_bins).abs().argmin()",
+                        "(dist - dist_bins).abs().argmin().item()"
+                    ],
+                    "hint": "Find the bin index closest to the actual distance."
+                },
+                {
+                    "id": "prot_struct_new_frag_b2",
+                    "placeholder": "torch.log(predicted_dist_probs[gi, j, ???] + 1e-8).item()",
+                    "acceptable": [
+                        "torch.log(predicted_dist_probs[gi, j, bin_idx] + 1e-8).item()"
+                    ],
+                    "hint": "Log-probability of the observed distance under the predicted distribution at the closest bin."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_molecular_surface",
+            "title": "Molecular Surface Computation (Grid-Based)",
+            "difficulty": "hard",
+            "description": "Implement a grid-based molecular surface computation by evaluating atom density on a 3D grid. Points near the molecular surface have density close to an isovalue threshold.",
+            "info": "Molecular surface representations are essential for analyzing protein binding sites and electrostatic properties. Connolly surfaces (Connolly, Journal of Applied Crystallography 1983) define the solvent-excluded surface using a probe sphere. A grid-based approximation evaluates a smooth density function (sum of Gaussian atom densities) on a 3D grid, where the isosurface at a threshold value approximates the molecular surface. This approach is used by tools like MSMS (Sanner et al., Biopolymers 1996) and PyMOL's surface renderer. Modern deep learning methods like dMaSIF (Sverrisson et al., NeurIPS 2021) learn on molecular surfaces directly for tasks like binding site prediction. AlphaFold2 (Jumper et al., Nature 2021) does not explicitly compute surfaces, but downstream analysis of predicted structures frequently uses surface representations for docking and molecular dynamics.",
+            "code": "import torch\nimport math\n\ndef compute_molecular_surface(atom_coords, atom_radii, grid_size=32, padding=5.0, sigma=1.0):\n    \"\"\"\n    Grid-based molecular surface computation.\n    atom_coords: (N, 3) atom positions\n    atom_radii: (N,) van der Waals radii\n    Returns: grid (G, G, G) density values, grid_origin (3,)\n    \"\"\"\n    # Define grid bounds\n    min_coords = atom_coords.min(dim=0).values - padding\n    max_coords = atom_coords.max(dim=0).values + padding\n\n    # Create 3D grid\n    x = torch.linspace(min_coords[0], max_coords[0], grid_size)\n    y = torch.linspace(min_coords[1], max_coords[1], grid_size)\n    z = torch.linspace(min_coords[2], max_coords[2], grid_size)\n    gx, gy, gz = torch.meshgrid(x, y, z, indexing='ij')\n    grid_points = {{prot_struct_new_surface_b1}}  # (G*G*G, 3)\n\n    # Compute density: sum of Gaussian contributions from each atom\n    density = torch.zeros(grid_points.shape[0])\n    for i in range(atom_coords.shape[0]):\n        diff = grid_points - atom_coords[i]\n        dist_sq = (diff ** 2).sum(dim=-1)\n        r = atom_radii[i]\n        density += {{prot_struct_new_surface_b2}}\n\n    return density.reshape(grid_size, grid_size, grid_size), min_coords\n\nN = 50\ncoords = torch.randn(N, 3) * 5\nradii = torch.ones(N) * 1.8\ngrid, origin = compute_molecular_surface(coords, radii, grid_size=16)\nprint(f\"Grid shape: {grid.shape}, density range: [{grid.min():.2f}, {grid.max():.2f}]\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_surface_b1",
+                    "placeholder": "torch.stack([gx.flatten(), gy.flatten(), gz.flatten()], dim=???)",
+                    "acceptable": [
+                        "torch.stack([gx.flatten(), gy.flatten(), gz.flatten()], dim=-1)",
+                        "torch.stack([gx.flatten(), gy.flatten(), gz.flatten()], dim=1)"
+                    ],
+                    "hint": "Stack flattened grid coordinates along the last dimension to get (G^3, 3) points."
+                },
+                {
+                    "id": "prot_struct_new_surface_b2",
+                    "placeholder": "torch.exp(-dist_sq / (2 * ??? ** 2))",
+                    "acceptable": [
+                        "torch.exp(-dist_sq / (2 * r ** 2))",
+                        "torch.exp(-dist_sq / (2 * (r * sigma) ** 2))"
+                    ],
+                    "hint": "Gaussian density contribution falls off with the atom's radius."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_af3_token_pair_trunk",
+            "title": "AlphaFold3 Pairformer Trunk Block",
+            "difficulty": "hard",
+            "description": "Implement a simplified Pairformer block from AlphaFold3's trunk, which replaces the Evoformer's MSA track with a single-track pair representation update using triangular attention and transitions.",
+            "info": "AlphaFold3 (Abramson et al., Nature 2024) replaced the Evoformer with a Pairformer trunk that operates solely on single and pair representations, eliminating the explicit MSA processing track. The Pairformer processes pair representations using triangular multiplicative updates, triangular self-attention (both starting and ending node variants), and pair transitions. Single representations are updated through attention biased by the pair representation. This simplification was enabled by preprocessing MSA information into initial pair features before the trunk, rather than iteratively refining MSA features. The Pairformer has 48 blocks (same as AlphaFold2's Evoformer) but is more computationally efficient because it avoids the O(N_seq * L^2) cost of MSA attention. The architecture change also facilitates handling non-protein molecules that lack MSA information.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PairformerBlock(nn.Module):\n    \"\"\"Simplified AF3 Pairformer block.\"\"\"\n    def __init__(self, d_pair=128, d_single=256):\n        super().__init__()\n        # Triangular multiplicative updates\n        self.tri_mul_out = nn.Sequential(\n            nn.LayerNorm(d_pair),\n            nn.Linear(d_pair, d_pair),\n            nn.ReLU(),\n            nn.Linear(d_pair, d_pair)\n        )\n        # Pair transition\n        self.pair_transition = nn.Sequential(\n            nn.LayerNorm(d_pair),\n            nn.Linear(d_pair, 4 * d_pair),\n            nn.ReLU(),\n            nn.Linear(4 * d_pair, d_pair)\n        )\n        # Single representation update via pair-biased attention\n        self.single_attn = nn.MultiheadAttention(d_single, num_heads=8, batch_first=True)\n        self.pair_to_bias = nn.Linear(d_pair, 8)  # num_heads\n\n    def forward(self, pair, single):\n        # Pair updates\n        pair = pair + {{prot_struct_new_pairformer_b1}}\n        pair = pair + self.pair_transition(pair)\n\n        # Single update with pair bias\n        L = single.shape[0]\n        bias = self.pair_to_bias(pair).permute(2, 0, 1)  # (H, L, L)\n        single_in = single.unsqueeze(0)  # (1, L, d_single)\n        attn_out, _ = self.single_attn(single_in, single_in, single_in,\n                                        attn_mask={{prot_struct_new_pairformer_b2}})\n        single = single + attn_out.squeeze(0)\n        return pair, single\n\nL = 60\npair = torch.randn(L, L, 128)\nsingle = torch.randn(L, 256)\nmodel = PairformerBlock()\npair_out, single_out = model(pair, single)\nprint(f\"Pair: {pair_out.shape}, Single: {single_out.shape}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_pairformer_b1",
+                    "placeholder": "self.???(pair)",
+                    "acceptable": [
+                        "self.tri_mul_out(pair)"
+                    ],
+                    "hint": "Apply the triangular multiplicative update to the pair representation."
+                },
+                {
+                    "id": "prot_struct_new_pairformer_b2",
+                    "placeholder": "bias.repeat(1, 1, 1).reshape(??? * 8, L, L)",
+                    "acceptable": [
+                        "bias.repeat(1, 1, 1).reshape(1 * 8, L, L)",
+                        "bias.reshape(8, L, L)"
+                    ],
+                    "hint": "Reshape bias to (batch_size * num_heads, L, L) for the attention mask format."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_lddt_loss",
+            "title": "LDDT Loss for Structure Training",
+            "difficulty": "medium",
+            "description": "Implement the Local Distance Difference Test (LDDT) as a differentiable loss function for training structure prediction models. LDDT measures preservation of local inter-atomic distances.",
+            "info": "LDDT (Local Distance Difference Test) (Mariani et al., Bioinformatics 2013) measures the fraction of inter-atomic distances within 15 Angstroms that are preserved within tolerance thresholds (0.5, 1, 2, 4 Angstroms). Unlike RMSD, LDDT does not require structural superposition, making it a purely local quality metric. AlphaFold2 (Jumper et al., Nature 2021) uses LDDT as both a confidence metric (pLDDT) and an auxiliary training loss. A differentiable approximation replaces the hard threshold with a sigmoid function, enabling gradient-based optimization. LDDT values range from 0 to 1, where 1 indicates perfect preservation of all local distances. The 15 Angstrom inclusion radius makes LDDT insensitive to domain orientation errors while capturing local backbone and side chain accuracy. CASP assessors (Kryshtafovych et al., Proteins 2021) use lDDT as a primary evaluation metric alongside GDT-TS and TM-score.",
+            "code": "import torch\n\ndef differentiable_lddt(pred_coords, true_coords, cutoff=15.0, temperature=0.5):\n    \"\"\"\n    Differentiable LDDT loss.\n    pred_coords, true_coords: (L, 3)\n    Returns: scalar LDDT score (higher is better)\n    \"\"\"\n    # True distance matrix\n    true_diff = true_coords.unsqueeze(0) - true_coords.unsqueeze(1)\n    true_dists = torch.norm(true_diff, dim=-1)  # (L, L)\n\n    # Predicted distance matrix\n    pred_diff = pred_coords.unsqueeze(0) - pred_coords.unsqueeze(1)\n    pred_dists = torch.norm(pred_diff, dim=-1)\n\n    # Mask: only consider pairs within cutoff in true structure\n    mask = (true_dists < cutoff) & (true_dists > 0.01)  # exclude self\n\n    # Distance difference\n    dist_diff = {{prot_struct_new_lddt_b1}}\n\n    thresholds = [0.5, 1.0, 2.0, 4.0]\n    score = 0.0\n    for t in thresholds:\n        # Smooth approximation of (dist_diff < t) using sigmoid\n        preserved = {{prot_struct_new_lddt_b2}}\n        score += (preserved * mask.float()).sum() / mask.float().sum()\n\n    return score / len(thresholds)\n\npred = torch.randn(60, 3, requires_grad=True)\ntrue = pred.detach() + 0.3 * torch.randn(60, 3)\nlddt = differentiable_lddt(pred, true)\nprint(f\"LDDT: {lddt:.3f}\")\nlddt.backward()\nprint(f\"Gradient norm: {pred.grad.norm():.4f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_lddt_b1",
+                    "placeholder": "torch.abs(pred_dists - ???)",
+                    "acceptable": [
+                        "torch.abs(pred_dists - true_dists)",
+                        "(pred_dists - true_dists).abs()"
+                    ],
+                    "hint": "Absolute difference between predicted and true inter-residue distances."
+                },
+                {
+                    "id": "prot_struct_new_lddt_b2",
+                    "placeholder": "torch.sigmoid((t - dist_diff) / ???)",
+                    "acceptable": [
+                        "torch.sigmoid((t - dist_diff) / temperature)"
+                    ],
+                    "hint": "Sigmoid smoothly approximates the step function (dist_diff < t), controlled by temperature."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_relative_pos_encoding",
+            "title": "Relative Position Encoding for Pair Representation",
+            "difficulty": "easy",
+            "description": "Implement relative position encoding for the pair representation, where the relative sequence separation between residue pairs is encoded as a learned embedding clipped to a maximum value.",
+            "info": "Relative position encoding is a fundamental feature in protein structure prediction models. AlphaFold2 (Jumper et al., Nature 2021) encodes the relative sequence separation |i - j| between residue pairs as a learned embedding, clipped to a maximum value (typically +/- 32 residues). This encoding is added to the initial pair representation and helps the model reason about sequence-local contacts versus long-range interactions. For AlphaFold-Multimer (Evans et al., 2022), relative position encoding is only applied within the same chain to avoid creating spurious proximity signals between chains. The concept of relative position encoding was popularized by Transformer-XL (Dai et al., ACL 2019) and Music Transformer (Huang et al., ICLR 2019). In the context of protein structure, relative position is crucial because contacts between residues close in sequence (local contacts) are fundamentally different from those far apart (long-range contacts).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass RelativePositionEncoding(nn.Module):\n    def __init__(self, max_rel_pos=32, d_pair=128):\n        super().__init__()\n        self.max_rel_pos = max_rel_pos\n        # 2 * max_rel_pos + 1 possible values: -32, ..., 0, ..., +32\n        self.embed = nn.Embedding(2 * max_rel_pos + 1, d_pair)\n\n    def forward(self, residue_indices):\n        # residue_indices: (L,) integer positions\n        L = residue_indices.shape[0]\n        # Relative positions: (L, L)\n        rel_pos = residue_indices.unsqueeze(1) - residue_indices.unsqueeze(0)\n        # Clip to [-max_rel_pos, max_rel_pos]\n        rel_pos = {{prot_struct_new_relpos_b1}}\n        # Shift to non-negative indices for embedding lookup\n        rel_pos_idx = rel_pos + {{prot_struct_new_relpos_b2}}\n        return self.embed(rel_pos_idx)  # (L, L, d_pair)\n\nresidues = torch.arange(100)\nmodel = RelativePositionEncoding()\nprint(model(residues).shape)  # (100, 100, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_relpos_b1",
+                    "placeholder": "torch.clamp(rel_pos, -self.max_rel_pos, ???)",
+                    "acceptable": [
+                        "torch.clamp(rel_pos, -self.max_rel_pos, self.max_rel_pos)"
+                    ],
+                    "hint": "Clamp relative positions to the range [-max_rel_pos, max_rel_pos]."
+                },
+                {
+                    "id": "prot_struct_new_relpos_b2",
+                    "placeholder": "self.???",
+                    "acceptable": [
+                        "self.max_rel_pos"
+                    ],
+                    "hint": "Shift by max_rel_pos so indices range from 0 to 2*max_rel_pos."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_msa_subsampling",
+            "title": "MSA Depth Subsampling for Training",
+            "difficulty": "easy",
+            "description": "Implement MSA subsampling strategies used during training of structure prediction models. AlphaFold2 randomly subsamples MSA sequences with a bias toward more diverse sequences.",
+            "info": "MSA subsampling is critical for training efficiency and regularization in protein structure prediction. AlphaFold2 (Jumper et al., Nature 2021) subsamples MSAs to a maximum of 512 sequences during training, using a diversity-weighted sampling scheme that prefers sequences with more unique residue types at each position. ColabFold (Mirdita et al., Nature Methods 2022) generates MSAs using MMseqs2 against ColabFoldDB, often producing thousands of sequences that must be subsampled for inference. During evaluation, AlphaFold2 uses up to 5120 MSA sequences for maximum accuracy. The subsampling approach acts as data augmentation, presenting different MSA subsets across training iterations. OpenFold (Ahdritz et al., 2022) implements configurable MSA subsampling with cluster-based sampling to maintain diversity. Deeper MSAs generally improve prediction accuracy, particularly for targets with limited sequence conservation.",
+            "code": "import torch\n\ndef subsample_msa(msa_tokens, max_seqs=512, method='diversity'):\n    \"\"\"\n    Subsample MSA sequences.\n    msa_tokens: (N_seq, L) integer token tensor\n    max_seqs: maximum number of sequences to keep\n    Returns: subsampled (max_seqs, L) tensor\n    \"\"\"\n    N, L = msa_tokens.shape\n    if N <= max_seqs:\n        return msa_tokens\n\n    # Always keep the query (first sequence)\n    if method == 'random':\n        perm = torch.randperm(N - 1) + 1\n        selected = torch.cat([torch.tensor([0]), perm[:max_seqs - 1]])\n    elif method == 'diversity':\n        # Weight by number of unique residues per sequence\n        diversity = torch.tensor([\n            {{prot_struct_new_msasub_b1}}\n            for i in range(N)\n        ]).float()\n        diversity[0] = float('inf')  # always keep query\n        probs = diversity / diversity.sum()\n        selected = {{prot_struct_new_msasub_b2}}\n\n    return msa_tokens[selected]\n\nmsa = torch.randint(0, 22, (2000, 150))\nsubsampled = subsample_msa(msa, max_seqs=512)\nprint(f\"Original: {msa.shape}, Subsampled: {subsampled.shape}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_msasub_b1",
+                    "placeholder": "msa_tokens[i].???.item()",
+                    "acceptable": [
+                        "msa_tokens[i].unique().numel()",
+                        "len(msa_tokens[i].unique())"
+                    ],
+                    "hint": "Count the number of unique amino acid types in sequence i."
+                },
+                {
+                    "id": "prot_struct_new_msasub_b2",
+                    "placeholder": "torch.multinomial(probs, max_seqs, replacement=???)",
+                    "acceptable": [
+                        "torch.multinomial(probs, max_seqs, replacement=False)"
+                    ],
+                    "hint": "Sample without replacement to get max_seqs unique sequence indices."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_iptm_interface",
+            "title": "Interface pTM Score for Multimer Evaluation",
+            "difficulty": "medium",
+            "description": "Implement the interface predicted TM-score (ipTM) that specifically evaluates the quality of predicted protein-protein interfaces by computing pTM only over inter-chain residue pairs.",
+            "info": "The interface predicted TM-score (ipTM) was introduced in AlphaFold-Multimer (Evans et al., 2022) to evaluate the confidence of predicted protein-protein interfaces specifically, rather than overall structure quality. ipTM restricts the TM-score computation to inter-chain residue pairs, providing a targeted confidence metric for binding mode prediction. AlphaFold3 (Abramson et al., Nature 2024) uses a weighted combination of ipTM and pTM (0.8 * ipTM + 0.2 * pTM) as its primary ranking metric for multimer predictions. An ipTM > 0.8 generally indicates a confidently predicted interface, while ipTM < 0.5 suggests the interaction may not be reliable. This metric has been validated against experimental binding data and is used by the AlphaFold Protein Structure Database for complex quality assessment. ipTM is particularly important for drug target identification where interface accuracy determines druggability.",
+            "code": "import torch\n\ndef compute_iptm(pae_matrix, chain_ids, length):\n    \"\"\"\n    Compute interface pTM from PAE matrix.\n    pae_matrix: (L, L) predicted aligned errors\n    chain_ids: (L,) integer chain assignments\n    length: total number of residues\n    Returns: ipTM score\n    \"\"\"\n    d0 = 1.24 * (length - 15) ** (1.0/3) - 1.8\n    tm_per_pair = 1.0 / (1.0 + (pae_matrix / d0) ** 2)\n\n    # Create inter-chain mask\n    inter_chain = {{prot_struct_new_iptm_b1}}\n    num_inter = inter_chain.float().sum()\n\n    if num_inter == 0:\n        return torch.tensor(0.0)\n\n    iptm = {{prot_struct_new_iptm_b2}}\n    return iptm\n\n# Two-chain complex\nchain_ids = torch.tensor([0]*50 + [1]*50)\npae = torch.rand(100, 100) * 10  # random PAE values\niptm = compute_iptm(pae, chain_ids, 100)\nprint(f\"ipTM: {iptm:.3f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_iptm_b1",
+                    "placeholder": "chain_ids.unsqueeze(0) != chain_ids.unsqueeze(???)",
+                    "acceptable": [
+                        "chain_ids.unsqueeze(0) != chain_ids.unsqueeze(1)"
+                    ],
+                    "hint": "Inter-chain pairs are those where chain IDs differ between the two residues."
+                },
+                {
+                    "id": "prot_struct_new_iptm_b2",
+                    "placeholder": "(tm_per_pair * inter_chain.float()).sum() / ???",
+                    "acceptable": [
+                        "(tm_per_pair * inter_chain.float()).sum() / num_inter"
+                    ],
+                    "hint": "Average TM-score contributions over only the inter-chain residue pairs."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_confidence_ranking",
+            "title": "Multi-Model Confidence Ranking",
+            "difficulty": "easy",
+            "description": "Implement a model ranking function that combines pLDDT, pTM, and ipTM scores to rank multiple structure predictions and select the best model, following AlphaFold3's ranking protocol.",
+            "info": "AlphaFold2 (Jumper et al., Nature 2021) generates 5 models using different random seeds and ranks them by confidence metrics to select the best prediction. For monomers, models are ranked by mean pLDDT; for multimers, AlphaFold-Multimer (Evans et al., 2022) uses 0.8 * ipTM + 0.2 * pTM. AlphaFold3 (Abramson et al., Nature 2024) additionally uses a diffusion model confidence score and generates up to 5 diffusion samples per trunk output. Model ranking is crucial because different seeds explore different local minima. The CASP assessment (Kryshtafovych et al., Proteins 2021) showed that model selection can improve median GDT-TS by 2-5 points compared to random selection. Boltz-1 (Wohlwend et al., 2024) uses a similar multi-seed approach with confidence-based ranking for selecting the best prediction from multiple samples.",
+            "code": "import torch\n\ndef rank_models(plddt_scores, ptm_scores, iptm_scores=None, is_multimer=False):\n    \"\"\"\n    Rank structure predictions by confidence.\n    plddt_scores: (N_models,) mean pLDDT per model\n    ptm_scores: (N_models,) pTM per model\n    iptm_scores: (N_models,) ipTM per model (multimer only)\n    Returns: ranked indices (best first)\n    \"\"\"\n    if is_multimer and iptm_scores is not None:\n        ranking_score = {{prot_struct_new_rank_b1}}\n    else:\n        ranking_score = plddt_scores\n\n    ranked = {{prot_struct_new_rank_b2}}\n    return ranked\n\n# 5 models with different confidences\nplddt = torch.tensor([85.2, 91.3, 88.7, 82.1, 90.5])\nptm = torch.tensor([0.82, 0.91, 0.87, 0.78, 0.89])\niptm = torch.tensor([0.75, 0.88, 0.82, 0.71, 0.85])\n\nmono_rank = rank_models(plddt, ptm)\nmulti_rank = rank_models(plddt, ptm, iptm, is_multimer=True)\nprint(f\"Monomer ranking: {mono_rank}\")\nprint(f\"Multimer ranking: {multi_rank}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_rank_b1",
+                    "placeholder": "0.8 * iptm_scores + 0.2 * ???",
+                    "acceptable": [
+                        "0.8 * iptm_scores + 0.2 * ptm_scores"
+                    ],
+                    "hint": "AlphaFold-Multimer ranking: 0.8 * ipTM + 0.2 * pTM."
+                },
+                {
+                    "id": "prot_struct_new_rank_b2",
+                    "placeholder": "torch.argsort(ranking_score, descending=???)",
+                    "acceptable": [
+                        "torch.argsort(ranking_score, descending=True)"
+                    ],
+                    "hint": "Sort in descending order so the highest-confidence model comes first."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_af3_cross_attention",
+            "title": "AlphaFold3 Cross-Attention for Conditioning",
+            "difficulty": "hard",
+            "description": "Implement cross-attention from AlphaFold3's diffusion module where noisy atom features attend to conditioning single representations from the trunk, allowing the denoiser to be guided by sequence and evolutionary information.",
+            "info": "AlphaFold3 (Abramson et al., Nature 2024) uses cross-attention in its diffusion module to condition the denoising process on trunk representations. Noisy atom-level features serve as queries and attend to single-representation keys/values from the Pairformer trunk. This conditioning mechanism ensures the diffusion model generates structures consistent with evolutionary and sequence information captured by the trunk. The cross-attention architecture is similar to the conditioning mechanism in diffusion models for image generation like Stable Diffusion (Rombach et al., CVPR 2022), adapted for 3D molecular structure. AlphaFold3's diffusion module processes atoms at a finer granularity than residues, using an atom-level transformer with cross-attention to residue-level trunk features. This hierarchical approach allows detailed all-atom coordinate prediction while maintaining computational tractability.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport math\n\nclass DiffusionCrossAttention(nn.Module):\n    def __init__(self, d_atom=128, d_single=256, num_heads=8):\n        super().__init__()\n        self.num_heads = num_heads\n        self.head_dim = d_atom // num_heads\n        self.q_proj = nn.Linear(d_atom, d_atom)\n        self.k_proj = nn.Linear(d_single, d_atom)\n        self.v_proj = nn.Linear(d_single, d_atom)\n        self.out_proj = nn.Linear(d_atom, d_atom)\n        self.norm_atom = nn.LayerNorm(d_atom)\n        self.norm_cond = nn.LayerNorm(d_single)\n\n    def forward(self, atom_features, conditioning):\n        # atom_features: (N_atoms, d_atom) noisy atom representations\n        # conditioning: (L_res, d_single) trunk single representation\n        N = atom_features.shape[0]\n        L = conditioning.shape[0]\n\n        q = self.q_proj(self.norm_atom(atom_features)).view(N, self.num_heads, self.head_dim)\n        cond = self.norm_cond(conditioning)\n        k = self.k_proj(cond).view(L, self.num_heads, self.head_dim)\n        v = self.v_proj(cond).view(L, self.num_heads, self.head_dim)\n\n        # Cross-attention: atoms query, residues are keys/values\n        attn = torch.einsum('nhd,lhd->nhl', q, k) / {{prot_struct_new_crossattn_b1}}\n        attn = F.softmax(attn, dim=-1)  # (N, H, L)\n        out = {{prot_struct_new_crossattn_b2}}\n        out = out.reshape(N, -1)\n        return atom_features + self.out_proj(out)\n\natom_feat = torch.randn(500, 128)\ncond = torch.randn(100, 256)\nmodel = DiffusionCrossAttention()\nprint(model(atom_feat, cond).shape)  # (500, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_crossattn_b1",
+                    "placeholder": "math.sqrt(self.???)",
+                    "acceptable": [
+                        "math.sqrt(self.head_dim)"
+                    ],
+                    "hint": "Scale attention logits by sqrt of head dimension."
+                },
+                {
+                    "id": "prot_struct_new_crossattn_b2",
+                    "placeholder": "torch.einsum('nhl,lhd->???', attn, v)",
+                    "acceptable": [
+                        "torch.einsum('nhl,lhd->nhd', attn, v)"
+                    ],
+                    "hint": "Contract over L (residue) dimension: attention weights times values gives (N, H, d) output."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_rmsd_computation",
+            "title": "Root Mean Square Deviation (RMSD)",
+            "difficulty": "easy",
+            "description": "Implement RMSD computation between predicted and true protein structures after centering. RMSD is the most basic structural comparison metric.",
+            "info": "Root Mean Square Deviation (RMSD) is the most widely used metric for comparing protein structures, measuring the average distance between corresponding atoms after optimal superposition. RMSD is defined as sqrt(mean(sum_i(d_i^2))), where d_i is the distance between atom i in the two structures. Unlike TM-score (Zhang & Skolnick, Proteins 2004), RMSD is length-dependent, meaning longer proteins tend to have higher RMSD even for accurate predictions. AlphaFold2 (Jumper et al., Nature 2021) achieves backbone RMSD < 1 Angstrom for many single-domain targets. RMSD is sensitive to outlier residues in flexible regions, which is why metrics like GDT-TS and LDDT were developed. For fair comparison, structures must first be optimally superimposed, typically using the Kabsch algorithm (Kabsch, Acta Crystallographica 1976). All-atom RMSD includes side chains while C-alpha RMSD measures only backbone accuracy.",
+            "code": "import torch\n\ndef compute_rmsd(pred_coords, true_coords):\n    \"\"\"\n    Compute RMSD between two coordinate sets (assumed pre-aligned).\n    pred_coords, true_coords: (L, 3)\n    Returns: scalar RMSD value\n    \"\"\"\n    diff = pred_coords - true_coords\n    sq_dists = {{prot_struct_new_rmsd_b1}}\n    rmsd = {{prot_struct_new_rmsd_b2}}\n    return rmsd\n\npred = torch.randn(100, 3)\ntrue = pred + 0.5 * torch.randn(100, 3)\nprint(f\"RMSD: {compute_rmsd(pred, true):.3f} Angstroms\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_rmsd_b1",
+                    "placeholder": "(diff ** 2).sum(dim=???)",
+                    "acceptable": [
+                        "(diff ** 2).sum(dim=-1)",
+                        "(diff ** 2).sum(dim=1)"
+                    ],
+                    "hint": "Sum squared differences along the coordinate dimension to get per-residue squared distances."
+                },
+                {
+                    "id": "prot_struct_new_rmsd_b2",
+                    "placeholder": "torch.sqrt(sq_dists.???())",
+                    "acceptable": [
+                        "torch.sqrt(sq_dists.mean())"
+                    ],
+                    "hint": "RMSD = sqrt of the mean of squared distances."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_openfold_ema",
+            "title": "OpenFold Exponential Moving Average of Weights",
+            "difficulty": "medium",
+            "description": "Implement exponential moving average (EMA) of model weights as used in OpenFold's training pipeline. EMA provides more stable model weights for inference by maintaining a running average.",
+            "info": "OpenFold (Ahdritz et al., 2022) uses Exponential Moving Average (EMA) of model parameters during training to obtain more stable weights for inference. The EMA model maintains shadow parameters that are updated each step as theta_ema = decay * theta_ema + (1 - decay) * theta, typically with decay = 0.999. This technique smooths out training noise and often yields better generalization. AlphaFold2 (Jumper et al., Nature 2021) similarly uses EMA in its training procedure. EMA is a standard technique in deep learning, popularized by works on semi-supervised learning (Tarvainen & Valpola, NeurIPS 2017) and diffusion models (Song et al., ICLR 2021). For structure prediction, EMA particularly helps stabilize the structure module predictions, which can be sensitive to parameter fluctuations. OpenFold's implementation carefully handles multi-GPU synchronization of EMA weights.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass EMAModel:\n    def __init__(self, model, decay=0.999):\n        self.decay = decay\n        self.shadow = {}\n        for name, param in model.named_parameters():\n            self.shadow[name] = {{prot_struct_new_ema_b1}}\n\n    @torch.no_grad()\n    def update(self, model):\n        for name, param in model.named_parameters():\n            self.shadow[name] = {{prot_struct_new_ema_b2}}\n\n    def apply_to(self, model):\n        \"\"\"Copy EMA weights into model for inference.\"\"\"\n        for name, param in model.named_parameters():\n            param.data.copy_(self.shadow[name])\n\n# Example usage\nmodel = nn.Sequential(nn.Linear(256, 128), nn.ReLU(), nn.Linear(128, 3))\nema = EMAModel(model, decay=0.999)\n\n# Simulate training steps\nfor step in range(100):\n    with torch.no_grad():\n        for p in model.parameters():\n            p.add_(0.01 * torch.randn_like(p))  # fake gradient step\n    ema.update(model)\n\nprint(f\"Model weight norm: {list(model.parameters())[0].norm():.3f}\")\nprint(f\"EMA weight norm: {list(ema.shadow.values())[0].norm():.3f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_ema_b1",
+                    "placeholder": "param.data.???()",
+                    "acceptable": [
+                        "param.data.clone()"
+                    ],
+                    "hint": "Initialize shadow parameters as clones of the model parameters."
+                },
+                {
+                    "id": "prot_struct_new_ema_b2",
+                    "placeholder": "self.decay * self.shadow[name] + (1 - self.decay) * ???",
+                    "acceptable": [
+                        "self.decay * self.shadow[name] + (1 - self.decay) * param.data"
+                    ],
+                    "hint": "EMA update: theta_ema = decay * theta_ema + (1 - decay) * theta_current."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_new_dihedral_angle",
+            "title": "Backbone Dihedral Angle Computation",
+            "difficulty": "medium",
+            "description": "Compute backbone dihedral angles (phi, psi, omega) from four consecutive backbone atom positions using the atan2 formula for torsion angles.",
+            "info": "Backbone dihedral angles phi, psi, and omega define the protein backbone conformation. Phi is the torsion around the N-CA bond (C_prev-N-CA-C), psi around the CA-C bond (N-CA-C-N_next), and omega around the C-N peptide bond (CA-C-N_next-CA_next, usually ~180 degrees for trans). The dihedral angle between four atoms A-B-C-D is computed using the cross products of consecutive bond vectors: n1 = (B-A) x (C-B) and n2 = (C-B) x (D-C), then the angle is atan2(dot(n1 x n2, normalized(C-B)), dot(n1, n2)). AlphaFold2 (Jumper et al., Nature 2021) predicts backbone frames rather than dihedral angles directly, but side chain chi angles are predicted explicitly. Dihedral angles are used in Ramachandran validation (Ramachandran et al., JMB 1963) and are the degrees of freedom in fragment-based assembly methods like Rosetta (Simons et al., JMB 1997).",
+            "code": "import torch\nimport math\n\ndef compute_dihedral(p0, p1, p2, p3):\n    \"\"\"\n    Compute dihedral angle defined by four points.\n    p0, p1, p2, p3: (L, 3) or (3,) atom coordinates\n    Returns: dihedral angles in radians\n    \"\"\"\n    b1 = p1 - p0\n    b2 = p2 - p1\n    b3 = p3 - p2\n\n    # Normal vectors to planes\n    n1 = {{prot_struct_new_dihed_b1}}\n    n2 = torch.cross(b2, b3, dim=-1)\n\n    # Normalize b2 for the atan2 formula\n    b2_norm = b2 / (b2.norm(dim=-1, keepdim=True) + 1e-8)\n\n    m1 = torch.cross(n1, b2_norm, dim=-1)\n    x = (n1 * n2).sum(dim=-1)\n    y = (m1 * n2).sum(dim=-1)\n\n    return {{prot_struct_new_dihed_b2}}\n\n# Example: compute phi angles from backbone atoms\nL = 50\nn_pos = torch.randn(L, 3)\nca_pos = n_pos + torch.randn(L, 3) * 0.5\nc_pos = ca_pos + torch.randn(L, 3) * 0.5\n# Phi: C(i-1) - N(i) - CA(i) - C(i)\nphi = compute_dihedral(c_pos[:-1], n_pos[1:], ca_pos[1:], c_pos[1:])\nprint(f\"Phi angles shape: {phi.shape}, range: [{phi.min():.2f}, {phi.max():.2f}] rad\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_new_dihed_b1",
+                    "placeholder": "torch.cross(b1, b2, dim=???)",
+                    "acceptable": [
+                        "torch.cross(b1, b2, dim=-1)"
+                    ],
+                    "hint": "Cross product of the first two bond vectors along the coordinate dimension."
+                },
+                {
+                    "id": "prot_struct_new_dihed_b2",
+                    "placeholder": "torch.???(y, x)",
+                    "acceptable": [
+                        "torch.atan2(y, x)"
+                    ],
+                    "hint": "Use atan2(y, x) to compute the dihedral angle in [-pi, pi]."
                 }
             ]
         }

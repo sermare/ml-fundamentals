@@ -64,6 +64,614 @@
                     "hint": "Use the .T attribute or np.transpose()."
                 }
             ]
+        },
+        {
+            "id": "linalg_new_eigenvalues",
+            "title": "Eigenvalues and Eigenvectors",
+            "difficulty": "medium",
+            "description": "Compute the eigenvalues and eigenvectors of a square matrix using NumPy.",
+            "info": "Eigenvalues and eigenvectors satisfy the equation Av = lambda*v, where A is a square matrix, v is the eigenvector, and lambda is the eigenvalue. In ML, eigendecomposition is central to PCA, spectral clustering, and understanding the geometry of transformations. The eigenvalues indicate how much the transformation stretches space along each eigenvector direction. Large eigenvalues in the Hessian of a loss function indicate directions of high curvature, which affects optimizer behavior.",
+            "code": "import numpy as np\n\ndef compute_eigen(A):\n    eigenvalues, eigenvectors = {{b1}}\n    return eigenvalues, eigenvectors",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.eig(A)",
+                        "np.linalg.eigh(A)"
+                    ],
+                    "hint": "Use np.linalg.eig() for general matrices or np.linalg.eigh() for symmetric matrices."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_svd",
+            "title": "Singular Value Decomposition",
+            "difficulty": "medium",
+            "description": "Compute the SVD of a matrix using NumPy, decomposing it into U, S, and V^T.",
+            "info": "Singular Value Decomposition (SVD) factorizes any matrix A into U * diag(S) * V^T, where U and V are orthogonal matrices and S contains the singular values. SVD is foundational in ML for dimensionality reduction (truncated SVD), recommendation systems (matrix factorization), and computing pseudoinverses. The singular values reveal the intrinsic dimensionality of data and the numerical stability of computations. Unlike eigendecomposition, SVD works on any matrix, not just square ones.",
+            "code": "import numpy as np\n\ndef compute_svd(A):\n    U, S, Vt = {{b1}}\n    return U, S, Vt",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.svd(A)",
+                        "np.linalg.svd(A, full_matrices=True)",
+                        "np.linalg.svd(A, full_matrices=False)"
+                    ],
+                    "hint": "Use np.linalg.svd() which returns U, S, and V^T."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_inverse",
+            "title": "Matrix Inverse",
+            "difficulty": "easy",
+            "description": "Compute the inverse of a square matrix using NumPy.",
+            "info": "The inverse of a matrix A is the matrix A^{-1} such that A @ A^{-1} = I (the identity matrix). Matrix inversion is used in ML for solving linear systems, computing closed-form solutions to linear regression (the normal equation), and in Gaussian processes. However, directly computing inverses is numerically unstable and computationally expensive (O(n^3)), so in practice solvers like np.linalg.solve() are preferred. A matrix is invertible (nonsingular) if and only if its determinant is nonzero.",
+            "code": "import numpy as np\n\ndef invert_matrix(A):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.inv(A)"
+                    ],
+                    "hint": "Use np.linalg.inv() to compute the matrix inverse."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_determinant",
+            "title": "Matrix Determinant",
+            "difficulty": "easy",
+            "description": "Compute the determinant of a square matrix using NumPy.",
+            "info": "The determinant of a matrix is a scalar that encodes how much the linear transformation scales areas (in 2D) or volumes (in higher dimensions). A zero determinant means the matrix is singular and not invertible, indicating that the transformation collapses space into a lower dimension. In ML, determinants appear in the normalizing constant of multivariate Gaussian distributions and in change-of-variable formulas for normalizing flows. Computing determinants naively is expensive, so log-determinants and triangular factorizations are often used instead.",
+            "code": "import numpy as np\n\ndef compute_det(A):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.det(A)"
+                    ],
+                    "hint": "Use np.linalg.det() to compute the determinant."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_trace",
+            "title": "Matrix Trace",
+            "difficulty": "easy",
+            "description": "Compute the trace of a square matrix using NumPy.",
+            "info": "The trace of a matrix is the sum of its diagonal elements. It equals the sum of the eigenvalues and is invariant under cyclic permutations: trace(ABC) = trace(CAB) = trace(BCA). In ML, the trace appears in regularization (trace norm), Frobenius norm computation (||A||_F^2 = trace(A^T A)), and in the formulation of many loss functions. The trace is also used in the derivation of gradients for matrix-valued functions, making it essential for understanding backpropagation through linear layers.",
+            "code": "import numpy as np\n\ndef compute_trace(A):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": [
+                        "np.trace(A)",
+                        "np.diag(A).sum()",
+                        "A.trace()"
+                    ],
+                    "hint": "Use np.trace() to sum the diagonal elements."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_l2_norm",
+            "title": "L2 Vector Norm",
+            "difficulty": "easy",
+            "description": "Compute the L2 (Euclidean) norm of a vector using NumPy.",
+            "info": "The L2 norm (Euclidean norm) of a vector is the square root of the sum of squared elements: ||x||_2 = sqrt(sum(x_i^2)). It measures the straight-line distance from the origin and is the most commonly used norm in ML. L2 regularization (weight decay) penalizes ||w||_2^2 to prevent overfitting by discouraging large weights. The L2 norm is also used to normalize vectors to unit length, which is essential in cosine similarity computations and in normalizing gradients for stable training.",
+            "code": "import numpy as np\n\ndef l2_norm(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.norm(x)",
+                        "np.linalg.norm(x, 2)",
+                        "np.linalg.norm(x, ord=2)",
+                        "np.sqrt(np.sum(x**2))",
+                        "np.sqrt(np.sum(x ** 2))",
+                        "np.sqrt(np.dot(x, x))",
+                        "np.sqrt(np.dot(x,x))"
+                    ],
+                    "hint": "Use np.linalg.norm() which defaults to L2, or compute sqrt(sum(x^2))."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_l1_norm",
+            "title": "L1 Vector Norm",
+            "difficulty": "easy",
+            "description": "Compute the L1 (Manhattan) norm of a vector using NumPy.",
+            "info": "The L1 norm computes the sum of absolute values: ||x||_1 = sum(|x_i|). Unlike the L2 norm, L1 regularization (Lasso) promotes sparsity by driving some weights exactly to zero, effectively performing feature selection. This property makes L1 critical in compressed sensing and sparse signal recovery. In ML, L1 is used in Lasso regression, sparse autoencoders, and as a loss function (mean absolute error). The L1 norm is also called the Manhattan distance because it measures distance along axis-aligned paths.",
+            "code": "import numpy as np\n\ndef l1_norm(x):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.norm(x, 1)",
+                        "np.linalg.norm(x, ord=1)",
+                        "np.sum(np.abs(x))",
+                        "np.abs(x).sum()"
+                    ],
+                    "hint": "Use np.linalg.norm(x, ord=1) or sum the absolute values manually."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_frobenius_norm",
+            "title": "Frobenius Norm",
+            "difficulty": "medium",
+            "description": "Compute the Frobenius norm of a matrix using NumPy.",
+            "info": "The Frobenius norm generalizes the L2 vector norm to matrices: ||A||_F = sqrt(sum(a_ij^2)) = sqrt(trace(A^T A)). It treats the matrix as a flattened vector and computes its Euclidean length. In ML, the Frobenius norm is used for weight regularization in neural networks, measuring reconstruction error in matrix factorization, and quantifying the difference between two matrices. It also equals the square root of the sum of squared singular values, connecting it to SVD.",
+            "code": "import numpy as np\n\ndef frobenius_norm(A):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.norm(A, 'fro')",
+                        "np.linalg.norm(A)",
+                        "np.sqrt(np.sum(A**2))",
+                        "np.sqrt(np.sum(A ** 2))",
+                        "np.sqrt(np.trace(A.T @ A))"
+                    ],
+                    "hint": "Use np.linalg.norm(A, 'fro') or np.linalg.norm(A) which defaults to Frobenius for matrices."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_orthogonal_check",
+            "title": "Check Orthogonal Matrix",
+            "difficulty": "medium",
+            "description": "Verify that a matrix Q is orthogonal by checking that Q^T Q equals the identity matrix.",
+            "info": "An orthogonal matrix Q satisfies Q^T Q = Q Q^T = I, meaning its inverse equals its transpose. Orthogonal matrices preserve lengths and angles, making them isometries. In ML, orthogonal weight initialization helps prevent vanishing/exploding gradients in deep networks. Orthogonal matrices also appear in SVD (U and V are orthogonal), QR decomposition, and Householder reflections. Checking orthogonality numerically requires allowing for small floating-point errors using np.allclose().",
+            "code": "import numpy as np\n\ndef is_orthogonal(Q, tol=1e-6):\n    n = Q.shape[0]\n    product = {{b1}}\n    return np.allclose(product, np.eye(n), atol=tol)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "Q.??? @ ???",
+                    "acceptable": [
+                        "Q.T @ Q",
+                        "Q.transpose() @ Q",
+                        "np.dot(Q.T, Q)",
+                        "np.dot(Q.T,Q)",
+                        "np.matmul(Q.T, Q)",
+                        "np.matmul(Q.T,Q)"
+                    ],
+                    "hint": "Compute Q^T Q and compare it to the identity matrix."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_positive_definite",
+            "title": "Check Positive Definite Matrix",
+            "difficulty": "hard",
+            "description": "Check if a symmetric matrix is positive definite by verifying all eigenvalues are positive.",
+            "info": "A symmetric matrix A is positive definite if x^T A x > 0 for all nonzero vectors x, which is equivalent to all eigenvalues being strictly positive. Positive definite matrices are crucial in ML as covariance matrices must be positive semi-definite, kernel matrices in SVMs must be positive definite, and the Hessian being positive definite at a point guarantees a local minimum. Cholesky decomposition only exists for positive definite matrices, providing both a definiteness check and an efficient factorization.",
+            "code": "import numpy as np\n\ndef is_positive_definite(A):\n    eigenvalues = {{b1}}\n    return np.all(eigenvalues > 0)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.eigvalsh(A)",
+                        "np.linalg.eigvals(A)",
+                        "np.linalg.eigh(A)[0]",
+                        "np.linalg.eig(A)[0]"
+                    ],
+                    "hint": "Use np.linalg.eigvalsh() for symmetric matrices to get only the eigenvalues."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_cholesky",
+            "title": "Cholesky Decomposition",
+            "difficulty": "medium",
+            "description": "Compute the Cholesky decomposition of a positive definite matrix using NumPy.",
+            "info": "Cholesky decomposition factors a positive definite matrix A into A = L L^T, where L is a lower triangular matrix. It is roughly twice as fast as LU decomposition and is numerically stable. In ML, Cholesky is used in Gaussian processes for efficiently solving linear systems and computing log-determinants of covariance matrices. It is also used in sampling from multivariate normal distributions: given samples z from N(0, I), the vector L z + mu follows N(mu, A). If the decomposition fails, the matrix is not positive definite.",
+            "code": "import numpy as np\n\ndef cholesky(A):\n    L = {{b1}}\n    return L",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.cholesky(A)"
+                    ],
+                    "hint": "Use np.linalg.cholesky() which returns the lower triangular factor L."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_covariance_matrix",
+            "title": "Covariance Matrix",
+            "difficulty": "medium",
+            "description": "Compute the covariance matrix of a data matrix X (samples as rows) by centering the data and using matrix multiplication.",
+            "info": "The covariance matrix C = (1/(n-1)) * X_c^T X_c (where X_c is the mean-centered data) captures pairwise linear relationships between features. Diagonal entries are variances and off-diagonal entries are covariances. In ML, the covariance matrix is central to PCA, Gaussian mixture models, Mahalanobis distance, and whitening transformations. The covariance matrix is always symmetric and positive semi-definite. Its eigenvalues represent the variance explained along each principal direction.",
+            "code": "import numpy as np\n\ndef covariance_matrix(X):\n    # X has shape (n_samples, n_features)\n    X_centered = X - {{b1}}\n    n = X.shape[0]\n    cov = (X_centered.T @ X_centered) / (n - 1)\n    return cov",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "X.???",
+                    "acceptable": [
+                        "X.mean(axis=0)",
+                        "np.mean(X, axis=0)",
+                        "X.mean(0)",
+                        "np.mean(X, 0)"
+                    ],
+                    "hint": "Subtract the column-wise mean to center the data. Use axis=0 to compute the mean across samples."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_pca",
+            "title": "PCA via Eigendecomposition",
+            "difficulty": "hard",
+            "description": "Implement PCA by computing the eigendecomposition of the covariance matrix and projecting data onto the top k eigenvectors.",
+            "info": "Principal Component Analysis (PCA) finds the directions of maximum variance in data by eigendecomposing the covariance matrix. The eigenvectors (principal components) form an orthogonal basis sorted by decreasing eigenvalue (variance explained). Projecting data onto the top k eigenvectors achieves optimal linear dimensionality reduction in the mean squared error sense. PCA is used for visualization, denoising, feature extraction, and as a preprocessing step to decorrelate features before training ML models.",
+            "code": "import numpy as np\n\ndef pca_project(X, k):\n    X_centered = X - X.mean(axis=0)\n    cov = (X_centered.T @ X_centered) / (X.shape[0] - 1)\n    eigenvalues, eigenvectors = np.linalg.eigh(cov)\n    # Sort by descending eigenvalue\n    idx = np.argsort(eigenvalues)[::-1]\n    top_k_vectors = eigenvectors[:, idx[:k]]\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "X_centered @ ???",
+                    "acceptable": [
+                        "X_centered @ top_k_vectors",
+                        "np.dot(X_centered, top_k_vectors)",
+                        "np.dot(X_centered,top_k_vectors)",
+                        "np.matmul(X_centered, top_k_vectors)",
+                        "np.matmul(X_centered,top_k_vectors)"
+                    ],
+                    "hint": "Project the centered data onto the top k eigenvectors using matrix multiplication."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_least_squares",
+            "title": "Least Squares Solution",
+            "difficulty": "medium",
+            "description": "Solve the least squares problem min ||Ax - b||^2 using NumPy.",
+            "info": "The least squares solution minimizes the sum of squared residuals and is given by the normal equation x = (A^T A)^{-1} A^T b, but is more stably computed via QR or SVD-based solvers. In ML, least squares is the foundation of linear regression, where we find the weight vector that best fits the training data. NumPy's lstsq uses SVD internally, handling rank-deficient matrices gracefully. The residual norm tells us the irreducible training error for the linear model.",
+            "code": "import numpy as np\n\ndef least_squares(A, b):\n    x, residuals, rank, sv = {{b1}}\n    return x",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.lstsq(A, b, rcond=None)",
+                        "np.linalg.lstsq(A, b)",
+                        "np.linalg.lstsq(A,b,rcond=None)",
+                        "np.linalg.lstsq(A,b)"
+                    ],
+                    "hint": "Use np.linalg.lstsq() which returns the solution, residuals, rank, and singular values."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_projection",
+            "title": "Orthogonal Projection Matrix",
+            "difficulty": "hard",
+            "description": "Compute the orthogonal projection matrix onto the column space of A.",
+            "info": "The projection matrix P = A (A^T A)^{-1} A^T projects any vector onto the column space of A. The projected vector is the closest point in the column space to the original vector. In ML, projection matrices appear in linear regression (the hat matrix H = X(X^T X)^{-1}X^T maps observations to fitted values), in residual analysis, and in understanding the geometry of underdetermined and overdetermined linear systems. Projection matrices are idempotent (P^2 = P) and symmetric.",
+            "code": "import numpy as np\n\ndef projection_matrix(A):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "A @ np.linalg.???",
+                    "acceptable": [
+                        "A @ np.linalg.inv(A.T @ A) @ A.T",
+                        "A @ np.linalg.solve(A.T @ A, A.T)",
+                        "np.linalg.pinv(A) @ A.T"
+                    ],
+                    "hint": "Compute P = A (A^T A)^{-1} A^T using np.linalg.inv() or np.linalg.solve()."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_gram_schmidt",
+            "title": "QR Decomposition (Gram-Schmidt)",
+            "difficulty": "medium",
+            "description": "Compute the QR decomposition of a matrix using NumPy.",
+            "info": "QR decomposition factors a matrix A into an orthogonal matrix Q and an upper triangular matrix R, such that A = QR. The classical Gram-Schmidt process orthogonalizes the columns of A to produce Q. In ML, QR decomposition is used for numerically stable least squares solutions, computing eigenvalues (QR algorithm), and orthogonal initialization of weight matrices. It is more numerically stable than directly computing (A^T A)^{-1} A^T for solving least squares problems.",
+            "code": "import numpy as np\n\ndef qr_decomposition(A):\n    Q, R = {{b1}}\n    return Q, R",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.qr(A)",
+                        "np.linalg.qr(A, mode='reduced')"
+                    ],
+                    "hint": "Use np.linalg.qr() which returns the orthogonal Q and upper triangular R."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_matrix_rank",
+            "title": "Matrix Rank",
+            "difficulty": "easy",
+            "description": "Compute the rank of a matrix using NumPy.",
+            "info": "The rank of a matrix is the number of linearly independent rows (or equivalently, columns), and equals the number of nonzero singular values. A matrix is full rank if its rank equals the smaller of its dimensions. In ML, low-rank matrices are exploited in dimensionality reduction, low-rank matrix factorization for recommendations, and LoRA (Low-Rank Adaptation) for efficient fine-tuning of large language models. Numerically, rank is determined by counting singular values above a tolerance threshold.",
+            "code": "import numpy as np\n\ndef matrix_rank(A):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.matrix_rank(A)"
+                    ],
+                    "hint": "Use np.linalg.matrix_rank() which counts nonzero singular values."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_null_space",
+            "title": "Null Space",
+            "difficulty": "hard",
+            "description": "Compute a basis for the null space of a matrix A using SVD.",
+            "info": "The null space (kernel) of a matrix A is the set of all vectors x such that Ax = 0. It can be found via SVD: the columns of V corresponding to zero (or near-zero) singular values form a basis for the null space. In ML, the null space is relevant for understanding underdetermined systems (infinitely many solutions lie in the null space), regularization (which selects among null space solutions), and the degrees of freedom in model parameters. The dimension of the null space equals n minus the rank of A.",
+            "code": "import numpy as np\n\ndef null_space(A, tol=1e-10):\n    U, S, Vt = np.linalg.svd(A)\n    null_mask = {{b1}}\n    return Vt[null_mask].T",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "S ??? tol",
+                    "acceptable": [
+                        "S < tol",
+                        "S <= tol",
+                        "(S < tol)",
+                        "(S <= tol)"
+                    ],
+                    "hint": "Select the rows of Vt where the corresponding singular value is below the tolerance."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_column_space",
+            "title": "Column Space Basis",
+            "difficulty": "hard",
+            "description": "Extract an orthonormal basis for the column space of A using SVD.",
+            "info": "The column space (range) of a matrix A is the span of its columns, representing all possible outputs of the transformation Ax. Via SVD, the first r columns of U (where r is the rank) form an orthonormal basis for the column space. In ML, the column space determines what outputs a linear layer can produce. Understanding column space helps diagnose rank-deficient design matrices in regression, where some features are linearly dependent. The dimension of the column space equals the rank of the matrix.",
+            "code": "import numpy as np\n\ndef column_space_basis(A):\n    U, S, Vt = np.linalg.svd(A, full_matrices=False)\n    rank = {{b1}}\n    return U[:, :rank]",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sum(???)",
+                    "acceptable": [
+                        "np.sum(S > 1e-10)",
+                        "np.linalg.matrix_rank(A)",
+                        "(S > 1e-10).sum()",
+                        "np.count_nonzero(S > 1e-10)"
+                    ],
+                    "hint": "Count the number of singular values above a small threshold to determine the rank."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_hadamard",
+            "title": "Hadamard (Element-wise) Product",
+            "difficulty": "easy",
+            "description": "Compute the Hadamard (element-wise) product of two matrices using NumPy.",
+            "info": "The Hadamard product multiplies matrices element-by-element, requiring the same shape (or broadcastable shapes). Unlike matrix multiplication, it preserves the input dimensions. In ML, element-wise multiplication is used in gating mechanisms (LSTM and GRU gates multiply element-wise), attention mechanisms (masking), dropout (multiplying by a binary mask), and feature-wise modulation like FiLM layers. It is also the core operation in the gradient computation for element-wise activation functions.",
+            "code": "import numpy as np\n\ndef hadamard_product(A, B):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "A ??? B",
+                    "acceptable": [
+                        "A * B",
+                        "np.multiply(A, B)",
+                        "np.multiply(A,B)"
+                    ],
+                    "hint": "Use the * operator or np.multiply() for element-wise multiplication."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_kronecker",
+            "title": "Kronecker Product",
+            "difficulty": "hard",
+            "description": "Compute the Kronecker product of two matrices using NumPy.",
+            "info": "The Kronecker product of A (m x n) and B (p x q) produces an (mp x nq) matrix by replacing each element a_ij of A with the block a_ij * B. It appears in ML in the theory of neural network training (the Fisher information matrix can be approximated as a Kronecker product in K-FAC optimization), in multi-task learning, and in tensor decompositions. The Kronecker product has useful properties: (A kron B)(C kron D) = (AC) kron (BD), which enables efficient computation without forming the full product.",
+            "code": "import numpy as np\n\ndef kronecker_product(A, B):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": [
+                        "np.kron(A, B)",
+                        "np.kron(A,B)"
+                    ],
+                    "hint": "Use np.kron() to compute the Kronecker product."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_broadcasting_add",
+            "title": "Broadcasting: Bias Addition",
+            "difficulty": "easy",
+            "description": "Add a bias vector to each row of a batch matrix using NumPy broadcasting.",
+            "info": "Broadcasting is NumPy's mechanism for performing arithmetic on arrays of different shapes by automatically expanding dimensions. When adding a bias vector of shape (d,) to a batch matrix of shape (n, d), the vector is broadcast across all n rows. This is exactly what happens in a neural network linear layer: Y = X @ W + b, where b is broadcast. Understanding broadcasting rules (dimensions are compared from the right, and size-1 dimensions are stretched) is essential for writing efficient, loop-free numerical code.",
+            "code": "import numpy as np\n\ndef add_bias(X, b):\n    # X: (n_samples, n_features), b: (n_features,)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "X ??? b",
+                    "acceptable": [
+                        "X + b",
+                        "np.add(X, b)",
+                        "np.add(X,b)"
+                    ],
+                    "hint": "Simply add X and b; NumPy broadcasting handles the shape mismatch automatically."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_einsum_trace",
+            "title": "Einsum: Matrix Trace",
+            "difficulty": "medium",
+            "description": "Compute the trace of a matrix using np.einsum.",
+            "info": "Einstein summation notation (einsum) provides a compact and general way to express tensor contractions, including dot products, matrix multiplication, trace, transpose, and outer products. The notation 'ii->' means sum over the repeated index i (the diagonal), producing a scalar. Einsum is heavily used in ML frameworks because it can express any linear algebra operation in a unified syntax, avoiding the need to remember separate function names. It often generates optimized contraction paths for complex tensor operations.",
+            "code": "import numpy as np\n\ndef einsum_trace(A):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.einsum('???', A)",
+                    "acceptable": [
+                        "np.einsum('ii->', A)",
+                        "np.einsum('ii', A)"
+                    ],
+                    "hint": "Use the subscript 'ii->' to sum over diagonal elements."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_einsum_matmul",
+            "title": "Einsum: Batch Matrix Multiplication",
+            "difficulty": "medium",
+            "description": "Perform batch matrix multiplication on 3D tensors using np.einsum.",
+            "info": "Batch matrix multiplication multiplies corresponding matrices in two batches: given A of shape (b, m, n) and B of shape (b, n, p), the result has shape (b, m, p). The einsum subscript 'bij,bjk->bik' expresses this cleanly by contracting over j for each batch index b. In ML, batch matrix multiplication is essential for multi-head attention in Transformers, batch processing in RNNs, and any operation that applies the same linear transformation independently across a batch dimension.",
+            "code": "import numpy as np\n\ndef batch_matmul(A, B):\n    # A: (batch, m, n), B: (batch, n, p)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.einsum('???', A, B)",
+                    "acceptable": [
+                        "np.einsum('bij,bjk->bik', A, B)",
+                        "np.einsum('bij,bjk->bik',A,B)",
+                        "A @ B",
+                        "np.matmul(A, B)",
+                        "np.matmul(A,B)"
+                    ],
+                    "hint": "Use 'bij,bjk->bik' to contract over the inner dimension j for each batch."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_solve_linear_system",
+            "title": "Solve Linear System",
+            "difficulty": "easy",
+            "description": "Solve the linear system Ax = b for x using NumPy.",
+            "info": "Solving Ax = b directly with np.linalg.solve() is preferred over computing A^{-1} b because it uses LU decomposition internally, which is faster and more numerically stable. In ML, linear systems arise in the normal equations for linear regression, in Gaussian process prediction, and in Newton's method for optimization (solving the Hessian system). The solve function requires A to be square and nonsingular; for overdetermined systems, use np.linalg.lstsq() instead.",
+            "code": "import numpy as np\n\ndef solve_system(A, b):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.solve(A, b)",
+                        "np.linalg.solve(A,b)"
+                    ],
+                    "hint": "Use np.linalg.solve(A, b) instead of computing the inverse explicitly."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_pseudoinverse",
+            "title": "Moore-Penrose Pseudoinverse",
+            "difficulty": "medium",
+            "description": "Compute the Moore-Penrose pseudoinverse of a matrix using NumPy.",
+            "info": "The pseudoinverse A^+ generalizes the matrix inverse to non-square and singular matrices. For a full-rank overdetermined system, A^+ = (A^T A)^{-1} A^T gives the least squares solution. For underdetermined systems, it gives the minimum-norm solution. In ML, the pseudoinverse is used in linear regression, in computing analytical solutions for simple models, and in understanding the implicit bias of gradient descent (which converges to the minimum-norm solution for underdetermined problems). It is computed stably via SVD.",
+            "code": "import numpy as np\n\ndef pseudoinverse(A):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.linalg.???",
+                    "acceptable": [
+                        "np.linalg.pinv(A)"
+                    ],
+                    "hint": "Use np.linalg.pinv() to compute the Moore-Penrose pseudoinverse."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_sparse_matrix",
+            "title": "Create Sparse Matrix",
+            "difficulty": "medium",
+            "description": "Create a sparse CSR matrix from dense data using SciPy.",
+            "info": "Sparse matrices store only nonzero elements, dramatically reducing memory and computation for matrices where most entries are zero. The CSR (Compressed Sparse Row) format is efficient for row slicing and matrix-vector products. In ML, sparse matrices arise in NLP (bag-of-words, TF-IDF), graph adjacency matrices, one-hot encodings, and recommender systems. Choosing the right sparse format matters: CSR for row operations, CSC for column operations, and COO for constructing sparse matrices incrementally.",
+            "code": "from scipy import sparse\nimport numpy as np\n\ndef to_sparse_csr(dense_matrix):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "sparse.???",
+                    "acceptable": [
+                        "sparse.csr_matrix(dense_matrix)",
+                        "sparse.csr_array(dense_matrix)"
+                    ],
+                    "hint": "Use sparse.csr_matrix() to convert a dense array to CSR format."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_torch_matmul",
+            "title": "PyTorch Matrix Multiplication",
+            "difficulty": "easy",
+            "description": "Multiply two matrices using PyTorch.",
+            "info": "PyTorch provides GPU-accelerated matrix multiplication through torch.matmul() and the @ operator, which is critical for training deep learning models at scale. Unlike NumPy, PyTorch tensors track computational graphs for automatic differentiation, enabling backpropagation through matrix operations. The torch.matmul function handles broadcasting and batch dimensions automatically, making it versatile for multi-dimensional tensor operations in attention mechanisms and convolutional layers. Moving tensors to GPU with .cuda() can speed up matrix multiplication by orders of magnitude.",
+            "code": "import torch\n\ndef torch_matmul(A, B):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???",
+                    "acceptable": [
+                        "torch.matmul(A, B)",
+                        "torch.matmul(A,B)",
+                        "A @ B",
+                        "torch.mm(A, B)",
+                        "torch.mm(A,B)"
+                    ],
+                    "hint": "Use torch.matmul(), torch.mm(), or the @ operator."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_torch_svd",
+            "title": "PyTorch SVD",
+            "difficulty": "medium",
+            "description": "Compute the SVD of a PyTorch tensor.",
+            "info": "PyTorch's torch.linalg.svd decomposes a tensor A into U, S, Vh such that A = U * diag(S) * Vh. Unlike NumPy, the PyTorch version supports automatic differentiation, allowing SVD to be used as a differentiable layer in neural networks. This is useful for spectral normalization (constraining the largest singular value of weight matrices), differentiable PCA, and low-rank approximations during training. The gradients through SVD can be unstable when singular values are close together, requiring careful handling.",
+            "code": "import torch\n\ndef torch_svd(A):\n    U, S, Vh = {{b1}}\n    return U, S, Vh",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.linalg.???",
+                    "acceptable": [
+                        "torch.linalg.svd(A)",
+                        "torch.svd(A)"
+                    ],
+                    "hint": "Use torch.linalg.svd() which returns U, S, and Vh."
+                }
+            ]
+        },
+        {
+            "id": "linalg_new_outer_product",
+            "title": "Outer Product",
+            "difficulty": "easy",
+            "description": "Compute the outer product of two vectors using NumPy.",
+            "info": "The outer product of vectors u (m,) and v (n,) produces an (m x n) matrix where entry (i,j) = u_i * v_j. In ML, outer products create rank-1 matrices and appear in the gradient of a linear layer (the weight gradient is the outer product of input and output gradients), in attention mechanisms, and in constructing covariance matrices from data. The outer product can also be seen as matrix multiplication of a column vector by a row vector: u.reshape(-1,1) @ v.reshape(1,-1).",
+            "code": "import numpy as np\n\ndef outer_product(u, v):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???",
+                    "acceptable": [
+                        "np.outer(u, v)",
+                        "np.outer(u,v)",
+                        "np.einsum('i,j->ij', u, v)",
+                        "np.einsum('i,j->ij',u,v)",
+                        "u[:, None] * v[None, :]",
+                        "u.reshape(-1, 1) @ v.reshape(1, -1)",
+                        "u.reshape(-1,1) @ v.reshape(1,-1)"
+                    ],
+                    "hint": "Use np.outer() or np.einsum('i,j->ij', u, v)."
+                }
+            ]
         }
     ]
 }

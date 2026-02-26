@@ -71,6 +71,1042 @@
                     "hint": "Residual connection: x + attention_output."
                 }
             ]
+        },
+        {
+            "id": "attn_new_sinusoidal_pe",
+            "title": "Sinusoidal Positional Encoding",
+            "difficulty": "hard",
+            "description": "Implement the sinusoidal positional encoding from the original Transformer paper. For even indices use sin, for odd indices use cos, with frequencies that decrease geometrically.",
+            "info": "Sinusoidal positional encoding injects sequence order information into the Transformer by adding fixed sinusoidal signals to token embeddings. The encoding uses sin for even dimensions and cos for odd dimensions, with wavelengths forming a geometric progression from 2*pi to 10000*2*pi. This design allows the model to learn to attend to relative positions because for any fixed offset k, PE(pos+k) can be represented as a linear function of PE(pos). Unlike learned positional embeddings, sinusoidal encodings can theoretically generalize to sequence lengths not seen during training.",
+            "code": "import torch\nimport math\n\ndef sinusoidal_positional_encoding(max_len, d_model):\n    pe = torch.zeros(max_len, d_model)\n    position = torch.arange(0, max_len).unsqueeze(1).float()\n    div_term = torch.exp(torch.arange(0, d_model, 2).float() * {{b1}})\n    pe[:, 0::2] = {{b2}}\n    pe[:, 1::2] = {{b3}}\n    return pe",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "-(math.log(???) / ???)",
+                    "acceptable": [
+                        "-(math.log(10000.0) / d_model)",
+                        "(-math.log(10000.0) / d_model)"
+                    ],
+                    "hint": "The divisor term uses exp(-log(10000) * 2i / d_model), which simplifies to 1/10000^(2i/d_model)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(position * div_term)",
+                    "acceptable": [
+                        "torch.sin(position * div_term)"
+                    ],
+                    "hint": "Even indices use the sine function."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.???(position * div_term)",
+                    "acceptable": [
+                        "torch.cos(position * div_term)"
+                    ],
+                    "hint": "Odd indices use the cosine function."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_learned_pe",
+            "title": "Learned Positional Embedding",
+            "difficulty": "easy",
+            "description": "Create a learned positional embedding table using nn.Embedding that supports sequences up to max_len tokens with embedding dimension d_model.",
+            "info": "Learned positional embeddings use a trainable lookup table to assign a unique vector to each position in the sequence. Unlike sinusoidal encodings, these embeddings are initialized randomly and optimized during training via backpropagation. Models like GPT-2 and BERT use learned positional embeddings, which empirically perform comparably to sinusoidal encodings for in-distribution sequence lengths. The main limitation is that they cannot naturally extrapolate to positions beyond max_len, since those positions have no trained embedding vector.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass LearnedPositionalEmbedding(nn.Module):\n    def __init__(self, max_len, d_model):\n        super().__init__()\n        self.pos_embed = {{b1}}\n\n    def forward(self, x):\n        # x: (batch, seq_len, d_model)\n        seq_len = x.size(1)\n        positions = {{b2}}\n        return x + {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(max_len, d_model)",
+                    "acceptable": [
+                        "nn.Embedding(max_len, d_model)"
+                    ],
+                    "hint": "Use nn.Embedding to create a lookup table of positional vectors."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.arange(???).to(x.device)",
+                    "acceptable": [
+                        "torch.arange(seq_len).to(x.device)",
+                        "torch.arange(0, seq_len).to(x.device)"
+                    ],
+                    "hint": "Generate position indices [0, 1, ..., seq_len-1]."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.pos_embed(???)",
+                    "acceptable": [
+                        "self.pos_embed(positions)"
+                    ],
+                    "hint": "Look up the positional embeddings for the generated positions."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_causal_mask",
+            "title": "Causal (Autoregressive) Attention Mask",
+            "difficulty": "medium",
+            "description": "Create a causal attention mask that prevents each position from attending to future positions. The mask should be an upper-triangular matrix of -inf values (with zeros on and below the diagonal).",
+            "info": "Causal masking is essential for autoregressive models like GPT, where the prediction for position t should only depend on positions 0 through t. This is implemented by adding a mask of negative infinity values to the attention scores before softmax, which drives the corresponding attention weights to zero. The mask is an upper-triangular matrix because we want to block attention from each position to all later positions. Without causal masking, the model would have access to future tokens during training, making the autoregressive generation task trivial and preventing proper generalization.",
+            "code": "import torch\n\ndef create_causal_mask(seq_len):\n    # Returns a (seq_len, seq_len) mask with 0 on/below diagonal, -inf above\n    mask = {{b1}}\n    return mask.masked_fill({{b2}}, {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(seq_len, seq_len)",
+                    "acceptable": [
+                        "torch.zeros(seq_len, seq_len)"
+                    ],
+                    "hint": "Start with a zero matrix of the right shape."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.triu(torch.ones(seq_len, seq_len), diagonal=???).bool()",
+                    "acceptable": [
+                        "torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()"
+                    ],
+                    "hint": "Create a boolean upper-triangular mask with diagonal=1 to keep the main diagonal as False."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "float('???')",
+                    "acceptable": [
+                        "float('-inf')"
+                    ],
+                    "hint": "Masked positions get negative infinity so softmax zeroes them out."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_cross_attention",
+            "title": "Cross-Attention Layer",
+            "difficulty": "medium",
+            "description": "Implement a cross-attention module where queries come from the decoder and keys/values come from the encoder output. This is the key mechanism connecting encoder and decoder in seq2seq Transformers.",
+            "info": "Cross-attention allows the decoder to attend to all positions in the encoder output, enabling information transfer between the two stacks. Unlike self-attention where Q, K, V all derive from the same sequence, in cross-attention the queries come from the decoder while keys and values come from the encoder. This mechanism is crucial for tasks like machine translation, where the decoder must selectively read from the source sentence while generating the target. Cross-attention is also used in multimodal models where text queries attend to image features.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass CrossAttention(nn.Module):\n    def __init__(self, d_model=512, nhead=8):\n        super().__init__()\n        self.attn = nn.MultiheadAttention(d_model, nhead)\n        self.norm = nn.LayerNorm(d_model)\n\n    def forward(self, decoder_x, encoder_out):\n        # decoder_x: (seq_len_dec, batch, d_model)\n        # encoder_out: (seq_len_enc, batch, d_model)\n        attn_out, _ = self.attn({{b1}}, {{b2}}, {{b3}})\n        return self.norm(decoder_x + attn_out)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? (query source)",
+                    "acceptable": [
+                        "decoder_x"
+                    ],
+                    "hint": "Queries come from the decoder."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? (key source)",
+                    "acceptable": [
+                        "encoder_out"
+                    ],
+                    "hint": "Keys come from the encoder output."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? (value source)",
+                    "acceptable": [
+                        "encoder_out"
+                    ],
+                    "hint": "Values also come from the encoder output."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_kv_cache",
+            "title": "KV Cache for Autoregressive Generation",
+            "difficulty": "hard",
+            "description": "Implement a simple KV cache mechanism that stores past keys and values so that during autoregressive generation only the new token's K/V are computed and concatenated with the cache.",
+            "info": "The KV cache is a critical optimization for autoregressive Transformer inference. Without it, generating token t requires recomputing keys and values for all previous tokens 0..t-1, leading to O(n^2) total compute for generating n tokens. With a KV cache, previously computed keys and values are stored and reused, so each step only computes the new token's projections and appends them. This reduces per-step compute from O(n) to O(1) in the attention projection (though the attention dot-product itself is still O(n)). The KV cache is the standard technique used in all production LLM serving systems.",
+            "code": "import torch\n\ndef update_kv_cache(new_key, new_value, cached_keys=None, cached_values=None):\n    # new_key, new_value: (batch, 1, d_k) for the single new token\n    # cached_keys, cached_values: (batch, seq_so_far, d_k) or None\n    if cached_keys is None:\n        return new_key, new_value\n    updated_keys = {{b1}}\n    updated_values = {{b2}}\n    return updated_keys, updated_values\n\n# Usage: attention scores for new token against all keys\n# scores = query @ updated_keys.transpose(-2, -1) / scale\n# out = softmax(scores) @ {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.cat([???, ???], dim=???)",
+                    "acceptable": [
+                        "torch.cat([cached_keys, new_key], dim=1)",
+                        "torch.cat((cached_keys, new_key), dim=1)"
+                    ],
+                    "hint": "Concatenate the cached keys with the new key along the sequence dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.cat([???, ???], dim=???)",
+                    "acceptable": [
+                        "torch.cat([cached_values, new_value], dim=1)",
+                        "torch.cat((cached_values, new_value), dim=1)"
+                    ],
+                    "hint": "Concatenate the cached values with the new value along the sequence dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? (attend over all values)",
+                    "acceptable": [
+                        "updated_values"
+                    ],
+                    "hint": "The final attention output multiplies softmax weights by all values (cached + new)."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_flash_attn_concept",
+            "title": "Flash Attention: Tiling Concept",
+            "difficulty": "medium",
+            "description": "Flash Attention avoids materializing the full N x N attention matrix in HBM by processing attention in tiles. Fill in the conceptual pseudocode that shows the online softmax tiling approach.",
+            "info": "Flash Attention is an IO-aware exact attention algorithm that reduces memory usage from O(N^2) to O(N) by never materializing the full attention matrix in GPU high-bandwidth memory (HBM). Instead, it loads blocks of Q, K, V from HBM into fast SRAM, computes partial attention within each block, and uses an online softmax trick to combine block results without storing intermediate N x N matrices. This achieves 2-4x wall-clock speedup on typical Transformer training by being memory-bandwidth bound rather than compute bound. Flash Attention is now the default attention implementation in most modern deep learning frameworks.",
+            "code": "import torch\nimport torch.nn.functional as F\n\n# Standard attention (materializes N x N matrix - O(N^2) memory)\ndef standard_attention(Q, K, V):\n    scores = Q @ K.transpose(-2, -1) / (Q.size(-1) ** 0.5)\n    weights = F.softmax(scores, dim=-1)  # (batch, N, N) in HBM!\n    return weights @ V\n\n# Flash attention uses PyTorch's scaled_dot_product_attention\n# which can dispatch to the flash attention kernel\ndef flash_attention(Q, K, V):\n    return F.scaled_dot_product_attention({{b1}}, {{b2}}, {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? (queries)",
+                    "acceptable": [
+                        "Q"
+                    ],
+                    "hint": "Pass the queries tensor."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? (keys)",
+                    "acceptable": [
+                        "K"
+                    ],
+                    "hint": "Pass the keys tensor."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? (values)",
+                    "acceptable": [
+                        "V"
+                    ],
+                    "hint": "Pass the values tensor."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_mqa",
+            "title": "Multi-Query Attention",
+            "difficulty": "hard",
+            "description": "Implement multi-query attention where all heads share the same single key and value projections but each head has its own query projection. This reduces KV cache size by a factor of num_heads.",
+            "info": "Multi-query attention (MQA), introduced by Shazeer (2019), uses multiple query heads but only a single key head and a single value head shared across all query heads. This dramatically reduces the KV cache size during inference by a factor equal to the number of heads (e.g., 32x for a 32-head model), which is the primary memory bottleneck for long-context generation. The quality degradation compared to standard multi-head attention is minimal for most tasks. MQA was adopted by models like PaLM and Falcon, and later generalized to grouped-query attention (GQA) which uses a small number of KV heads instead of just one.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass MultiQueryAttention(nn.Module):\n    def __init__(self, d_model=512, nhead=8):\n        super().__init__()\n        self.nhead = nhead\n        self.head_dim = d_model // nhead\n        self.q_proj = nn.Linear(d_model, d_model)  # nhead separate Q heads\n        self.k_proj = {{b1}}  # single shared K\n        self.v_proj = {{b2}}  # single shared V\n        self.out_proj = nn.Linear(d_model, d_model)\n\n    def forward(self, x):\n        B, S, _ = x.shape\n        q = self.q_proj(x).view(B, S, self.nhead, self.head_dim).transpose(1, 2)\n        k = self.k_proj(x).view(B, S, 1, self.head_dim).transpose(1, 2)\n        v = self.v_proj(x).view(B, S, 1, self.head_dim).transpose(1, 2)\n        k = {{b3}}  # broadcast to all heads\n        v = v.expand_as(q)\n        scores = (q @ k.transpose(-2, -1)) / (self.head_dim ** 0.5)\n        attn = torch.softmax(scores, dim=-1)\n        out = (attn @ v).transpose(1, 2).contiguous().view(B, S, -1)\n        return self.out_proj(out)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(d_model, ???)",
+                    "acceptable": [
+                        "nn.Linear(d_model, self.head_dim)"
+                    ],
+                    "hint": "Only one key head, so project to a single head_dim."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(d_model, ???)",
+                    "acceptable": [
+                        "nn.Linear(d_model, self.head_dim)"
+                    ],
+                    "hint": "Only one value head, so project to a single head_dim."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "k.???(q)",
+                    "acceptable": [
+                        "k.expand_as(q)"
+                    ],
+                    "hint": "Broadcast/expand the single K head to match all Q heads."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_gqa",
+            "title": "Grouped-Query Attention",
+            "difficulty": "hard",
+            "description": "Implement grouped-query attention (GQA) where num_heads query heads are divided into groups, each group sharing one set of key/value heads. This is a generalization between MHA and MQA.",
+            "info": "Grouped-query attention (GQA), introduced by Ainslie et al. (2023), is a compromise between multi-head attention (every head has its own KV) and multi-query attention (all heads share one KV). In GQA, query heads are divided into groups, and each group shares one key and one value head. For example, with 8 query heads and 2 KV groups, every 4 query heads share the same KV projections, reducing KV cache by 4x. GQA is used in Llama 2 70B and Llama 3, offering a favorable trade-off between inference efficiency and model quality.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass GroupedQueryAttention(nn.Module):\n    def __init__(self, d_model=512, nhead=8, num_kv_groups=2):\n        super().__init__()\n        self.nhead = nhead\n        self.num_kv_groups = num_kv_groups\n        self.heads_per_group = nhead // num_kv_groups\n        self.head_dim = d_model // nhead\n        self.q_proj = nn.Linear(d_model, d_model)\n        self.k_proj = nn.Linear(d_model, {{b1}})\n        self.v_proj = nn.Linear(d_model, self.num_kv_groups * self.head_dim)\n        self.out_proj = nn.Linear(d_model, d_model)\n\n    def forward(self, x):\n        B, S, _ = x.shape\n        q = self.q_proj(x).view(B, S, self.nhead, self.head_dim).transpose(1, 2)\n        k = self.k_proj(x).view(B, S, self.num_kv_groups, self.head_dim).transpose(1, 2)\n        v = self.v_proj(x).view(B, S, self.num_kv_groups, self.head_dim).transpose(1, 2)\n        # Repeat KV heads for each group\n        k = {{b2}}\n        v = torch.repeat_interleave(v, self.heads_per_group, dim=1)\n        scores = (q @ k.transpose(-2, -1)) / (self.head_dim ** 0.5)\n        attn = {{b3}}\n        out = (attn @ v).transpose(1, 2).contiguous().view(B, S, -1)\n        return self.out_proj(out)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.??? * self.???",
+                    "acceptable": [
+                        "self.num_kv_groups * self.head_dim"
+                    ],
+                    "hint": "K projection outputs num_kv_groups heads, each of head_dim size."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.repeat_interleave(k, ???, dim=1)",
+                    "acceptable": [
+                        "torch.repeat_interleave(k, self.heads_per_group, dim=1)"
+                    ],
+                    "hint": "Each KV head is repeated heads_per_group times along the head dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.softmax(scores, dim=???)",
+                    "acceptable": [
+                        "torch.softmax(scores, dim=-1)"
+                    ],
+                    "hint": "Softmax over the last (key) dimension."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_encoder_block",
+            "title": "Full Transformer Encoder Block",
+            "difficulty": "hard",
+            "description": "Implement a complete Transformer encoder block with self-attention, feed-forward network, residual connections, and layer normalization (post-norm style).",
+            "info": "A Transformer encoder block consists of two sub-layers: multi-head self-attention and a position-wise feed-forward network (FFN). Each sub-layer is wrapped with a residual connection followed by layer normalization (in the original post-norm design). The FFN typically expands the dimension by 4x, applies a nonlinearity (ReLU or GELU), then projects back down. The encoder block processes all positions in parallel with bidirectional attention, meaning each token can attend to every other token. Stacking multiple encoder blocks creates increasingly abstract representations of the input sequence.",
+            "code": "import torch.nn as nn\n\nclass EncoderBlock(nn.Module):\n    def __init__(self, d_model=512, nhead=8, d_ff=2048):\n        super().__init__()\n        self.self_attn = nn.MultiheadAttention(d_model, nhead)\n        self.ffn = nn.Sequential(\n            nn.Linear(d_model, d_ff),\n            nn.ReLU(),\n            nn.Linear(d_ff, d_model)\n        )\n        self.norm1 = nn.LayerNorm(d_model)\n        self.norm2 = nn.LayerNorm(d_model)\n\n    def forward(self, x):\n        attn_out, _ = self.self_attn(x, x, x)\n        x = {{b1}}\n        ff_out = self.ffn(x)\n        x = {{b2}}\n        return x",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.norm1(??? + ???)",
+                    "acceptable": [
+                        "self.norm1(x + attn_out)"
+                    ],
+                    "hint": "Residual connection then layer norm: norm(x + sublayer_output)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.norm2(??? + ???)",
+                    "acceptable": [
+                        "self.norm2(x + ff_out)"
+                    ],
+                    "hint": "Same pattern for the FFN sub-layer: norm(x + ffn_output)."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_decoder_block",
+            "title": "Full Transformer Decoder Block",
+            "difficulty": "hard",
+            "description": "Implement a complete Transformer decoder block with masked self-attention, cross-attention to encoder output, and a feed-forward network, each with residual connections and layer norms.",
+            "info": "A Transformer decoder block has three sub-layers: (1) masked self-attention that prevents attending to future positions, (2) cross-attention where queries come from the decoder and keys/values come from the encoder, and (3) a position-wise feed-forward network. Each sub-layer uses a residual connection and layer normalization. The causal mask in self-attention ensures autoregressive generation, while cross-attention enables the decoder to condition on the full encoder output. This three-sublayer design is used in the original Transformer for machine translation and in encoder-decoder models like T5 and BART.",
+            "code": "import torch.nn as nn\n\nclass DecoderBlock(nn.Module):\n    def __init__(self, d_model=512, nhead=8, d_ff=2048):\n        super().__init__()\n        self.self_attn = nn.MultiheadAttention(d_model, nhead)\n        self.cross_attn = nn.MultiheadAttention(d_model, nhead)\n        self.ffn = nn.Sequential(\n            nn.Linear(d_model, d_ff), nn.ReLU(), nn.Linear(d_ff, d_model)\n        )\n        self.norm1 = nn.LayerNorm(d_model)\n        self.norm2 = nn.LayerNorm(d_model)\n        self.norm3 = nn.LayerNorm(d_model)\n\n    def forward(self, x, enc_out, tgt_mask=None):\n        attn_out, _ = self.self_attn(x, x, x, attn_mask=tgt_mask)\n        x = self.norm1(x + attn_out)\n        cross_out, _ = self.cross_attn({{b1}}, {{b2}}, {{b3}})\n        x = self.norm2(x + cross_out)\n        ff_out = self.ffn(x)\n        x = self.norm3(x + ff_out)\n        return x",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? (query for cross-attention)",
+                    "acceptable": [
+                        "x"
+                    ],
+                    "hint": "Cross-attention queries come from the decoder representation."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? (key for cross-attention)",
+                    "acceptable": [
+                        "enc_out"
+                    ],
+                    "hint": "Cross-attention keys come from the encoder output."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? (value for cross-attention)",
+                    "acceptable": [
+                        "enc_out"
+                    ],
+                    "hint": "Cross-attention values also come from the encoder output."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_bert_encoder",
+            "title": "BERT-Style Encoder Model",
+            "difficulty": "medium",
+            "description": "Build a simplified BERT-style encoder using PyTorch's TransformerEncoder. BERT uses bidirectional self-attention (no causal mask) to produce contextualized representations.",
+            "info": "BERT (Bidirectional Encoder Representations from Transformers) is a Transformer encoder model that uses bidirectional self-attention, meaning every token can attend to every other token in the input. It is pre-trained with masked language modeling (predict randomly masked tokens) and next sentence prediction. The [CLS] token is prepended to the input and its final hidden state is often used as a sentence-level representation for classification tasks. BERT and its variants (RoBERTa, ALBERT, DeBERTa) remain widely used for classification, NER, question answering, and other discriminative NLP tasks.",
+            "code": "import torch.nn as nn\n\nclass BERTEncoder(nn.Module):\n    def __init__(self, vocab_size, d_model=768, nhead=12, num_layers=12, max_len=512):\n        super().__init__()\n        self.token_embed = nn.Embedding(vocab_size, d_model)\n        self.pos_embed = {{b1}}\n        encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, batch_first=True)\n        self.encoder = {{b2}}\n\n    def forward(self, input_ids):\n        positions = torch.arange(input_ids.size(1), device=input_ids.device)\n        x = self.token_embed(input_ids) + self.pos_embed(positions)\n        return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(max_len, d_model)",
+                    "acceptable": [
+                        "nn.Embedding(max_len, d_model)"
+                    ],
+                    "hint": "BERT uses learned positional embeddings, so use nn.Embedding."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.TransformerEncoder(encoder_layer, ???)",
+                    "acceptable": [
+                        "nn.TransformerEncoder(encoder_layer, num_layers)"
+                    ],
+                    "hint": "Stack the encoder layer num_layers times."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.encoder(???)",
+                    "acceptable": [
+                        "self.encoder(x)"
+                    ],
+                    "hint": "Pass the embedded input through the encoder stack. No mask needed for bidirectional attention."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_gpt_decoder",
+            "title": "GPT-Style Decoder Model",
+            "difficulty": "hard",
+            "description": "Build a simplified GPT-style decoder-only Transformer. GPT uses causal (masked) self-attention so each token can only attend to itself and previous tokens.",
+            "info": "GPT (Generative Pre-trained Transformer) is a decoder-only Transformer that uses causal self-attention to model sequences autoregressively. During training, a causal mask ensures that position i can only attend to positions 0 through i, enabling efficient parallel training while maintaining the autoregressive property needed at inference. The model is pre-trained with a simple next-token prediction objective. GPT-style architectures (GPT-2, GPT-3, GPT-4, Llama, etc.) have become the dominant paradigm for large language models due to their simplicity and scalability.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass GPTDecoder(nn.Module):\n    def __init__(self, vocab_size, d_model=768, nhead=12, num_layers=12, max_len=1024):\n        super().__init__()\n        self.token_embed = nn.Embedding(vocab_size, d_model)\n        self.pos_embed = nn.Embedding(max_len, d_model)\n        decoder_layer = nn.TransformerEncoderLayer(d_model, nhead, batch_first=True)\n        self.decoder = nn.TransformerEncoder(decoder_layer, num_layers)\n        self.lm_head = {{b1}}\n\n    def forward(self, input_ids):\n        B, S = input_ids.shape\n        positions = torch.arange(S, device=input_ids.device)\n        x = self.token_embed(input_ids) + self.pos_embed(positions)\n        causal_mask = {{b2}}\n        x = self.decoder(x, mask=causal_mask)\n        return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(d_model, ???)",
+                    "acceptable": [
+                        "nn.Linear(d_model, vocab_size)"
+                    ],
+                    "hint": "The language model head projects back to vocabulary size for next-token prediction."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Transformer.generate_square_subsequent_mask(???).to(input_ids.device)",
+                    "acceptable": [
+                        "nn.Transformer.generate_square_subsequent_mask(S).to(input_ids.device)"
+                    ],
+                    "hint": "Generate a causal mask of size S x S."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.???(x)",
+                    "acceptable": [
+                        "self.lm_head(x)"
+                    ],
+                    "hint": "Project the final hidden states to logits over the vocabulary."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_vit_patch",
+            "title": "Vision Transformer (ViT) Patch Embedding",
+            "difficulty": "medium",
+            "description": "Implement the patch embedding layer for a Vision Transformer. Split an image into non-overlapping patches and project each patch into the Transformer embedding dimension using a convolution with kernel_size=stride=patch_size.",
+            "info": "The Vision Transformer (ViT) treats an image as a sequence of patches, analogous to tokens in NLP. A 224x224 image with patch_size=16 produces a 14x14 = 196 patches, each of size 16x16x3. These patches are linearly projected to the model dimension using a Conv2d with kernel_size and stride both equal to patch_size, which is mathematically equivalent to extracting non-overlapping patches and applying a linear layer. The resulting sequence of patch embeddings is then processed by a standard Transformer encoder. ViT demonstrated that pure Transformer architectures can match or exceed CNNs on image classification when trained on sufficient data.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PatchEmbedding(nn.Module):\n    def __init__(self, img_size=224, patch_size=16, in_channels=3, d_model=768):\n        super().__init__()\n        self.num_patches = (img_size // patch_size) ** 2\n        self.proj = {{b1}}\n\n    def forward(self, x):\n        # x: (batch, 3, 224, 224)\n        x = self.proj(x)          # (batch, d_model, H', W')\n        x = {{b2}}                # (batch, d_model, num_patches)\n        x = {{b3}}                # (batch, num_patches, d_model)\n        return x",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Conv2d(in_channels, d_model, kernel_size=???, stride=???)",
+                    "acceptable": [
+                        "nn.Conv2d(in_channels, d_model, kernel_size=patch_size, stride=patch_size)"
+                    ],
+                    "hint": "Use Conv2d with kernel_size=patch_size and stride=patch_size for non-overlapping patches."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x.flatten(???)",
+                    "acceptable": [
+                        "x.flatten(2)"
+                    ],
+                    "hint": "Flatten the spatial dimensions (H', W') into a single sequence dimension starting at dim 2."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x.transpose(?, ?)",
+                    "acceptable": [
+                        "x.transpose(1, 2)"
+                    ],
+                    "hint": "Swap d_model and num_patches dimensions so sequence is dim 1."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_cls_token",
+            "title": "ViT Class Token and Classification Head",
+            "difficulty": "medium",
+            "description": "Add a learnable [CLS] token to the patch embedding sequence, prepend it, and use its final representation for classification.",
+            "info": "In Vision Transformers, a learnable class token ([CLS]) is prepended to the sequence of patch embeddings before being fed into the Transformer encoder. Through self-attention across all layers, this special token aggregates information from all patches. After the final encoder layer, the [CLS] token's representation is extracted (position 0) and passed through a classification head (typically a linear layer or small MLP). This approach follows BERT's convention of using a special token for sequence-level tasks. An alternative is to use global average pooling over all patch representations, which some variants like DeiT have shown to work equally well.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass ViTWithCLS(nn.Module):\n    def __init__(self, d_model=768, num_classes=1000):\n        super().__init__()\n        self.cls_token = {{b1}}\n        self.classifier = nn.Linear(d_model, num_classes)\n\n    def prepare_tokens(self, patch_embeddings):\n        # patch_embeddings: (batch, num_patches, d_model)\n        B = patch_embeddings.size(0)\n        cls = self.cls_token.expand(B, -1, -1)\n        return {{b2}}\n\n    def classify(self, encoder_output):\n        # encoder_output: (batch, 1 + num_patches, d_model)\n        cls_repr = {{b3}}\n        return self.classifier(cls_repr)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Parameter(torch.randn(1, 1, ???))",
+                    "acceptable": [
+                        "nn.Parameter(torch.randn(1, 1, d_model))"
+                    ],
+                    "hint": "The CLS token is a learnable parameter of shape (1, 1, d_model)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.cat([???, ???], dim=1)",
+                    "acceptable": [
+                        "torch.cat([cls, patch_embeddings], dim=1)",
+                        "torch.cat((cls, patch_embeddings), dim=1)"
+                    ],
+                    "hint": "Prepend the CLS token to the patch embeddings along the sequence dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "encoder_output[:, ???, :]",
+                    "acceptable": [
+                        "encoder_output[:, 0, :]",
+                        "encoder_output[:, 0]"
+                    ],
+                    "hint": "Extract the CLS token representation at position 0."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_rope",
+            "title": "Rotary Positional Embedding (RoPE)",
+            "difficulty": "hard",
+            "description": "Implement the core rotation operation of RoPE, which encodes positions by rotating pairs of dimensions in the query and key vectors. RoPE makes the dot product between q and k depend only on their relative position.",
+            "info": "Rotary Positional Embedding (RoPE), proposed by Su et al. (2021), encodes absolute position by rotating query and key vectors in 2D subspaces of the embedding dimension. For each consecutive pair of dimensions (2i, 2i+1), the vector is rotated by an angle proportional to the position and inversely proportional to the dimension index. The key insight is that the dot product of two RoPE-encoded vectors depends only on their relative position, giving the model relative positional awareness while being applied to absolute positions. RoPE is used in Llama, PaLM, and most modern open-source LLMs due to its excellent length extrapolation properties.",
+            "code": "import torch\n\ndef apply_rope(x, positions, d_model, base=10000):\n    # x: (batch, seq_len, d_model), positions: (seq_len,)\n    half_dim = d_model // 2\n    freqs = 1.0 / (base ** (torch.arange(0, d_model, 2).float() / d_model))\n    angles = {{b1}}  # (seq_len, half_dim)\n    cos_a = torch.cos(angles)\n    sin_a = torch.sin(angles)\n    x1 = x[..., ::2]   # even dimensions\n    x2 = x[..., 1::2]  # odd dimensions\n    rx1 = {{b2}}\n    rx2 = {{b3}}\n    return torch.stack([rx1, rx2], dim=-1).flatten(-2)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "positions.unsqueeze(1) * ???",
+                    "acceptable": [
+                        "positions.unsqueeze(1) * freqs.unsqueeze(0)",
+                        "positions.unsqueeze(-1) * freqs.unsqueeze(0)"
+                    ],
+                    "hint": "Outer product of positions and frequencies gives the rotation angles."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x1 * cos_a ??? x2 * sin_a",
+                    "acceptable": [
+                        "x1 * cos_a - x2 * sin_a"
+                    ],
+                    "hint": "2D rotation formula for even dims: x1*cos - x2*sin."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x2 * cos_a ??? x1 * sin_a",
+                    "acceptable": [
+                        "x2 * cos_a + x1 * sin_a"
+                    ],
+                    "hint": "2D rotation formula for odd dims: x2*cos + x1*sin."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_alibi",
+            "title": "ALiBi Positional Bias",
+            "difficulty": "medium",
+            "description": "Implement ALiBi (Attention with Linear Biases), which adds a linear distance-based penalty directly to attention scores instead of using positional embeddings. Each head uses a different slope.",
+            "info": "ALiBi (Press et al., 2022) replaces positional embeddings entirely by adding a static, non-learned bias to attention scores that penalizes distant key-query pairs. The bias for head h at positions (i, j) is -m_h * |i - j|, where m_h is a head-specific slope set to a geometric sequence (e.g., 1/2, 1/4, 1/8, ...). ALiBi requires no trainable positional parameters and enables strong extrapolation to sequence lengths much longer than those seen during training. It is used in models like BLOOM and MPT, and is particularly attractive for its simplicity and zero additional parameter cost.",
+            "code": "import torch\n\ndef get_alibi_slopes(nhead):\n    # Returns geometric sequence of slopes for each head\n    return torch.tensor([2 ** (-(8 / nhead) * (i + 1)) for i in range(nhead)])\n\ndef alibi_bias(seq_len, nhead):\n    slopes = get_alibi_slopes(nhead)  # (nhead,)\n    positions = torch.arange(seq_len)\n    # Distance matrix: |i - j| for all pairs\n    dist = {{b1}}  # (seq_len, seq_len)\n    # Multiply each head's slope by the distance matrix\n    bias = {{b2}}  # (nhead, seq_len, seq_len)\n    return bias\n\n# Usage: scores = Q @ K^T / sqrt(d_k) + {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.abs(positions.unsqueeze(?) - positions.unsqueeze(?))",
+                    "acceptable": [
+                        "torch.abs(positions.unsqueeze(1) - positions.unsqueeze(0))",
+                        "(positions.unsqueeze(1) - positions.unsqueeze(0)).abs()"
+                    ],
+                    "hint": "Compute pairwise absolute distances using broadcasting."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-slopes.view(nhead, 1, 1) * ???",
+                    "acceptable": [
+                        "-slopes.view(nhead, 1, 1) * dist.unsqueeze(0)",
+                        "-slopes.view(-1, 1, 1) * dist.unsqueeze(0)"
+                    ],
+                    "hint": "Negate slopes (penalty for distance) and multiply by the distance matrix. Reshape slopes for broadcasting."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? (the bias term)",
+                    "acceptable": [
+                        "alibi_bias(seq_len, nhead)",
+                        "bias"
+                    ],
+                    "hint": "Add the ALiBi bias to the raw attention scores before softmax."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_relative_pe",
+            "title": "Relative Positional Encoding Bias",
+            "difficulty": "medium",
+            "description": "Implement a learnable relative positional bias table that maps relative distances between positions to a scalar bias added to attention scores. Used in models like T5 and Swin Transformer.",
+            "info": "Relative positional encoding adds a bias to attention scores based on the relative distance between the query and key positions rather than their absolute positions. A learnable bias table maps each possible relative distance to a scalar value. For a sequence of length L, relative distances range from -(L-1) to (L-1), requiring a table of size 2L-1. This approach was popularized by Shaw et al. (2018) and later simplified in T5, which buckets relative positions to handle long sequences. Swin Transformer uses a similar 2D relative positional bias for image patches.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass RelativePositionBias(nn.Module):\n    def __init__(self, max_len=128):\n        super().__init__()\n        self.max_len = max_len\n        num_buckets = 2 * max_len - 1\n        self.bias_table = {{b1}}\n\n    def forward(self, seq_len):\n        positions = torch.arange(seq_len)\n        relative_pos = {{b2}}\n        # Shift so index 0 corresponds to -(max_len-1)\n        indices = relative_pos + (self.max_len - 1)\n        return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Parameter(torch.zeros(???))",
+                    "acceptable": [
+                        "nn.Parameter(torch.zeros(num_buckets))"
+                    ],
+                    "hint": "One learnable scalar per possible relative distance. There are 2*max_len - 1 possible distances."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "positions.unsqueeze(?) - positions.unsqueeze(?)",
+                    "acceptable": [
+                        "positions.unsqueeze(0) - positions.unsqueeze(1)",
+                        "positions.unsqueeze(1) - positions.unsqueeze(0)"
+                    ],
+                    "hint": "Compute the pairwise relative positions: q_pos - k_pos."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.bias_table[???]",
+                    "acceptable": [
+                        "self.bias_table[indices]"
+                    ],
+                    "hint": "Index into the bias table using the shifted relative position indices."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_sliding_window",
+            "title": "Sliding Window Attention Mask",
+            "difficulty": "medium",
+            "description": "Create a sliding window attention mask where each position can only attend to positions within a fixed window of size w around it. Used in Longformer, Mistral, and other efficient attention models.",
+            "info": "Sliding window attention restricts each token to attend only to a local neighborhood of w tokens around it, reducing the attention complexity from O(n^2) to O(n*w). This is based on the observation that most useful attention patterns are local, and global context can be built up across multiple layers (a stack of L layers with window w gives an effective receptive field of L*w). Mistral 7B uses sliding window attention with a window size of 4096, combined with a KV cache that rolls over at the window boundary. Longformer combines sliding window attention with a few global attention tokens for tasks requiring long-range dependencies.",
+            "code": "import torch\n\ndef sliding_window_mask(seq_len, window_size):\n    # Returns a mask where True = BLOCKED (to be filled with -inf)\n    positions = torch.arange(seq_len)\n    # Compute distance between all pairs of positions\n    dist = {{b1}}\n    # Block positions further than window_size // 2 away\n    half_w = window_size // 2\n    mask = {{b2}}\n    return mask\n\n# Usage with attention scores:\n# scores = scores.masked_fill(mask, {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.abs(positions.unsqueeze(?) - positions.unsqueeze(?))",
+                    "acceptable": [
+                        "torch.abs(positions.unsqueeze(0) - positions.unsqueeze(1))",
+                        "torch.abs(positions.unsqueeze(1) - positions.unsqueeze(0))",
+                        "(positions.unsqueeze(0) - positions.unsqueeze(1)).abs()",
+                        "(positions.unsqueeze(1) - positions.unsqueeze(0)).abs()"
+                    ],
+                    "hint": "Compute pairwise absolute distances between all positions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "dist > ???",
+                    "acceptable": [
+                        "dist > half_w"
+                    ],
+                    "hint": "Block (True) when distance exceeds half the window size."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "float('???')",
+                    "acceptable": [
+                        "float('-inf')"
+                    ],
+                    "hint": "Blocked positions get negative infinity."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_linear_attention",
+            "title": "Linear Attention Approximation",
+            "difficulty": "hard",
+            "description": "Implement linear attention that replaces softmax(QK^T)V with phi(Q)(phi(K)^T V), where phi is a feature map. By computing K^T V first, complexity drops from O(n^2 d) to O(n d^2).",
+            "info": "Linear attention replaces the softmax kernel in standard attention with a decomposable feature map phi, enabling the computation to be rewritten as phi(Q) * (phi(K)^T * V). This change of computation order avoids materializing the n x n attention matrix, reducing complexity from O(n^2 d) to O(n d^2), which is linear in sequence length when d << n. Common feature maps include ELU+1, ReLU, and random Fourier features. While linear attention is significantly faster for long sequences, it typically sacrifices some modeling quality compared to softmax attention. Models like Linear Transformers and RWKV use variants of this idea.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef feature_map(x):\n    \"\"\"Simple ELU+1 feature map to ensure non-negative values.\"\"\"\n    return F.elu(x) + 1\n\ndef linear_attention(Q, K, V):\n    # Q, K, V: (batch, seq_len, d_k)\n    Q_prime = feature_map(Q)\n    K_prime = feature_map(K)\n    # Key trick: compute K^T V first -> (batch, d_k, d_v)\n    KV = {{b1}}\n    # Then Q @ (K^T V) -> (batch, seq_len, d_v)\n    numerator = {{b2}}\n    # Normalize by sum of attention weights\n    denominator = {{b3}} + 1e-6\n    return numerator / denominator",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "K_prime.transpose(-2, -1) @ ???",
+                    "acceptable": [
+                        "K_prime.transpose(-2, -1) @ V"
+                    ],
+                    "hint": "First compute K^T V which is (d_k x d_v), avoiding the n x n matrix."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "Q_prime @ ???",
+                    "acceptable": [
+                        "Q_prime @ KV"
+                    ],
+                    "hint": "Multiply queries by the precomputed KV matrix."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "Q_prime @ K_prime.transpose(-2, -1).sum(dim=???, keepdim=True)",
+                    "acceptable": [
+                        "Q_prime @ K_prime.transpose(-2, -1).sum(dim=-1, keepdim=True)"
+                    ],
+                    "hint": "Normalizer: sum of phi(Q_i) . phi(K_j) for all j, computed efficiently."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_attn_dropout",
+            "title": "Attention Dropout",
+            "difficulty": "easy",
+            "description": "Add dropout to attention weights (after softmax, before multiplying by V). This is a standard regularization technique in Transformers.",
+            "info": "Attention dropout is applied to the attention weight matrix after the softmax normalization and before the weighted sum with values. It randomly zeroes out some attention weights during training, which prevents the model from relying too heavily on specific attention patterns and improves generalization. Typical dropout rates are 0.1 for large models. This is distinct from residual dropout (applied to sub-layer outputs before the residual connection) and embedding dropout. During inference, dropout is disabled and the full attention pattern is used.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass AttentionWithDropout(nn.Module):\n    def __init__(self, d_model=512, dropout_rate=0.1):\n        super().__init__()\n        self.d_model = d_model\n        self.dropout = {{b1}}\n\n    def forward(self, Q, K, V):\n        scores = Q @ K.transpose(-2, -1) / (self.d_model ** 0.5)\n        weights = {{b2}}\n        weights = {{b3}}\n        return weights @ V",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(dropout_rate)",
+                    "acceptable": [
+                        "nn.Dropout(dropout_rate)",
+                        "nn.Dropout(p=dropout_rate)"
+                    ],
+                    "hint": "Create a dropout layer with the given rate."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.softmax(scores, dim=???)",
+                    "acceptable": [
+                        "F.softmax(scores, dim=-1)",
+                        "torch.softmax(scores, dim=-1)"
+                    ],
+                    "hint": "Apply softmax over the key dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.???(weights)",
+                    "acceptable": [
+                        "self.dropout(weights)"
+                    ],
+                    "hint": "Apply dropout to the attention weights."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_prenorm",
+            "title": "Pre-Norm vs Post-Norm Transformer Block",
+            "difficulty": "medium",
+            "description": "Implement a Transformer block using the pre-norm architecture, where layer normalization is applied BEFORE each sub-layer rather than after. Pre-norm is the dominant choice in modern LLMs.",
+            "info": "In the original Transformer (post-norm), layer normalization is applied after the residual connection: x = LayerNorm(x + Sublayer(x)). In pre-norm, normalization is applied before the sub-layer: x = x + Sublayer(LayerNorm(x)). Pre-norm was found to produce more stable training dynamics, especially for deep models, because gradients flow directly through the residual path without passing through a normalization layer. GPT-2, GPT-3, Llama, and most modern LLMs use pre-norm. The trade-off is that pre-norm may require a final layer norm after the last block, as the residual stream is not normalized at the output.",
+            "code": "import torch.nn as nn\n\nclass PreNormTransformerBlock(nn.Module):\n    def __init__(self, d_model=512, nhead=8, d_ff=2048):\n        super().__init__()\n        self.norm1 = nn.LayerNorm(d_model)\n        self.norm2 = nn.LayerNorm(d_model)\n        self.attn = nn.MultiheadAttention(d_model, nhead, batch_first=True)\n        self.ffn = nn.Sequential(\n            nn.Linear(d_model, d_ff), nn.GELU(), nn.Linear(d_ff, d_model)\n        )\n\n    def forward(self, x):\n        # Pre-norm: normalize BEFORE the sub-layer\n        normed = self.norm1(x)\n        attn_out, _ = self.attn(normed, normed, normed)\n        x = {{b1}}\n        normed = {{b2}}\n        ff_out = self.ffn(normed)\n        x = {{b3}}\n        return x",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x + ???",
+                    "acceptable": [
+                        "x + attn_out"
+                    ],
+                    "hint": "Residual connection: add the sub-layer output to the input (no norm here in pre-norm)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.???(x)",
+                    "acceptable": [
+                        "self.norm2(x)"
+                    ],
+                    "hint": "Apply the second layer norm BEFORE the FFN."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x + ???",
+                    "acceptable": [
+                        "x + ff_out"
+                    ],
+                    "hint": "Second residual connection after the FFN."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_bpe",
+            "title": "Byte-Pair Encoding (BPE) Tokenization",
+            "difficulty": "medium",
+            "description": "Implement one step of BPE merge: find the most frequent adjacent pair of tokens in a corpus and merge all occurrences into a single new token.",
+            "info": "Byte-Pair Encoding (BPE) is the most common tokenization algorithm used in modern LLMs (GPT, Llama, etc.). Starting with a vocabulary of individual characters (or bytes), BPE iteratively finds the most frequent adjacent pair of tokens in the training corpus and merges them into a new token. This process is repeated thousands of times to build a vocabulary of common subwords. BPE strikes a balance between character-level (small vocab, long sequences) and word-level (large vocab, short sequences) tokenization. The resulting subword vocabulary handles rare and out-of-vocabulary words by decomposing them into known subword units.",
+            "code": "from collections import Counter\n\ndef get_pair_frequencies(token_sequences):\n    \"\"\"Count frequencies of all adjacent token pairs.\"\"\"\n    pairs = Counter()\n    for seq in token_sequences:\n        for i in range(len(seq) - 1):\n            pairs[(seq[i], seq[i+1])] += 1\n    return pairs\n\ndef bpe_merge_step(token_sequences):\n    pairs = get_pair_frequencies(token_sequences)\n    if not pairs:\n        return token_sequences\n    best_pair = {{b1}}\n    new_token = best_pair[0] + best_pair[1]\n    merged = []\n    for seq in token_sequences:\n        new_seq = []\n        i = 0\n        while i < len(seq):\n            if i < len(seq) - 1 and {{b2}}:\n                new_seq.append({{b3}})\n                i += 2\n            else:\n                new_seq.append(seq[i])\n                i += 1\n        merged.append(new_seq)\n    return merged",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "max(pairs, key=???)",
+                    "acceptable": [
+                        "max(pairs, key=pairs.get)"
+                    ],
+                    "hint": "Find the pair with the highest frequency."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(seq[i], seq[i+1]) == ???",
+                    "acceptable": [
+                        "(seq[i], seq[i+1]) == best_pair"
+                    ],
+                    "hint": "Check if the current adjacent pair matches the best pair to merge."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? (the merged token)",
+                    "acceptable": [
+                        "new_token"
+                    ],
+                    "hint": "Append the concatenation of the two tokens as one new token."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_embedding_layer",
+            "title": "Token Embedding Layer with Scaling",
+            "difficulty": "easy",
+            "description": "Create a token embedding layer that maps token IDs to dense vectors and scales them by sqrt(d_model), as done in the original Transformer.",
+            "info": "The embedding layer maps discrete token indices to continuous dense vectors of dimension d_model. In the original Transformer, the embeddings are scaled by sqrt(d_model) to ensure that the embedding magnitudes are in a similar range to the positional encodings that are added to them. Without this scaling, the positional signals could dominate the token content signals (or vice versa) since embedding weights are typically initialized with small random values. This simple multiplication is often overlooked but is present in the original paper and many implementations.",
+            "code": "import torch\nimport torch.nn as nn\nimport math\n\nclass ScaledEmbedding(nn.Module):\n    def __init__(self, vocab_size, d_model):\n        super().__init__()\n        self.embed = {{b1}}\n        self.scale = {{b2}}\n\n    def forward(self, token_ids):\n        return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???(vocab_size, d_model)",
+                    "acceptable": [
+                        "nn.Embedding(vocab_size, d_model)"
+                    ],
+                    "hint": "Standard PyTorch embedding lookup table."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "math.sqrt(???)",
+                    "acceptable": [
+                        "math.sqrt(d_model)"
+                    ],
+                    "hint": "The scaling factor is sqrt(d_model)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.embed(token_ids) * ???",
+                    "acceptable": [
+                        "self.embed(token_ids) * self.scale"
+                    ],
+                    "hint": "Look up embeddings and multiply by the scale factor."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_padding_mask",
+            "title": "Padding Attention Mask",
+            "difficulty": "easy",
+            "description": "Create a padding mask that prevents attention to padding tokens (token ID = 0). The mask should be broadcastable to attention score matrices.",
+            "info": "When batching sequences of different lengths, shorter sequences are padded with a special padding token (typically ID 0). The padding mask prevents the model from attending to these meaningless padding positions, which would otherwise pollute the attention-weighted representations. The mask is created by comparing token IDs to the padding value and is reshaped for broadcasting across attention heads and query positions. Without proper padding masks, the model would waste capacity attending to padding tokens and could produce degraded representations, especially for shorter sequences in the batch.",
+            "code": "import torch\n\ndef create_padding_mask(input_ids, pad_token_id=0):\n    # input_ids: (batch, seq_len)\n    # Returns mask of shape (batch, 1, 1, seq_len) for broadcasting\n    mask = {{b1}}  # True where padding\n    mask = mask.unsqueeze(1).unsqueeze(2)  # (batch, 1, 1, seq_len)\n    return {{b2}}\n\n# Usage:\n# scores = Q @ K^T / sqrt(d_k)\n# scores = scores + padding_mask  # or scores.masked_fill(bool_mask, {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(input_ids == ???)",
+                    "acceptable": [
+                        "(input_ids == pad_token_id)"
+                    ],
+                    "hint": "Compare each token ID to the padding token ID."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "mask.float() * ???",
+                    "acceptable": [
+                        "mask.float() * float('-inf')",
+                        "mask.float() * (-1e9)"
+                    ],
+                    "hint": "Convert to float and multiply by a large negative number (or -inf) so softmax zeroes these positions."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "float('???')",
+                    "acceptable": [
+                        "float('-inf')"
+                    ],
+                    "hint": "Masked positions get negative infinity so softmax outputs zero for them."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_combined_mask",
+            "title": "Combined Causal + Padding Mask",
+            "difficulty": "medium",
+            "description": "Combine a causal mask (no attending to future) with a padding mask (no attending to pad tokens) into a single attention mask for autoregressive models processing padded batches.",
+            "info": "In practice, autoregressive models processing batched inputs need both causal and padding masks simultaneously. The causal mask prevents attending to future tokens, while the padding mask prevents attending to padding tokens. These two masks are combined by taking the element-wise minimum (or logical OR for boolean masks), ensuring that a position is masked if either condition applies. This combined mask is essential for efficient batched training of decoder models like GPT, where sequences in a batch may have different lengths and must be padded to the maximum length.",
+            "code": "import torch\n\ndef combined_mask(seq_len, padding_mask):\n    # padding_mask: (batch, seq_len), True where padded\n    # Create causal mask: (seq_len, seq_len)\n    causal = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()\n    # Expand padding mask: (batch, 1, seq_len)\n    pad_mask = {{b1}}\n    # Expand causal mask: (1, seq_len, seq_len)\n    causal = causal.unsqueeze(0)\n    # Combine: masked if EITHER mask says so\n    combined = {{b2}}\n    # Convert to additive mask\n    return combined.float() * {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "padding_mask.unsqueeze(???)",
+                    "acceptable": [
+                        "padding_mask.unsqueeze(1)"
+                    ],
+                    "hint": "Add a dimension at position 1 so it broadcasts over query positions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "causal ??? pad_mask",
+                    "acceptable": [
+                        "causal | pad_mask"
+                    ],
+                    "hint": "Logical OR: mask if either causal or padding says to mask."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "float('???')",
+                    "acceptable": [
+                        "float('-inf')"
+                    ],
+                    "hint": "Additive mask uses negative infinity for masked positions."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_ffn_gelu",
+            "title": "Position-wise FFN with GELU",
+            "difficulty": "easy",
+            "description": "Implement the position-wise feed-forward network (FFN) used in Transformer blocks. It consists of two linear layers with a GELU activation in between. The inner dimension is typically 4x the model dimension.",
+            "info": "The position-wise feed-forward network (FFN) is the second sub-layer in every Transformer block. It applies the same two-layer MLP independently to each position in the sequence. The inner dimension is typically 4 times the model dimension (e.g., d_model=512, d_ff=2048). The original Transformer used ReLU, but modern models (GPT-2 onwards) use GELU (Gaussian Error Linear Unit), which provides smoother gradients. Some newer architectures like Llama use SwiGLU, a gated variant that splits the inner layer and applies a gating mechanism for improved performance.",
+            "code": "import torch.nn as nn\n\nclass FeedForward(nn.Module):\n    def __init__(self, d_model=512, d_ff=2048, dropout=0.1):\n        super().__init__()\n        self.net = nn.Sequential(\n            {{b1}},\n            nn.GELU(),\n            nn.Dropout(dropout),\n            {{b2}},\n            {{b3}}\n        )\n\n    def forward(self, x):\n        return self.net(x)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.Linear(???, ???)",
+                    "acceptable": [
+                        "nn.Linear(d_model, d_ff)"
+                    ],
+                    "hint": "First linear layer expands from d_model to d_ff."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.Linear(???, ???)",
+                    "acceptable": [
+                        "nn.Linear(d_ff, d_model)"
+                    ],
+                    "hint": "Second linear layer projects back from d_ff to d_model."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "nn.???(dropout)",
+                    "acceptable": [
+                        "nn.Dropout(dropout)"
+                    ],
+                    "hint": "Apply dropout after the second linear layer."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_head_split",
+            "title": "Multi-Head Attention: Splitting and Merging Heads",
+            "difficulty": "medium",
+            "description": "Implement the reshape operations that split a tensor into multiple attention heads and merge them back. This is the mechanical core of multi-head attention.",
+            "info": "Multi-head attention works by splitting the d_model dimensional vectors into nhead separate head_dim dimensional subspaces, running attention independently in each, and concatenating the results. The split is done by reshaping (batch, seq_len, d_model) to (batch, seq_len, nhead, head_dim) and transposing to (batch, nhead, seq_len, head_dim). After attention, the reverse operation merges heads back. This reshape-based splitting is mathematically equivalent to having separate projection matrices per head but is much more memory-efficient since a single large matrix multiplication handles all heads simultaneously.",
+            "code": "import torch\n\ndef split_heads(x, nhead):\n    # x: (batch, seq_len, d_model) -> (batch, nhead, seq_len, head_dim)\n    B, S, D = x.shape\n    head_dim = D // nhead\n    return {{b1}}\n\ndef merge_heads(x):\n    # x: (batch, nhead, seq_len, head_dim) -> (batch, seq_len, d_model)\n    B, H, S, D = x.shape\n    return {{b2}}\n\n# After projecting Q, K, V with linear layers:\n# q, k, v = split_heads(Q, nhead), split_heads(K, nhead), split_heads(V, nhead)\n# attn_out = scaled_dot_product_attention(q, k, v)\n# output = {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x.view(B, S, ???, ???).transpose(1, 2)",
+                    "acceptable": [
+                        "x.view(B, S, nhead, head_dim).transpose(1, 2)",
+                        "x.reshape(B, S, nhead, head_dim).transpose(1, 2)"
+                    ],
+                    "hint": "Reshape to (B, S, nhead, head_dim) then swap seq and head dims."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x.transpose(1, 2).???.view(B, S, ???)",
+                    "acceptable": [
+                        "x.transpose(1, 2).contiguous().view(B, S, H * D)",
+                        "x.transpose(1, 2).contiguous().view(B, S, -1)",
+                        "x.transpose(1, 2).reshape(B, S, H * D)",
+                        "x.transpose(1, 2).reshape(B, S, -1)"
+                    ],
+                    "hint": "Transpose back, make contiguous, then reshape to merge head and head_dim dimensions."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "merge_heads(???)",
+                    "acceptable": [
+                        "merge_heads(attn_out)"
+                    ],
+                    "hint": "Merge the heads of the attention output."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_mask_strategies",
+            "title": "Attention Masking Strategies: Prefix LM",
+            "difficulty": "hard",
+            "description": "Implement a prefix LM attention mask where the first prefix_len tokens use bidirectional attention (can see each other) and the remaining tokens use causal attention. Used in models like T5 and UL2.",
+            "info": "Prefix LM masking is a hybrid attention pattern where a prefix of the sequence uses bidirectional (encoder-like) attention while the rest uses causal (decoder-like) attention. This allows the model to fully encode a prompt or context with bidirectional attention, then generate continuations autoregressively. Models like T5 (in its encoder), UL2, and some instruction-tuned models use this pattern. The mask construction combines a fully-visible block for the prefix with a causal block for the suffix, enabling a single decoder-only architecture to simulate encoder-decoder behavior.",
+            "code": "import torch\n\ndef prefix_lm_mask(seq_len, prefix_len):\n    # Returns a float mask: 0 = attend, -inf = block\n    mask = torch.zeros(seq_len, seq_len)\n    # Causal part: for positions after prefix, block future tokens\n    causal_part = {{b1}}\n    mask[prefix_len:, prefix_len:] = causal_part\n    # Also block suffix -> future suffix (above diagonal in bottom-right block)\n    # The prefix tokens (rows 0..prefix_len-1) can see everything: already 0\n    # Suffix tokens should not see future suffix tokens: handled above\n    # Suffix tokens CAN see all prefix tokens: already 0\n    return {{b2}}\n\n# Example: seq_len=8, prefix_len=3\n# Tokens 0,1,2 attend to all 8 tokens (bidirectional prefix)\n# Token 3 attends to 0,1,2,3 only\n# Token 7 attends to {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.triu(torch.ones(seq_len - prefix_len, seq_len - prefix_len), diagonal=???).float() * float('-inf')",
+                    "acceptable": [
+                        "torch.triu(torch.ones(seq_len - prefix_len, seq_len - prefix_len), diagonal=1).float() * float('-inf')"
+                    ],
+                    "hint": "Standard upper-triangular causal mask for the suffix portion, with diagonal=1."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? (the final combined mask)",
+                    "acceptable": [
+                        "mask"
+                    ],
+                    "hint": "Return the constructed mask directly."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "tokens 0 through ???",
+                    "acceptable": [
+                        "tokens 0 through 7",
+                        "0 through 7",
+                        "all 8 tokens"
+                    ],
+                    "hint": "The last token can attend to all prefix tokens and all suffix tokens up to and including itself."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_rmsnorm",
+            "title": "RMSNorm (Root Mean Square Normalization)",
+            "difficulty": "easy",
+            "description": "Implement RMSNorm, a simpler alternative to LayerNorm used in Llama and other modern LLMs. RMSNorm skips the mean-centering step and only normalizes by the root mean square.",
+            "info": "RMSNorm (Zhang and Sennrich, 2019) simplifies LayerNorm by removing the mean-centering (re-centering) step and only dividing by the root mean square of the activations. This reduces computation by avoiding the mean calculation while empirically maintaining comparable performance. The formula is: RMSNorm(x) = x / RMS(x) * gamma, where RMS(x) = sqrt(mean(x^2) + eps). Llama, Llama 2, and Llama 3 all use RMSNorm instead of LayerNorm, contributing to slightly faster training and inference. The learnable scale parameter gamma allows the model to adjust the normalization magnitude per feature.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass RMSNorm(nn.Module):\n    def __init__(self, d_model, eps=1e-6):\n        super().__init__()\n        self.weight = nn.Parameter(torch.ones(d_model))\n        self.eps = eps\n\n    def forward(self, x):\n        rms = {{b1}}\n        x_normed = {{b2}}\n        return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sqrt(torch.mean(x ** ???, dim=-1, keepdim=True) + self.eps)",
+                    "acceptable": [
+                        "torch.sqrt(torch.mean(x ** 2, dim=-1, keepdim=True) + self.eps)",
+                        "torch.sqrt((x ** 2).mean(dim=-1, keepdim=True) + self.eps)"
+                    ],
+                    "hint": "RMS = sqrt(mean(x^2) + eps)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x / ???",
+                    "acceptable": [
+                        "x / rms"
+                    ],
+                    "hint": "Divide input by the RMS."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x_normed * self.???",
+                    "acceptable": [
+                        "x_normed * self.weight"
+                    ],
+                    "hint": "Multiply by the learnable scale parameter."
+                }
+            ]
+        },
+        {
+            "id": "attn_new_weight_tying",
+            "title": "Weight Tying: Embedding and LM Head",
+            "difficulty": "easy",
+            "description": "Implement weight tying where the input token embedding matrix and the output language model head share the same weight matrix. This reduces parameter count and often improves performance.",
+            "info": "Weight tying (Press and Wolf, 2017) shares the weight matrix between the input embedding layer and the output softmax projection (LM head). Since the embedding maps token IDs to vectors and the LM head maps vectors back to token logits, they operate on the same semantic space and benefit from sharing parameters. This reduces the total parameter count by vocab_size * d_model parameters (which can be substantial, e.g., ~25M for vocab_size=32000 and d_model=768). Weight tying is used in GPT-2, T5, and many other language models, and empirically improves perplexity, especially for smaller models.",
+            "code": "import torch.nn as nn\n\nclass LMWithTiedWeights(nn.Module):\n    def __init__(self, vocab_size, d_model=768):\n        super().__init__()\n        self.embed = nn.Embedding(vocab_size, d_model)\n        self.lm_head = nn.Linear(d_model, vocab_size, bias=False)\n        # Tie weights\n        {{b1}}\n\n    def forward(self, token_ids, hidden_states):\n        # Embedding lookup\n        embeds = {{b2}}\n        # ... Transformer layers would go here ...\n        # LM head for next-token prediction\n        logits = {{b3}}\n        return embeds, logits",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.lm_head.weight = self.???.???",
+                    "acceptable": [
+                        "self.lm_head.weight = self.embed.weight"
+                    ],
+                    "hint": "Assign the embedding weight to the LM head weight (they share the same parameter tensor)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.???(token_ids)",
+                    "acceptable": [
+                        "self.embed(token_ids)"
+                    ],
+                    "hint": "Look up token embeddings."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.???(hidden_states)",
+                    "acceptable": [
+                        "self.lm_head(hidden_states)"
+                    ],
+                    "hint": "Project hidden states to vocabulary logits using the LM head."
+                }
+            ]
         }
     ]
 }

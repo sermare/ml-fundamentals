@@ -380,6 +380,510 @@
                     "hint": "Normalize f by f[0] and skip the first element to get T values."
                 }
             ]
+        },
+        {
+            "id": "diff_basics_new_quadratic_beta_schedule",
+            "title": "Quadratic Beta Schedule",
+            "difficulty": "easy",
+            "description": "Create a quadratic noise schedule where beta values follow a quadratic curve from beta_start to beta_end over T timesteps.",
+            "info": "A quadratic beta schedule spaces the beta values along a squared curve rather than a straight line. This means noise increases slowly at first and then accelerates toward the end. The implementation takes the square of linearly spaced values between sqrt(beta_start) and sqrt(beta_end). This schedule was explored as an alternative to the linear schedule and can preserve more signal in early timesteps while still reaching the same final noise level.",
+            "code": "import torch\n\ndef quadratic_beta_schedule(T, beta_start=1e-4, beta_end=0.02):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.linspace(???, ???, T) ** 2",
+                    "acceptable": ["torch.linspace(beta_start ** 0.5, beta_end ** 0.5, T) ** 2", "torch.linspace(beta_start**0.5, beta_end**0.5, T)**2"],
+                    "hint": "Linearly space values between sqrt(beta_start) and sqrt(beta_end), then square the result."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_sigmoid_beta_schedule",
+            "title": "Sigmoid Beta Schedule",
+            "difficulty": "medium",
+            "description": "Implement a sigmoid-based beta schedule that transitions smoothly from beta_start to beta_end using a sigmoid function.",
+            "info": "The sigmoid beta schedule uses the logistic sigmoid function to create an S-shaped curve for the beta values. It maps linearly spaced values through a sigmoid, then scales and shifts to fit between beta_start and beta_end. The sigmoid's flat tails mean that beta changes slowly at the start and end, with faster changes in the middle. This can be advantageous because it provides a smoother transition than the linear schedule while being simpler to implement than the cosine schedule.",
+            "code": "import torch\n\ndef sigmoid_beta_schedule(T, beta_start=1e-4, beta_end=0.02):\n    betas = torch.linspace(-6, 6, T)\n    betas = {{b1}}\n    return betas * (beta_end - beta_start) + beta_start",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(betas)",
+                    "acceptable": ["torch.sigmoid(betas)"],
+                    "hint": "Apply the sigmoid function to map values into the (0, 1) range."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_alpha_bar_to_snr_db",
+            "title": "SNR in Decibels from Alpha Bar",
+            "difficulty": "easy",
+            "description": "Compute the signal-to-noise ratio in decibels (dB) from the alpha_bar schedule. SNR_dB = 10 * log10(alpha_bar / (1 - alpha_bar)).",
+            "info": "Expressing the SNR in decibels provides a more interpretable scale for human reasoning about noise levels. The conversion uses 10*log10 of the linear SNR. A positive dB value means the signal dominates, zero dB means equal signal and noise power, and negative dB means noise dominates. Diffusion processes typically span a wide range, from high positive dB (clean data) to large negative dB (nearly pure noise). This representation is borrowed from signal processing and is useful for comparing different schedules.",
+            "code": "import torch\n\ndef snr_in_db(alpha_bar):\n    \"\"\"Compute SNR in decibels for each timestep.\"\"\"\n    snr = alpha_bar / (1.0 - alpha_bar)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "10.0 * torch.???(snr)",
+                    "acceptable": ["10.0 * torch.log10(snr)", "10 * torch.log10(snr)"],
+                    "hint": "Convert linear SNR to decibels using 10 * log10(snr)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_marginal_mean_std",
+            "title": "Marginal Distribution Mean and Std at Time t",
+            "difficulty": "easy",
+            "description": "Compute the mean and standard deviation of the marginal distribution q(x_t | x_0) = N(sqrt(alpha_bar_t) * x_0, (1 - alpha_bar_t) * I).",
+            "info": "The marginal distribution of x_t given x_0 is a Gaussian whose mean is sqrt(alpha_bar_t)*x_0 and whose standard deviation is sqrt(1 - alpha_bar_t). The mean shrinks the original data by a factor of sqrt(alpha_bar_t), which decreases over time. The standard deviation grows as sqrt(1 - alpha_bar_t) increases. At t=0, the mean is approximately x_0 and std is approximately 0 (no noise). At t=T, the mean is approximately 0 and std is approximately 1 (pure noise).",
+            "code": "import torch\n\ndef marginal_mean_std(x0, alpha_bar_t):\n    \"\"\"Return the mean and std of q(x_t | x_0).\"\"\"\n    mean = {{b1}}\n    std = {{b2}}\n    return mean, std",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sqrt(???) * x0",
+                    "acceptable": ["torch.sqrt(alpha_bar_t) * x0", "alpha_bar_t.sqrt() * x0"],
+                    "hint": "The mean of q(x_t|x_0) is sqrt(alpha_bar_t) * x_0."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(1 - alpha_bar_t)", "torch.sqrt(1.0 - alpha_bar_t)", "(1 - alpha_bar_t).sqrt()", "(1.0 - alpha_bar_t).sqrt()"],
+                    "hint": "The std of q(x_t|x_0) is sqrt(1 - alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_transition_kernel_params",
+            "title": "Transition Kernel Parameters",
+            "difficulty": "medium",
+            "description": "Extract the mean coefficient and variance for the forward transition kernel q(x_t | x_{t-1}) = N(sqrt(alpha_t) * x_{t-1}, beta_t * I) from the schedule.",
+            "info": "The forward transition kernel q(x_t | x_{t-1}) is fully characterized by two parameters: a mean coefficient sqrt(alpha_t) = sqrt(1 - beta_t) that scales the previous state, and a variance beta_t that determines the noise magnitude. These parameters are derived directly from the beta schedule. Understanding these kernel parameters is important because they define each individual step of the Markov chain. The mean coefficient being less than 1 ensures the process gradually shrinks the signal, while the added noise ensures it converges to a standard Gaussian.",
+            "code": "import torch\n\ndef transition_kernel_params(betas):\n    \"\"\"Return mean_coeff and variance for each forward step.\"\"\"\n    alphas = 1.0 - betas\n    mean_coeff = {{b1}}\n    variance = {{b2}}\n    return mean_coeff, variance",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(alphas)", "alphas.sqrt()"],
+                    "hint": "The mean coefficient of q(x_t|x_{t-1}) is sqrt(alpha_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???",
+                    "acceptable": ["betas"],
+                    "hint": "The variance of the transition kernel is simply beta_t."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_verify_markov_property",
+            "title": "Verify Markov Chain Composition",
+            "difficulty": "medium",
+            "description": "Verify that running the forward process step-by-step for k steps produces the same distribution as the closed-form marginal q(x_k | x_0) by comparing the mean and variance.",
+            "info": "A defining property of the diffusion forward process is that it is a Markov chain where Gaussians compose in closed form. Running k individual steps q(x_1|x_0), q(x_2|x_1), ..., q(x_k|x_{k-1}) yields the same distribution as the direct marginal q(x_k|x_0). This can be verified by showing that the effective signal scaling is the product of individual scalings (i.e., sqrt(alpha_bar_k)) and the effective noise variance is (1 - alpha_bar_k). This composability is what makes training DDPM efficient since we can jump to any timestep directly.",
+            "code": "import torch\n\ndef verify_composition(betas, k):\n    \"\"\"Verify that composing k forward steps matches the marginal.\"\"\"\n    alphas = 1.0 - betas[:k]\n    # Composed signal scaling: product of sqrt(alpha_i)\n    composed_signal = {{b1}}\n    # Direct marginal signal scaling\n    alpha_bar_k = torch.prod(alphas)\n    direct_signal = torch.sqrt(alpha_bar_k)\n    return torch.allclose(composed_signal, direct_signal)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.prod(torch.sqrt(???))",
+                    "acceptable": ["torch.prod(torch.sqrt(alphas))", "torch.prod(alphas.sqrt())"],
+                    "hint": "The composed signal scaling is the product of sqrt(alpha_i) for each step."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_kl_between_forward_steps",
+            "title": "KL Divergence Between Two Gaussians (Forward Steps)",
+            "difficulty": "hard",
+            "description": "Compute the KL divergence between two diagonal Gaussian distributions KL(N(mu1, sigma1^2 I) || N(mu2, sigma2^2 I)) in closed form, as used to compare forward process distributions.",
+            "info": "The KL divergence between two Gaussians with diagonal covariance has a well-known closed-form expression. For d-dimensional Gaussians, KL(q||p) = 0.5 * sum(sigma1^2/sigma2^2 + (mu2-mu1)^2/sigma2^2 - 1 + log(sigma2^2/sigma1^2)). This formula is essential in the ELBO derivation for diffusion models, where each term in the variational bound involves a KL between Gaussian forward and reverse transitions. Computing this analytically avoids the need for Monte Carlo estimation of these KL terms.",
+            "code": "import torch\n\ndef kl_divergence_gaussians(mu1, sigma1, mu2, sigma2):\n    \"\"\"KL(N(mu1, sigma1^2 I) || N(mu2, sigma2^2 I)).\n    All inputs are tensors of the same shape.\"\"\"\n    var1 = sigma1 ** 2\n    var2 = sigma2 ** 2\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * torch.sum(var1/var2 + ??? - 1 + torch.log(???))",
+                    "acceptable": ["0.5 * torch.sum(var1 / var2 + (mu2 - mu1) ** 2 / var2 - 1 + torch.log(var2 / var1))", "0.5 * torch.sum(var1/var2 + (mu2 - mu1)**2 / var2 - 1 + torch.log(var2/var1))"],
+                    "hint": "KL = 0.5 * sum(var1/var2 + (mu2-mu1)^2/var2 - 1 + log(var2/var1))."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_elbo_reconstruction_term",
+            "title": "ELBO Reconstruction Term",
+            "difficulty": "hard",
+            "description": "Compute the reconstruction term of the ELBO: -E_q[log p(x_0 | x_1)], modeled as a discretized Gaussian log-likelihood at the final denoising step.",
+            "info": "The ELBO for diffusion models decomposes into three parts: a reconstruction term, KL terms for intermediate steps, and a prior matching term. The reconstruction term measures how well the model can recover x_0 from x_1 (the least noisy latent). For images, this is typically modeled as a discretized Gaussian: the model predicts a mean mu_theta(x_1, 1) and the log-likelihood is computed by integrating the Gaussian density over pixel bins of width 1/255. In the simplified DDPM loss, this term is approximated by MSE, but exact evaluation uses the discretized formulation.",
+            "code": "import torch\n\ndef reconstruction_log_likelihood(x0, predicted_mean, log_scale):\n    \"\"\"Discretized Gaussian log-likelihood for 8-bit images.\n    x0: ground truth in [-1, 1], predicted_mean: model output.\"\"\"\n    scale = torch.exp(log_scale)\n    bin_width = 1.0 / 127.5  # width of a pixel bin in [-1,1]\n    centered = x0 - predicted_mean\n    upper = (centered + bin_width / 2) / scale\n    lower = (centered - bin_width / 2) / scale\n    # CDF difference gives probability in each bin\n    log_probs = torch.log({{b1}} + 1e-12)\n    return log_probs.sum(dim=[1, 2, 3]).mean()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sigmoid(???) - torch.sigmoid(???)",
+                    "acceptable": ["torch.sigmoid(upper) - torch.sigmoid(lower)"],
+                    "hint": "The Gaussian CDF can be approximated via the sigmoid of the standardized bounds. CDF difference = sigmoid(upper) - sigmoid(lower)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_elbo_prior_term",
+            "title": "ELBO Prior Matching Term",
+            "difficulty": "medium",
+            "description": "Compute the prior matching term of the ELBO: KL(q(x_T | x_0) || p(x_T)), where p(x_T) = N(0, I) is the standard Gaussian prior.",
+            "info": "The prior term in the diffusion ELBO measures how close the final noised distribution q(x_T|x_0) is to the standard Gaussian prior N(0,I). Since q(x_T|x_0) = N(sqrt(alpha_bar_T)*x_0, (1-alpha_bar_T)*I), this KL can be computed in closed form. For a well-designed schedule with alpha_bar_T close to 0, this term is very small because the forward process has nearly destroyed all signal. This term has no learnable parameters and acts as a constant in training, but it is needed for exact log-likelihood evaluation.",
+            "code": "import torch\n\ndef prior_kl(x0, alpha_bar_T):\n    \"\"\"KL(q(x_T | x_0) || N(0, I)).\"\"\"\n    mean = torch.sqrt(alpha_bar_T) * x0\n    var = 1.0 - alpha_bar_T\n    # KL(N(mean, var*I) || N(0, I))\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * torch.sum(??? + ??? - 1 - torch.log(???), dim=[1,2,3]).mean()",
+                    "acceptable": ["0.5 * torch.sum(mean ** 2 + var - 1 - torch.log(var), dim=[1, 2, 3]).mean()", "0.5 * torch.sum(mean**2 + var - 1 - torch.log(var), dim=[1,2,3]).mean()"],
+                    "hint": "KL(N(mu, sigma^2 I) || N(0, I)) = 0.5 * sum(mu^2 + sigma^2 - 1 - log(sigma^2))."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_vlb_loss_single_term",
+            "title": "Variational Lower Bound: Single KL Term",
+            "difficulty": "hard",
+            "description": "Compute a single KL term L_{t-1} = KL(q(x_{t-1}|x_t, x_0) || p_theta(x_{t-1}|x_t)) of the variational lower bound, where both distributions are Gaussian with known variances.",
+            "info": "Each intermediate term L_{t-1} in the variational lower bound compares the true posterior q(x_{t-1}|x_t,x_0) with the learned reverse transition p_theta(x_{t-1}|x_t). Both are Gaussians with the same fixed variance (beta_tilde_t), so the KL reduces to a scaled squared difference between their means. Specifically, L_{t-1} = (1/(2*beta_tilde_t)) * ||mu_tilde - mu_theta||^2. This is why the simplified DDPM loss (noise prediction MSE) works: it is proportional to this KL term up to a timestep-dependent weighting factor.",
+            "code": "import torch\n\ndef vlb_kl_term(mu_tilde, mu_theta, beta_tilde_t):\n    \"\"\"KL between q posterior and p_theta reverse, both with variance beta_tilde_t.\n    Returns per-sample KL averaged over dimensions.\"\"\"\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "0.5 * torch.sum((??? - ???) ** 2 / ???, dim=[1, 2, 3]).mean()",
+                    "acceptable": ["0.5 * torch.sum((mu_tilde - mu_theta) ** 2 / beta_tilde_t, dim=[1, 2, 3]).mean()", "0.5 * torch.sum((mu_tilde - mu_theta)**2 / beta_tilde_t, dim=[1, 2, 3]).mean()"],
+                    "hint": "KL between two Gaussians with equal variance simplifies to (1/(2*var)) * ||mu1 - mu2||^2 summed over dimensions."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_log_likelihood_bits_per_dim",
+            "title": "Bits Per Dimension from NLL",
+            "difficulty": "medium",
+            "description": "Convert a negative log-likelihood (in nats, base e) to bits per dimension, the standard metric for evaluating likelihood-based generative models on images.",
+            "info": "Bits per dimension (bpd) is the standard metric for comparing likelihood-based generative models. It measures the average number of bits needed to encode each dimension (pixel channel) of the data under the model. To convert from nats (natural log units) to bits, we divide by ln(2). Then we divide by the total number of dimensions (C*H*W for images). Lower bpd means the model assigns higher likelihood to the data. For reference, DDPM achieves around 3.7 bpd on CIFAR-10, while autoregressive models can reach below 3.0 bpd.",
+            "code": "import torch\nimport math\n\ndef nll_to_bpd(nll_nats, data_shape):\n    \"\"\"Convert NLL in nats to bits per dimension.\n    nll_nats: scalar or (batch,) tensor of negative log-likelihoods.\n    data_shape: tuple (C, H, W).\"\"\"\n    num_dims = 1\n    for d in data_shape:\n        num_dims *= d\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nll_nats / (??? * num_dims)",
+                    "acceptable": ["nll_nats / (math.log(2) * num_dims)", "nll_nats / (math.log(2.0) * num_dims)"],
+                    "hint": "Divide NLL in nats by ln(2) to convert to bits, then by num_dims for per-dimension."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_noise_level_visualization_numpy",
+            "title": "Noise Level Grid (NumPy)",
+            "difficulty": "easy",
+            "description": "Given an image as a NumPy array, create a grid of noisy versions at evenly spaced alpha_bar values from nearly clean to nearly pure noise.",
+            "info": "Visualizing how an image degrades at different noise levels helps build intuition for what the diffusion model must learn to reverse. By choosing evenly spaced alpha_bar values (e.g., 0.95, 0.75, 0.50, 0.25, 0.05), we can see the full progression from minimal to extreme corruption. At alpha_bar=0.95, only fine details are lost. At alpha_bar=0.5, the image is heavily corrupted but recognizable. At alpha_bar=0.05, it is nearly indistinguishable from pure noise. This visualization is a standard diagnostic tool.",
+            "code": "import numpy as np\n\ndef noise_level_grid(image, alpha_bar_values):\n    \"\"\"Create list of noisy images at specified alpha_bar levels.\"\"\"\n    results = []\n    for ab in alpha_bar_values:\n        noise = np.random.randn(*image.shape)\n        noisy = {{b1}}\n        results.append(noisy)\n    return results",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sqrt(ab) * image + np.sqrt(???) * noise",
+                    "acceptable": ["np.sqrt(ab) * image + np.sqrt(1 - ab) * noise", "np.sqrt(ab) * image + np.sqrt(1.0 - ab) * noise"],
+                    "hint": "Apply the forward diffusion formula: sqrt(ab)*image + sqrt(1-ab)*noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_clamp_predicted_x0",
+            "title": "Clamp Predicted x_0",
+            "difficulty": "easy",
+            "description": "After predicting x_0 from the noise estimate, clamp the result to the valid data range [-1, 1] to improve sampling stability.",
+            "info": "When the model predicts noise and we algebraically solve for x_0, the predicted values can sometimes fall outside the valid data range of [-1, 1] for normalized images. Clamping (clipping) the predicted x_0 to this range is a simple but effective trick that improves visual quality and prevents artifacts in generated samples. This technique is sometimes called 'dynamic thresholding' in its more sophisticated forms, as used in Imagen. The basic version simply uses torch.clamp to enforce hard bounds.",
+            "code": "import torch\n\ndef predict_and_clamp_x0(x_t, predicted_noise, alpha_bar_t):\n    \"\"\"Predict x_0 from noise and clamp to [-1, 1].\"\"\"\n    x0_pred = (x_t - torch.sqrt(1.0 - alpha_bar_t) * predicted_noise) / torch.sqrt(alpha_bar_t)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(x0_pred, ???, ???)",
+                    "acceptable": ["torch.clamp(x0_pred, -1, 1)", "torch.clamp(x0_pred, -1.0, 1.0)", "torch.clamp(x0_pred, min=-1, max=1)", "torch.clamp(x0_pred, min=-1.0, max=1.0)"],
+                    "hint": "Use torch.clamp to restrict x0_pred to the range [-1, 1]."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_noise_pred_network_input",
+            "title": "Prepare Noise Prediction Network Input",
+            "difficulty": "medium",
+            "description": "Prepare the input for the noise prediction network by creating x_t from x_0 and returning x_t along with the sampled timesteps and true noise for loss computation.",
+            "info": "During training, each forward pass requires assembling several quantities: a batch of random timesteps, the corresponding alpha_bar values reshaped for broadcasting, random Gaussian noise, and the noisy images x_t. The timesteps are sampled uniformly, the noise is standard Gaussian, and x_t is constructed via the reparameterization trick. All these quantities must be on the correct device and have compatible shapes. This input preparation function encapsulates the boilerplate code that precedes every model forward pass.",
+            "code": "import torch\n\ndef prepare_training_input(x0, alpha_bar, T):\n    \"\"\"Prepare (x_t, t, noise) for the noise prediction network.\"\"\"\n    B = x0.shape[0]\n    t = torch.randint(0, T, (B,), device=x0.device)\n    noise = torch.randn_like(x0)\n    ab_t = {{b1}}\n    x_t = torch.sqrt(ab_t) * x0 + torch.sqrt(1.0 - ab_t) * noise\n    return x_t, t, noise",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "alpha_bar[t].???(???)",
+                    "acceptable": ["alpha_bar[t].reshape(-1, 1, 1, 1)", "alpha_bar[t].view(-1, 1, 1, 1)"],
+                    "hint": "Index alpha_bar with t and reshape to (-1, 1, 1, 1) for broadcasting with image tensors."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_channel_concat_conditioning",
+            "title": "Channel Concatenation Conditioning",
+            "difficulty": "medium",
+            "description": "Implement channel concatenation conditioning where a conditioning signal (e.g., a segmentation mask or low-res image) is concatenated along the channel dimension with x_t before feeding to the U-Net.",
+            "info": "Channel concatenation is one of the simplest conditioning mechanisms for diffusion models. The conditioning signal is resized to match the spatial dimensions of x_t and then concatenated along the channel axis. For example, if x_t has shape (B, 3, H, W) and the condition has shape (B, C_cond, H, W), the U-Net input becomes (B, 3+C_cond, H, W). This approach is used in image-to-image translation tasks like super-resolution (concatenating the low-res input) and inpainting (concatenating the masked image and binary mask). The U-Net's first convolution must accept the increased channel count.",
+            "code": "import torch\n\ndef channel_concat_conditioning(x_t, condition):\n    \"\"\"Concatenate x_t and condition along channel dimension.\n    x_t: (B, C, H, W), condition: (B, C_cond, H, W)\"\"\"\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.cat([x_t, condition], dim=???)",
+                    "acceptable": ["torch.cat([x_t, condition], dim=1)", "torch.cat((x_t, condition), dim=1)"],
+                    "hint": "Concatenate along dim=1 (the channel dimension) for image tensors in (B, C, H, W) format."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_cross_attention_conditioning",
+            "title": "Cross-Attention Conditioning Layer",
+            "difficulty": "hard",
+            "description": "Implement a cross-attention layer that conditions intermediate U-Net features on an external embedding (e.g., text embeddings from CLIP), as used in Stable Diffusion.",
+            "info": "Cross-attention is the primary mechanism for text-to-image conditioning in models like Stable Diffusion. The U-Net features serve as queries, while the conditioning embeddings (e.g., from a text encoder) serve as keys and values. The attention output is a weighted combination of value vectors, where the weights depend on how each spatial location in the image relates to each token in the text. This mechanism allows the model to spatially distribute semantic information from the text prompt across the generated image.",
+            "code": "import torch\nimport torch.nn as nn\nimport math\n\nclass CrossAttention(nn.Module):\n    def __init__(self, dim, context_dim, heads=8):\n        super().__init__()\n        self.heads = heads\n        self.head_dim = dim // heads\n        self.to_q = nn.Linear(dim, dim)\n        self.to_k = nn.Linear(context_dim, dim)\n        self.to_v = nn.Linear(context_dim, dim)\n        self.to_out = nn.Linear(dim, dim)\n    \n    def forward(self, x, context):\n        \"\"\"x: (B, N, dim), context: (B, S, context_dim)\"\"\"\n        B, N, _ = x.shape\n        q = self.to_q(x).view(B, N, self.heads, self.head_dim).transpose(1, 2)\n        k = self.to_k(context).view(B, -1, self.heads, self.head_dim).transpose(1, 2)\n        v = self.to_v(context).view(B, -1, self.heads, self.head_dim).transpose(1, 2)\n        attn = {{b1}}\n        attn = attn.softmax(dim=-1)\n        out = (attn @ v).transpose(1, 2).reshape(B, N, -1)\n        return self.to_out(out)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(q @ k.???) / math.sqrt(???)",
+                    "acceptable": ["(q @ k.transpose(-2, -1)) / math.sqrt(self.head_dim)", "(q @ k.transpose(-1, -2)) / math.sqrt(self.head_dim)"],
+                    "hint": "Scaled dot-product attention: (Q @ K^T) / sqrt(d_k). Transpose the last two dims of k."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_fid_feature_extraction",
+            "title": "FID Score: Feature Extraction Setup",
+            "difficulty": "medium",
+            "description": "Set up the Inception-v3 feature extractor used for computing the Frechet Inception Distance (FID) by extracting features from the penultimate pooling layer.",
+            "info": "The FID score compares statistics of generated images to real images using features from a pre-trained Inception-v3 network. Features are extracted from the 2048-dimensional average pooling layer (before the final classification head). The model is set to eval mode with gradients disabled for efficiency. Both real and generated images must be resized to 299x299 pixels and normalized to the ImageNet range. FID measures the Frechet distance between two multivariate Gaussians fitted to these feature distributions.",
+            "code": "import torch\nimport torch.nn as nn\nfrom torchvision.models import inception_v3\n\ndef setup_fid_extractor():\n    \"\"\"Create Inception-v3 feature extractor for FID.\"\"\"\n    model = inception_v3(pretrained=True)\n    model.fc = {{b1}}\n    model.eval()\n    return model",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???()",
+                    "acceptable": ["nn.Identity()"],
+                    "hint": "Replace the final fully-connected layer with nn.Identity() to get the 2048-d features instead of class logits."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_fid_statistics",
+            "title": "FID Score: Compute Feature Statistics",
+            "difficulty": "medium",
+            "description": "Compute the mean and covariance of Inception features for a set of images, which are the statistics needed to compute the FID score.",
+            "info": "The FID score models the distribution of Inception features as a multivariate Gaussian, characterized by its mean vector and covariance matrix. Given a set of N feature vectors of dimension D (typically D=2048), we compute the empirical mean (a D-dimensional vector) and the empirical covariance matrix (a DxD matrix). These statistics are computed separately for both the real and generated image sets. The FID is then the Frechet distance between the two fitted Gaussians. Larger datasets yield more reliable statistics.",
+            "code": "import numpy as np\n\ndef compute_fid_statistics(features):\n    \"\"\"Compute mean and covariance of feature vectors.\n    features: numpy array of shape (N, D).\"\"\"\n    mu = {{b1}}\n    sigma = {{b2}}\n    return mu, sigma",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.mean(features, axis=???)",
+                    "acceptable": ["np.mean(features, axis=0)", "features.mean(axis=0)"],
+                    "hint": "Compute the mean across samples (axis=0) to get a D-dimensional vector."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.cov(features, ???)",
+                    "acceptable": ["np.cov(features, rowvar=False)", "np.cov(features.T)"],
+                    "hint": "Compute the covariance with rowvar=False since each row is a sample."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_v_parameterization",
+            "title": "V-Parameterization (Velocity Prediction)",
+            "difficulty": "hard",
+            "description": "Implement the v-parameterization where the model predicts v = sqrt(alpha_bar_t) * epsilon - sqrt(1 - alpha_bar_t) * x_0, and recover both x_0 and epsilon from the predicted v.",
+            "info": "The v-parameterization, introduced in the Progressive Distillation paper by Salimans & Ho, defines the prediction target as v_t = sqrt(alpha_bar_t)*epsilon - sqrt(1-alpha_bar_t)*x_0. This is a rotation of the (x_0, epsilon) pair in signal-noise space. The advantage is that predicting v gives a more balanced learning signal across all noise levels compared to predicting epsilon (which is hard at low noise) or x_0 (which is hard at high noise). Given the predicted v, we can recover both x_0 and epsilon analytically using the inverse rotation.",
+            "code": "import torch\n\ndef compute_v_target(x0, noise, alpha_bar_t):\n    \"\"\"Compute v = sqrt(alpha_bar_t) * noise - sqrt(1 - alpha_bar_t) * x0.\"\"\"\n    return torch.sqrt(alpha_bar_t) * noise - torch.sqrt(1.0 - alpha_bar_t) * x0\n\ndef predict_x0_from_v(x_t, v_pred, alpha_bar_t):\n    \"\"\"Recover x_0 from x_t and predicted v.\"\"\"\n    return {{b1}}\n\ndef predict_noise_from_v(x_t, v_pred, alpha_bar_t):\n    \"\"\"Recover epsilon from x_t and predicted v.\"\"\"\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sqrt(alpha_bar_t) * x_t - torch.sqrt(???) * v_pred",
+                    "acceptable": ["torch.sqrt(alpha_bar_t) * x_t - torch.sqrt(1.0 - alpha_bar_t) * v_pred", "torch.sqrt(alpha_bar_t) * x_t - torch.sqrt(1 - alpha_bar_t) * v_pred"],
+                    "hint": "x_0 = sqrt(alpha_bar_t) * x_t - sqrt(1 - alpha_bar_t) * v."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.sqrt(???) * x_t + torch.sqrt(alpha_bar_t) * v_pred",
+                    "acceptable": ["torch.sqrt(1.0 - alpha_bar_t) * x_t + torch.sqrt(alpha_bar_t) * v_pred", "torch.sqrt(1 - alpha_bar_t) * x_t + torch.sqrt(alpha_bar_t) * v_pred"],
+                    "hint": "epsilon = sqrt(1 - alpha_bar_t) * x_t + sqrt(alpha_bar_t) * v."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_snr_weighting_loss",
+            "title": "SNR-Weighted Loss (Min-SNR-gamma)",
+            "difficulty": "hard",
+            "description": "Implement the min-SNR-gamma loss weighting strategy that clips the SNR-based weight to a maximum of gamma, providing more balanced training across timesteps.",
+            "info": "The simplified DDPM loss implicitly uses a loss weighting of 1 for all timesteps, but this is suboptimal because the difficulty of predicting noise varies greatly across noise levels. The min-SNR-gamma strategy (Hang et al., 2023) uses weight = min(SNR_t, gamma) / SNR_t, where gamma is typically 5. This clips the weight for high-SNR (low-noise) timesteps, which would otherwise dominate training. The result is faster convergence and better sample quality because the model allocates more capacity to the harder, high-noise timesteps.",
+            "code": "import torch\n\ndef min_snr_gamma_weight(alpha_bar_t, gamma=5.0):\n    \"\"\"Compute min-SNR-gamma loss weight for timestep t.\"\"\"\n    snr = alpha_bar_t / (1.0 - alpha_bar_t)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(snr, gamma) / snr",
+                    "acceptable": ["torch.clamp(snr, max=gamma) / snr", "torch.minimum(snr, torch.tensor(gamma)) / snr"],
+                    "hint": "Clamp (or take minimum of) SNR to gamma, then divide by SNR to get the weight."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_posterior_log_variance",
+            "title": "Posterior Log Variance (Clipped)",
+            "difficulty": "medium",
+            "description": "Compute the log of the posterior variance with numerical clipping for stability, as done in the original DDPM implementation.",
+            "info": "Taking the log of the posterior variance is necessary for the reverse sampling step and for KL divergence computation. However, the posterior variance at t=1 involves alpha_bar_prev=1 and 1-alpha_bar_prev=0, making the log undefined. The DDPM implementation clips the posterior variance to a minimum value (typically beta_1, the first beta) before taking the log. This is a practical detail that prevents NaN values during sampling. The log variance is used rather than the variance itself for numerical stability when the values are very small.",
+            "code": "import torch\n\ndef posterior_log_variance_clipped(betas, alpha_bar):\n    \"\"\"Compute log of posterior variance with clipping.\"\"\"\n    alpha_bar_prev = torch.cat([torch.tensor([1.0]), alpha_bar[:-1]])\n    posterior_var = betas * (1.0 - alpha_bar_prev) / (1.0 - alpha_bar)\n    # Clip to prevent log(0) at t=1\n    posterior_var_clipped = {{b1}}\n    return torch.log(posterior_var_clipped)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(posterior_var, min=???)",
+                    "acceptable": ["torch.clamp(posterior_var, min=1e-20)", "torch.clamp(posterior_var, min=betas[0])"],
+                    "hint": "Clamp the posterior variance to a small minimum value to avoid taking log(0)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_reverse_sample_one_step",
+            "title": "Reverse Process: Sample x_{t-1} from x_t",
+            "difficulty": "hard",
+            "description": "Implement one step of the reverse diffusion process: given x_t and the model's noise prediction, sample x_{t-1}.",
+            "info": "The reverse sampling step is the core of image generation with DDPM. Given x_t and the model's noise prediction, we first estimate x_0, then compute the posterior mean mu_tilde. Finally, we add noise scaled by the posterior standard deviation (except at t=0 where no noise is added). The formula is x_{t-1} = mu_tilde + sqrt(beta_tilde_t) * z, where z ~ N(0,I). This stochastic reverse step is run sequentially from t=T down to t=1, progressively denoising the sample.",
+            "code": "import torch\n\ndef reverse_step(model, x_t, t, betas, alphas, alpha_bar, alpha_bar_prev, posterior_var):\n    \"\"\"One step of DDPM reverse sampling.\"\"\"\n    pred_noise = model(x_t, t)\n    # Predict x_0\n    ab_t = alpha_bar[t].reshape(-1, 1, 1, 1)\n    x0_pred = (x_t - torch.sqrt(1.0 - ab_t) * pred_noise) / torch.sqrt(ab_t)\n    x0_pred = torch.clamp(x0_pred, -1, 1)\n    # Posterior mean\n    b_t = betas[t].reshape(-1, 1, 1, 1)\n    ab_prev = alpha_bar_prev[t].reshape(-1, 1, 1, 1)\n    a_t = alphas[t].reshape(-1, 1, 1, 1)\n    mu = torch.sqrt(ab_prev) * b_t / (1.0 - ab_t) * x0_pred + torch.sqrt(a_t) * (1.0 - ab_prev) / (1.0 - ab_t) * x_t\n    noise = torch.randn_like(x_t)\n    pv = posterior_var[t].reshape(-1, 1, 1, 1)\n    # No noise at t=0\n    nonzero_mask = {{b1}}\n    return mu + nonzero_mask * torch.sqrt(pv) * noise",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(t != 0).float().reshape(???)",
+                    "acceptable": ["(t != 0).float().reshape(-1, 1, 1, 1)"],
+                    "hint": "Create a mask that is 1 when t > 0 and 0 when t = 0, reshaped for broadcasting."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_numpy_cumprod_alpha_bar",
+            "title": "Cumulative Product Alpha Bar (NumPy)",
+            "difficulty": "easy",
+            "description": "Compute alpha_bar as the cumulative product of alphas using NumPy.",
+            "info": "NumPy provides np.cumprod for computing cumulative products, analogous to torch.cumprod in PyTorch. Given an array of alpha values, the cumulative product at index t gives the total signal retention alpha_bar_t = alpha_1 * alpha_2 * ... * alpha_t. This is useful when prototyping diffusion schedules in NumPy before moving to PyTorch. The cumulative product operation is performed along a specified axis, typically axis 0 for a 1D array of schedule values.",
+            "code": "import numpy as np\n\ndef compute_alpha_bar_numpy(betas):\n    \"\"\"Compute alpha_bar from betas using NumPy.\"\"\"\n    alphas = 1.0 - betas\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.???(alphas)",
+                    "acceptable": ["np.cumprod(alphas)", "np.cumprod(alphas, axis=0)"],
+                    "hint": "Use np.cumprod to compute the running product of alphas."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_beta_schedule_warmup",
+            "title": "Linear Beta Schedule with Warmup",
+            "difficulty": "medium",
+            "description": "Implement a linear beta schedule that starts with a warmup phase of constant low beta for a specified number of steps before linearly increasing.",
+            "info": "A warmup phase at the start of the beta schedule keeps beta at a small constant value for the first few timesteps before transitioning to the linear ramp. This ensures that the earliest reverse steps (which produce the finest details) operate at very low noise levels, giving the model more precision for high-frequency features. The warmup concept is borrowed from learning rate scheduling in optimization. After the warmup period, the schedule linearly increases from beta_start to beta_end over the remaining timesteps.",
+            "code": "import torch\n\ndef linear_beta_schedule_warmup(T, warmup_steps, beta_start=1e-4, beta_end=0.02):\n    \"\"\"Linear beta schedule with constant warmup.\"\"\"\n    warmup = torch.full((warmup_steps,), beta_start)\n    ramp = {{b1}}\n    return torch.cat([warmup, ramp])",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.linspace(beta_start, beta_end, ???)",
+                    "acceptable": ["torch.linspace(beta_start, beta_end, T - warmup_steps)"],
+                    "hint": "The ramp covers the remaining T - warmup_steps timesteps."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_x0_prediction_loss",
+            "title": "x_0 Prediction Loss (Alternative Parameterization)",
+            "difficulty": "medium",
+            "description": "Implement a training loss where the model directly predicts x_0 instead of the noise epsilon, computing MSE between true x_0 and predicted x_0.",
+            "info": "While DDPM uses noise prediction (epsilon-parameterization), an alternative is to train the model to directly predict x_0 from x_t. The loss is L = E[||x_0 - x_0_theta(x_t, t)||^2]. This x_0-prediction parameterization can be advantageous at high noise levels where predicting x_0 directly is more stable. Some models like DALL-E 2 use this parameterization. The two parameterizations are mathematically related through the reparameterization trick, but they can have different training dynamics due to implicit loss weighting differences.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef x0_prediction_loss(model, x0, t, alpha_bar):\n    \"\"\"Training loss for x_0-prediction parameterization.\"\"\"\n    noise = torch.randn_like(x0)\n    alpha_bar_t = alpha_bar[t].reshape(-1, 1, 1, 1)\n    x_t = torch.sqrt(alpha_bar_t) * x0 + torch.sqrt(1.0 - alpha_bar_t) * noise\n    x0_pred = model(x_t, t)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "F.???(x0, x0_pred)",
+                    "acceptable": ["F.mse_loss(x0, x0_pred)", "F.mse_loss(x0_pred, x0)"],
+                    "hint": "MSE loss between the true x_0 and the model's predicted x_0."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_noise_pred_to_x0_pred",
+            "title": "Convert Between Noise and x_0 Parameterizations",
+            "difficulty": "medium",
+            "description": "Given a model that predicts noise, convert its output to an x_0 prediction, and vice versa. This allows switching between parameterizations at inference time.",
+            "info": "Noise prediction and x_0 prediction are two sides of the same coin. Given the forward process x_t = sqrt(alpha_bar_t)*x_0 + sqrt(1-alpha_bar_t)*epsilon, predicting one uniquely determines the other. To convert noise prediction to x_0: x_0 = (x_t - sqrt(1-ab)*eps_pred)/sqrt(ab). To convert x_0 prediction to noise: eps = (x_t - sqrt(ab)*x0_pred)/sqrt(1-ab). This interchangeability means you can train with one parameterization and sample with another, which is useful for methods like DDIM that work with x_0 predictions.",
+            "code": "import torch\n\ndef noise_to_x0(x_t, noise_pred, alpha_bar_t):\n    \"\"\"Convert noise prediction to x_0 prediction.\"\"\"\n    return (x_t - torch.sqrt(1.0 - alpha_bar_t) * noise_pred) / torch.sqrt(alpha_bar_t)\n\ndef x0_to_noise(x_t, x0_pred, alpha_bar_t):\n    \"\"\"Convert x_0 prediction to noise prediction.\"\"\"\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(x_t - torch.sqrt(???) * x0_pred) / torch.sqrt(???)",
+                    "acceptable": ["(x_t - torch.sqrt(alpha_bar_t) * x0_pred) / torch.sqrt(1.0 - alpha_bar_t)", "(x_t - torch.sqrt(alpha_bar_t) * x0_pred) / torch.sqrt(1 - alpha_bar_t)"],
+                    "hint": "eps = (x_t - sqrt(alpha_bar_t) * x0_pred) / sqrt(1 - alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_learned_variance_output",
+            "title": "Learned Variance Model Output Split",
+            "difficulty": "medium",
+            "description": "Split the model output into noise prediction and learned variance components, as used in Improved DDPM (Nichol & Dhariwal, 2021).",
+            "info": "The original DDPM uses a fixed posterior variance, but Improved DDPM learns the variance by having the model output both the noise prediction and a variance interpolation factor. The model output has twice the number of channels: the first half predicts noise, the second half predicts a log-variance interpolation parameter v. The actual log-variance is then interpolated between log(beta_tilde) and log(beta) using v. This learned variance significantly improves log-likelihood and enables fewer sampling steps without quality degradation.",
+            "code": "import torch\n\ndef split_model_output(model_output):\n    \"\"\"Split (B, 2*C, H, W) model output into noise and variance predictions.\"\"\"\n    C = model_output.shape[1] // 2\n    noise_pred, var_pred = {{b1}}\n    return noise_pred, var_pred",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.split(model_output, ???, dim=1)",
+                    "acceptable": ["torch.split(model_output, C, dim=1)", "model_output[:, :C], model_output[:, C:]"],
+                    "hint": "Split the tensor along the channel dimension (dim=1), each half having C channels."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_interpolate_variance",
+            "title": "Interpolate Between Fixed Variances",
+            "difficulty": "hard",
+            "description": "Interpolate between the two fixed variance bounds (beta_tilde and beta) in log-space using the learned variance parameter, as in Improved DDPM.",
+            "info": "Improved DDPM parameterizes the learned variance as an interpolation between two known bounds in log-space: log(beta_tilde_t) (the posterior variance, which is the lower bound) and log(beta_t) (the upper bound). The model outputs a parameter v in [0, 1] (after applying sigmoid), and the log-variance is v*log(beta) + (1-v)*log(beta_tilde). This constrained parameterization ensures the learned variance stays in a reasonable range. Training the variance requires the full VLB loss, not just the simplified MSE, making it slightly more complex to implement.",
+            "code": "import torch\n\ndef interpolate_log_variance(v_pred, log_beta, log_beta_tilde):\n    \"\"\"Interpolate in log-space between beta_tilde and beta.\n    v_pred: raw model output (before sigmoid).\"\"\"\n    v = torch.sigmoid(v_pred)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "v * ??? + (1 - v) * ???",
+                    "acceptable": ["v * log_beta + (1 - v) * log_beta_tilde", "v * log_beta + (1.0 - v) * log_beta_tilde"],
+                    "hint": "Linear interpolation: v * log(beta) + (1-v) * log(beta_tilde)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_ema_model_update",
+            "title": "Exponential Moving Average (EMA) Model Update",
+            "difficulty": "easy",
+            "description": "Update an EMA (shadow) copy of the model parameters, which is standard practice in diffusion model training for better sample quality.",
+            "info": "Exponential Moving Average of model parameters is a crucial trick for diffusion models. Instead of using the final trained weights, an EMA copy maintains a running weighted average: theta_ema = decay * theta_ema + (1 - decay) * theta. The decay is typically 0.9999 or 0.999. The EMA model produces significantly better samples than the raw trained model because it smooths out the optimization trajectory. This is a standard practice in nearly all modern diffusion model implementations, from DDPM to Stable Diffusion.",
+            "code": "import torch\n\n@torch.no_grad()\ndef update_ema(ema_model, model, decay=0.9999):\n    \"\"\"Update EMA model parameters.\"\"\"\n    for ema_param, param in zip(ema_model.parameters(), model.parameters()):\n        ema_param.data.copy_({{b1}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "decay * ema_param.data + ??? * param.data",
+                    "acceptable": ["decay * ema_param.data + (1 - decay) * param.data", "decay * ema_param.data + (1.0 - decay) * param.data"],
+                    "hint": "EMA update: theta_ema = decay * theta_ema + (1 - decay) * theta."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_new_fid_frechet_distance",
+            "title": "FID Score: Frechet Distance Computation",
+            "difficulty": "hard",
+            "description": "Compute the Frechet Inception Distance between two sets of feature statistics (mean and covariance) using the closed-form Frechet distance formula.",
+            "info": "The Frechet distance (also called Wasserstein-2 distance) between two multivariate Gaussians N(mu1, C1) and N(mu2, C2) is d^2 = ||mu1-mu2||^2 + Tr(C1 + C2 - 2*(C1*C2)^{1/2}). The square root of the product of covariance matrices is computed via eigendecomposition or scipy's sqrtm function. Lower FID indicates that generated images are more similar to real images in terms of both mean feature activations and their correlations. FID is the most widely used metric for evaluating unconditional image generation quality, though it has known limitations with small sample sizes.",
+            "code": "import numpy as np\nfrom scipy.linalg import sqrtm\n\ndef frechet_distance(mu1, sigma1, mu2, sigma2):\n    \"\"\"Compute FID between two Gaussian distributions.\"\"\"\n    diff = mu1 - mu2\n    covmean = sqrtm(sigma1 @ sigma2)\n    # Numerical stability: discard imaginary part\n    if np.iscomplexobj(covmean):\n        covmean = covmean.real\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sum(diff ** 2) + np.trace(sigma1 + sigma2 - 2 * ???)",
+                    "acceptable": ["np.sum(diff ** 2) + np.trace(sigma1 + sigma2 - 2 * covmean)", "np.dot(diff, diff) + np.trace(sigma1 + sigma2 - 2 * covmean)"],
+                    "hint": "FID = ||mu1-mu2||^2 + Tr(C1 + C2 - 2*sqrt(C1*C2)). The covmean variable holds sqrt(C1*C2)."
+                }
+            ]
         }
     ]
 }
