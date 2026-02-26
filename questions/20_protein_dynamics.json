@@ -1,0 +1,553 @@
+{
+    "topic": "Proteins - Dynamics & Representations",
+    "questions": [
+        {
+            "id": "prot_dyn_backbone_coords",
+            "title": "Extracting Backbone Atom Coordinates",
+            "difficulty": "easy",
+            "description": "Given a protein represented as an array of all-atom coordinates with atom names, extract only the backbone atoms (N, CA, C) for each residue. The input has shape (num_residues, num_atoms_per_residue, 3) with a corresponding atom name list.",
+            "info": "Protein backbone geometry is defined by three heavy atoms per residue: nitrogen (N), alpha-carbon (CA), and carbonyl carbon (C). These atoms define the peptide chain and are sufficient to reconstruct the backbone trace. AlphaFold2 (Jumper et al., Nature 2021) predicts per-residue frames anchored to these three backbone atoms, then builds full all-atom structures from torsion angles. MDAnalysis (Michaud-Agrawal et al., J Comput Chem 2011) provides utilities for selecting backbone atoms from molecular dynamics trajectories. Understanding backbone extraction is fundamental to all downstream structural analysis. Reference: Jumper et al., Nature 2021; Michaud-Agrawal et al., J Comput Chem 2011.",
+            "code": "import numpy as np\n\n# all_coords shape: (num_residues, num_atoms_per_residue, 3)\n# atom_names: list of atom name strings, e.g. ['N', 'CA', 'C', 'O', 'CB', ...]\nall_coords = np.random.randn(100, 14, 3)  # 100 residues, up to 14 atoms each\natom_names = ['N', 'CA', 'C', 'O', 'CB', 'CG', 'CG1', 'CG2', 'CD', 'CD1', 'CD2', 'CE', 'NZ', 'OG']\n\nbackbone_indices = [atom_names.index(a) for a in {{b1}}]\nbackbone_coords = all_coords[:, {{b2}}, :]\nprint('Backbone shape:', backbone_coords.shape)  # (100, 3, 3)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "['??', '??', '??']",
+                    "acceptable": ["['N', 'CA', 'C']"],
+                    "hint": "The three backbone heavy atoms per residue are N, CA, and C."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "index into atom dimension",
+                    "acceptable": ["backbone_indices"],
+                    "hint": "Use the list of backbone atom indices to select from the atom dimension."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_torsion_angles",
+            "title": "Computing Backbone Torsion (Dihedral) Angles",
+            "difficulty": "medium",
+            "description": "Compute the dihedral angle defined by four consecutive 3D points. Dihedral angles (phi, psi, omega) characterize protein backbone conformation. Given four points p0, p1, p2, p3, compute the angle between the planes (p0,p1,p2) and (p1,p2,p3).",
+            "info": "Backbone torsion angles (phi, psi, omega) are the primary degrees of freedom describing protein backbone conformation and are central to the Ramachandran plot. AlphaFold2 (Jumper et al., Nature 2021) predicts these torsion angles as part of its structure module to build all-atom coordinates from backbone frames. The dihedral angle is computed via cross products of bond vectors forming two planes, then taking the atan2 of their sine and cosine components. Boltzmann generators (Noe et al., Science 2019) operate in internal coordinate space including torsion angles to sample conformational ensembles. Proper handling of angle periodicity is critical for loss functions in structure prediction. Reference: Jumper et al., Nature 2021; Noe et al., Science 2019.",
+            "code": "import numpy as np\n\ndef dihedral_angle(p0, p1, p2, p3):\n    \"\"\"Compute dihedral angle in radians for four 3D points.\"\"\"\n    b0 = p0 - p1\n    b1 = {{b1}}\n    b2 = p3 - p2\n    # Normalize b1\n    b1 = b1 / np.linalg.norm(b1)\n    # Compute normal vectors to the two planes\n    n1 = np.cross(b0, b1)\n    n2 = {{b2}}\n    # Compute the signed angle\n    m1 = np.cross(n1, b1)\n    x = np.dot(n1, n2)\n    y = np.dot(m1, n2)\n    return {{b3}}\n\n# Test with known points\np0 = np.array([1.0, 0.0, 0.0])\np1 = np.array([0.0, 0.0, 0.0])\np2 = np.array([0.0, 1.0, 0.0])\np3 = np.array([0.0, 1.0, 1.0])\nangle = dihedral_angle(p0, p1, p2, p3)\nprint(f'Dihedral angle: {np.degrees(angle):.1f} degrees')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "?? - ??",
+                    "acceptable": ["p2 - p1"],
+                    "hint": "The central bond vector goes from p1 to p2."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.cross(??, ??)",
+                    "acceptable": ["np.cross(b1, b2)"],
+                    "hint": "The second plane normal is the cross product of b1 and b2."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.arctan2(??, ??)",
+                    "acceptable": ["np.arctan2(y, x)", "np.arctan2(-y, x)"],
+                    "hint": "Use atan2 with the sine and cosine components to get the signed angle."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_se3_rotation",
+            "title": "SE(3) Rotation via Rotation Matrix",
+            "difficulty": "medium",
+            "description": "Apply an SE(3) transformation (rotation + translation) to a set of 3D protein coordinates. SE(3) is the special Euclidean group in 3D, combining SO(3) rotations with translations.",
+            "info": "SE(3)-equivariance is a fundamental symmetry for molecular learning: the output of a model should transform consistently when the input is rotated or translated. SE(3)-Transformers (Fuchs et al., NeurIPS 2020) introduced attention mechanisms that are equivariant to rotations and translations by operating on geometric features in irreducible representations. The SE(3) group acts on coordinates as x' = Rx + t where R is a rotation matrix in SO(3) and t is a translation vector. This is the foundation for equivariant neural networks used in protein structure prediction. Maintaining equivariance eliminates the need for data augmentation over rotations. Reference: Fuchs et al., NeurIPS 2020; Thomas et al., arXiv 2018.",
+            "code": "import numpy as np\n\ndef se3_transform(coords, R, t):\n    \"\"\"Apply SE(3) transformation to coordinates.\n    coords: (N, 3) array of 3D points\n    R: (3, 3) rotation matrix\n    t: (3,) translation vector\n    Returns: (N, 3) transformed coordinates\n    \"\"\"\n    return {{b1}}\n\n# Create a rotation matrix (90 degrees around z-axis)\ntheta = np.pi / 2\nR = np.array([[np.cos(theta), -np.sin(theta), 0],\n              [{{b2}}],\n              [0, 0, 1]])\nt = np.array([1.0, 2.0, 3.0])\n\ncoords = np.random.randn(50, 3)\ntransformed = se3_transform(coords, R, t)\nprint('Original centroid:', coords.mean(axis=0))\nprint('Transformed centroid:', transformed.mean(axis=0))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "coords @ ??.T + ??",
+                    "acceptable": ["coords @ R.T + t", "(R @ coords.T).T + t"],
+                    "hint": "Apply rotation then translation: x' = xR^T + t (for row vectors) or (Rx^T)^T + t."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.sin(theta), ??, ??",
+                    "acceptable": ["np.sin(theta), np.cos(theta), 0"],
+                    "hint": "The second row of a z-axis rotation matrix is [sin(theta), cos(theta), 0]."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_gvp_scalar_vector",
+            "title": "Geometric Vector Perceptron - Scalar & Vector Features",
+            "difficulty": "hard",
+            "description": "Implement the core GVP operation that processes both scalar features (rotation-invariant) and vector features (rotation-equivariant). The GVP maps (s, V) -> (s', V') where s are scalars and V are 3D vectors.",
+            "info": "Geometric Vector Perceptrons (Jing et al., ICLR 2021) introduce a simple yet powerful architecture for learning on 3D protein structures by maintaining separate scalar (invariant) and vector (equivariant) feature channels. The key insight is that vector norms are rotation-invariant and can be mixed with scalar features, while vector directions are updated via learned linear maps that preserve equivariance. GVP-GNN achieves strong performance on protein structure tasks including model quality assessment and function prediction. The architecture avoids expensive higher-order tensor operations used in other equivariant networks while retaining geometric expressiveness. Reference: Jing et al., ICLR 2021; Jing et al., NeurIPS 2021.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass GVP(nn.Module):\n    \"\"\"Geometric Vector Perceptron.\n    Processes scalar features s (B, s_in) and\n    vector features V (B, v_in, 3).\n    \"\"\"\n    def __init__(self, s_in, s_out, v_in, v_out):\n        super().__init__()\n        self.v_out = v_out\n        # Linear map on vector features\n        self.Wv = nn.Linear(v_in, v_out, bias=False)\n        # Scalar MLP takes s_in + v_in (from vector norms)\n        self.Ws = nn.Sequential(\n            nn.Linear(s_in + v_in, s_out),\n            nn.ReLU()\n        )\n\n    def forward(self, s, V):\n        # V: (B, v_in, 3) -> transpose for linear -> (B, 3, v_in)\n        Vt = V.transpose(-1, -2)\n        # Apply learned linear to vector channels\n        Vh = self.Wv(Vt).transpose(-1, -2)  # (B, v_out, 3)\n        # Compute rotation-invariant vector norms\n        v_norms = {{b1}}  # (B, v_in)\n        # Concatenate scalar features with vector norms\n        s_combined = {{b2}}\n        s_out = self.Ws(s_combined)\n        # Normalize output vectors\n        Vh_norms = torch.norm(Vh, dim=-1, keepdim=True).clamp(min=1e-6)\n        V_out = Vh * (torch.sigmoid(Vh_norms) / {{b3}})\n        return s_out, V_out\n\ngvp = GVP(s_in=64, s_out=64, v_in=16, v_out=16)\ns = torch.randn(8, 64)\nV = torch.randn(8, 16, 3)\ns_out, V_out = gvp(s, V)\nprint('Scalar out:', s_out.shape, 'Vector out:', V_out.shape)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.norm(V, dim=??)  ",
+                    "acceptable": ["torch.norm(V, dim=-1)", "torch.linalg.norm(V, dim=-1)"],
+                    "hint": "Compute the L2 norm of each vector along the last (xyz) dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.cat([??, ??], dim=-1)",
+                    "acceptable": ["torch.cat([s, v_norms], dim=-1)"],
+                    "hint": "Concatenate the original scalar features with the rotation-invariant vector norms."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "clamp the norms",
+                    "acceptable": ["Vh_norms"],
+                    "hint": "Divide by the clamped norms to normalize, then scale by sigmoid gating."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_frame_repr",
+            "title": "Residue Frame Representation (Rotation + Translation)",
+            "difficulty": "hard",
+            "description": "Construct a local coordinate frame for each residue from three backbone atoms (N, CA, C). The frame consists of a rotation matrix (3x3) and a translation vector (the CA position), following the Gram-Schmidt process used in AlphaFold2.",
+            "info": "AlphaFold2 (Jumper et al., Nature 2021) represents each residue as a rigid-body frame (rotation + translation) anchored at the CA atom, with axes defined by the N-CA and CA-C bond directions via Gram-Schmidt orthogonalization. This frame representation is central to the Invariant Point Attention (IPA) mechanism, which operates on points expressed in local residue frames to achieve SE(3)-invariance. The rotation matrix columns define the local x, y, z axes of each residue. Frame representations enable composing local and global coordinate transformations efficiently. Reference: Jumper et al., Nature 2021; Ingraham et al., NeurIPS 2019.",
+            "code": "import numpy as np\n\ndef build_residue_frames(N_pos, CA_pos, C_pos):\n    \"\"\"Build local frames for each residue.\n    N_pos, CA_pos, C_pos: (L, 3) backbone atom positions\n    Returns: rotations (L, 3, 3), translations (L, 3)\n    \"\"\"\n    # Translation is the CA position\n    translations = {{b1}}\n    # First axis: CA -> C direction (normalized)\n    v1 = C_pos - CA_pos\n    e1 = v1 / np.linalg.norm(v1, axis=-1, keepdims=True)\n    # Second vector: CA -> N direction\n    v2 = N_pos - CA_pos\n    # Gram-Schmidt: remove component along e1\n    u2 = v2 - np.sum(v2 * e1, axis=-1, keepdims=True) * e1\n    e2 = u2 / np.linalg.norm(u2, axis=-1, keepdims=True)\n    # Third axis: cross product\n    e3 = {{b2}}\n    # Stack into rotation matrices (L, 3, 3)\n    rotations = {{b3}}\n    return rotations, translations\n\nL = 50\nN_pos = np.random.randn(L, 3)\nCA_pos = np.random.randn(L, 3)\nC_pos = np.random.randn(L, 3)\nR, t = build_residue_frames(N_pos, CA_pos, C_pos)\nprint('Rotations:', R.shape, 'Translations:', t.shape)\n# Verify orthogonality\nprint('R @ R^T ~= I:', np.allclose(R[0] @ R[0].T, np.eye(3), atol=1e-6))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "which atom position?",
+                    "acceptable": ["CA_pos"],
+                    "hint": "The translation (origin) of the residue frame is the alpha-carbon position."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.cross(??, ??)",
+                    "acceptable": ["np.cross(e1, e2)"],
+                    "hint": "The third orthonormal axis is the cross product of the first two."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.stack([??, ??, ??], axis=-1)",
+                    "acceptable": ["np.stack([e1, e2, e3], axis=-1)"],
+                    "hint": "Stack the three orthonormal vectors as columns to form the rotation matrix."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_rmsd",
+            "title": "RMSD Computation Between Two Structures",
+            "difficulty": "easy",
+            "description": "Compute the Root Mean Square Deviation (RMSD) between two sets of aligned 3D coordinates. RMSD is the standard metric for comparing protein structures.",
+            "info": "RMSD (Root Mean Square Deviation) is the most widely used metric for quantifying structural similarity between two protein conformations after optimal superposition. It is defined as sqrt(mean(sum_of_squared_distances)) over corresponding atoms. AlphaFold2 (Jumper et al., Nature 2021) reports GDT and lDDT scores but RMSD remains ubiquitous in structural biology. MDAnalysis (Michaud-Agrawal et al., J Comput Chem 2011) provides efficient RMSD implementations for trajectory analysis. Low RMSD (<2 Angstroms for CA atoms) generally indicates high structural similarity. RMSD is sensitive to outlier residues, motivating alternatives like GDT-TS for structure prediction benchmarking. Reference: Jumper et al., Nature 2021; Michaud-Agrawal et al., J Comput Chem 2011.",
+            "code": "import numpy as np\n\ndef compute_rmsd(coords1, coords2):\n    \"\"\"Compute RMSD between two aligned coordinate sets.\n    coords1, coords2: (N, 3) arrays\n    Returns: scalar RMSD value\n    \"\"\"\n    diff = {{b1}}\n    sq_dist = np.sum({{b2}}, axis=-1)  # (N,)\n    return {{b3}}\n\n# Test: identical structures should have RMSD = 0\ncoords = np.random.randn(100, 3)\nassert np.isclose(compute_rmsd(coords, coords), 0.0)\n\n# Test: add known displacement\ncoords2 = coords + 1.0\nrmsd = compute_rmsd(coords, coords2)\nprint(f'RMSD with unit displacement: {rmsd:.4f}')  # sqrt(3) ~ 1.732",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "coords1 - ??",
+                    "acceptable": ["coords1 - coords2"],
+                    "hint": "Compute the difference between corresponding atom positions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "diff ** ??",
+                    "acceptable": ["diff ** 2", "diff * diff"],
+                    "hint": "Square the differences element-wise."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.sqrt(np.mean(??))",
+                    "acceptable": ["np.sqrt(np.mean(sq_dist))"],
+                    "hint": "Take the square root of the mean of squared distances."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_kabsch",
+            "title": "Kabsch Alignment Algorithm",
+            "difficulty": "hard",
+            "description": "Implement the Kabsch algorithm to find the optimal rotation matrix that minimizes RMSD between two sets of 3D coordinates. This requires centering both point sets, computing the cross-covariance matrix, and performing SVD.",
+            "info": "The Kabsch algorithm (Kabsch, Acta Crystallogr 1976) finds the optimal rotation to superimpose two point sets by minimizing RMSD. It works by centering both structures, computing the cross-covariance matrix H = P^T Q, performing SVD to get H = USV^T, then constructing R = V diag(1,1,sign(det(VU^T))) U^T to ensure a proper rotation. This algorithm is fundamental to structural bioinformatics and is used extensively in tools like PyMOL and MDAnalysis (Michaud-Agrawal et al., J Comput Chem 2011). AlphaFold2 (Jumper et al., Nature 2021) uses a differentiable version for loss computation during training. Reference: Kabsch, Acta Crystallogr 1976; Jumper et al., Nature 2021.",
+            "code": "import numpy as np\n\ndef kabsch_align(P, Q):\n    \"\"\"Find optimal rotation to align P onto Q.\n    P, Q: (N, 3) coordinate arrays\n    Returns: R (3,3) rotation matrix, t (3,) translation\n    \"\"\"\n    # Center both point sets\n    p_center = P.mean(axis=0)\n    q_center = Q.mean(axis=0)\n    P_centered = P - p_center\n    Q_centered = Q - q_center\n    # Cross-covariance matrix\n    H = {{b1}}\n    # SVD\n    U, S, Vt = np.linalg.svd(H)\n    # Correct for reflection\n    d = np.sign(np.linalg.det({{b2}}))\n    sign_matrix = np.diag([1, 1, d])\n    # Optimal rotation\n    R = {{b3}}\n    # Translation\n    t = q_center - R @ p_center\n    return R, t\n\n# Test: apply known rotation and recover it\nP = np.random.randn(50, 3)\ntheta = np.pi / 4\nR_true = np.array([[np.cos(theta), -np.sin(theta), 0],\n                   [np.sin(theta),  np.cos(theta), 0],\n                   [0, 0, 1]])\nQ = (R_true @ P.T).T + np.array([5, 3, 1])\nR_est, t_est = kabsch_align(P, Q)\nprint('Rotation error:', np.linalg.norm(R_est - R_true))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??.T @ ??",
+                    "acceptable": ["P_centered.T @ Q_centered"],
+                    "hint": "The cross-covariance matrix is H = P_centered^T @ Q_centered."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "?? @ ??",
+                    "acceptable": ["Vt.T @ U.T"],
+                    "hint": "Check the sign of det(V @ U^T) to ensure a proper rotation (no reflection)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "?? @ sign_matrix @ ??",
+                    "acceptable": ["Vt.T @ sign_matrix @ U.T"],
+                    "hint": "R = V @ diag(1,1,d) @ U^T ensures a proper rotation."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_contact_map",
+            "title": "Contact Map from Coordinates",
+            "difficulty": "easy",
+            "description": "Compute a binary contact map from CA (alpha-carbon) coordinates. Two residues are in contact if their CA-CA distance is below a threshold (typically 8 Angstroms).",
+            "info": "Contact maps are a coarse-grained representation of protein 3D structure that encode which residue pairs are spatially close. They have been widely used as intermediate targets in protein structure prediction, notably in early deep learning approaches before end-to-end coordinate prediction (Senior et al., Nature 2020). AlphaFold2 (Jumper et al., Nature 2021) predicts full distance distributions (distograms) rather than binary contacts. Contact maps are rotation and translation invariant, making them useful for structure comparison. The typical CA-CA distance threshold of 8 Angstroms captures side-chain mediated interactions. Reference: Senior et al., Nature 2020; Jumper et al., Nature 2021.",
+            "code": "import numpy as np\n\ndef compute_contact_map(ca_coords, threshold=8.0):\n    \"\"\"Compute binary contact map from CA coordinates.\n    ca_coords: (L, 3) array of CA positions\n    threshold: distance cutoff in Angstroms\n    Returns: (L, L) binary contact matrix\n    \"\"\"\n    # Compute pairwise distance matrix\n    diff = ca_coords[:, None, :] - {{b1}}  # (L, L, 3)\n    dist_matrix = {{b2}}  # (L, L)\n    contact_map = (dist_matrix < {{b3}}).astype(np.float32)\n    return contact_map\n\nca_coords = np.random.randn(80, 3) * 10  # 80 residues\ncmap = compute_contact_map(ca_coords)\nprint('Contact map shape:', cmap.shape)\nprint('Number of contacts:', int(cmap.sum()))\nprint('Is symmetric:', np.allclose(cmap, cmap.T))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "ca_coords[??, :, :]",
+                    "acceptable": ["ca_coords[None, :, :]"],
+                    "hint": "Broadcast: add a new axis at position 0 (or 1) to compute all pairwise differences."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.linalg.norm(diff, axis=??)",
+                    "acceptable": ["np.linalg.norm(diff, axis=-1)", "np.linalg.norm(diff, axis=2)"],
+                    "hint": "Take the norm along the last axis (the xyz dimension) to get distances."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "distance cutoff",
+                    "acceptable": ["threshold"],
+                    "hint": "Compare distances against the threshold parameter to get binary contacts."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_radius_gyration",
+            "title": "Radius of Gyration",
+            "difficulty": "easy",
+            "description": "Compute the radius of gyration (Rg) of a protein, which measures the compactness of a structure. Rg is defined as the RMS distance of all atoms from the center of mass.",
+            "info": "The radius of gyration (Rg) quantifies the overall compactness or spread of a molecular structure and is commonly used to monitor protein folding and unfolding in molecular dynamics simulations. It is defined as Rg = sqrt(mean(|r_i - r_centroid|^2)). MDAnalysis (Michaud-Agrawal et al., J Comput Chem 2011) and OpenMM (Eastman et al., PLoS Comput Biol 2017) provide built-in Rg calculations. A decrease in Rg during simulation typically indicates compaction or folding. Rg can also be measured experimentally via small-angle X-ray scattering (SAXS). Boltzmann generators (Noe et al., Science 2019) can sample conformations with varying Rg to explore the folding landscape. Reference: Michaud-Agrawal et al., J Comput Chem 2011; Eastman et al., PLoS Comput Biol 2017.",
+            "code": "import numpy as np\n\ndef radius_of_gyration(coords):\n    \"\"\"Compute radius of gyration.\n    coords: (N, 3) array of atom positions\n    Returns: scalar Rg value\n    \"\"\"\n    centroid = {{b1}}\n    deviations = coords - centroid\n    sq_distances = np.sum({{b2}}, axis=-1)  # (N,)\n    return {{b3}}\n\n# Test with a sphere of radius ~5\ntheta = np.random.uniform(0, np.pi, 1000)\nphi = np.random.uniform(0, 2*np.pi, 1000)\nr = 5.0\ncoords = np.column_stack([r*np.sin(theta)*np.cos(phi),\n                          r*np.sin(theta)*np.sin(phi),\n                          r*np.cos(theta)])\nrg = radius_of_gyration(coords)\nprint(f'Rg of sphere (r=5): {rg:.2f}')  # ~sqrt(3/5)*5 for uniform sphere surface",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "coords.mean(axis=??)",
+                    "acceptable": ["coords.mean(axis=0)", "np.mean(coords, axis=0)"],
+                    "hint": "The centroid is the mean position over all atoms (axis 0)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "deviations ** ??",
+                    "acceptable": ["deviations ** 2", "deviations * deviations"],
+                    "hint": "Square the deviations to compute squared distances."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.sqrt(np.mean(??))",
+                    "acceptable": ["np.sqrt(np.mean(sq_distances))"],
+                    "hint": "Rg is the square root of the mean squared distance from the centroid."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_distance_matrix",
+            "title": "Pairwise Distance Matrix (Distogram)",
+            "difficulty": "easy",
+            "description": "Compute the full pairwise distance matrix between all CA atoms. Distance matrices (distograms) are a fundamental representation used in protein structure prediction.",
+            "info": "Distograms, or discretized pairwise distance distributions, are a key representation in modern protein structure prediction. AlphaFold2 (Jumper et al., Nature 2021) predicts binned distance distributions between all residue pairs as part of its Evoformer output. The pairwise distance matrix is SE(3)-invariant, meaning it is unchanged by rotations and translations, making it a natural target for prediction from sequence. Distance matrix representations were central to AlphaFold1 (Senior et al., Nature 2020), which predicted distance distributions and then optimized coordinates to match them. SchNet (Schutt et al., NeurIPS 2017) uses pairwise distances as input features for continuous-filter convolutions. Reference: Jumper et al., Nature 2021; Schutt et al., NeurIPS 2017.",
+            "code": "import numpy as np\n\ndef pairwise_distances(coords):\n    \"\"\"Compute full pairwise distance matrix.\n    coords: (L, 3) array\n    Returns: (L, L) distance matrix\n    \"\"\"\n    diff = {{b1}}  # (L, L, 3)\n    return {{b2}}\n\ncoords = np.random.randn(60, 3) * 10\ndist_mat = pairwise_distances(coords)\nprint('Distance matrix shape:', dist_mat.shape)\nprint('Symmetric:', np.allclose(dist_mat, {{b3}}))\nprint('Zero diagonal:', np.allclose(np.diag(dist_mat), 0))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "coords[:, None, :] - ??",
+                    "acceptable": ["coords[:, None, :] - coords[None, :, :]"],
+                    "hint": "Broadcast subtraction: expand dims to get all pairwise difference vectors."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.linalg.norm(??, axis=??)",
+                    "acceptable": ["np.linalg.norm(diff, axis=-1)", "np.linalg.norm(diff, axis=2)"],
+                    "hint": "Take the L2 norm along the last axis to get scalar distances."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "dist_mat.??",
+                    "acceptable": ["dist_mat.T"],
+                    "hint": "A distance matrix should be symmetric: D = D^T."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_knn_graph",
+            "title": "Protein Graph Construction (k-Nearest Neighbors)",
+            "difficulty": "medium",
+            "description": "Construct a k-nearest-neighbor graph from protein CA coordinates. Each residue becomes a node, and edges connect each residue to its k closest spatial neighbors. This graph is used as input to GNNs for protein structure learning.",
+            "info": "Graph-based representations of proteins enable the use of Graph Neural Networks (GNNs) for structure-based tasks. GVP-GNN (Jing et al., ICLR 2021) constructs k-nearest-neighbor graphs from CA coordinates where k is typically 10-30. Each node represents a residue with features like amino acid type, and edge features encode relative positions and distances. The kNN graph captures local spatial context without requiring a fixed distance cutoff, adapting to varying local packing densities. SchNet (Schutt et al., NeurIPS 2017) uses continuous radial filters on distance-based graphs. This approach has proven effective for protein design, model quality assessment, and function prediction. Reference: Jing et al., ICLR 2021; Schutt et al., NeurIPS 2017.",
+            "code": "import numpy as np\n\ndef build_knn_graph(coords, k=10):\n    \"\"\"Build kNN graph from CA coordinates.\n    coords: (L, 3) array\n    k: number of nearest neighbors\n    Returns: edge_index (2, num_edges), edge_vectors (num_edges, 3)\n    \"\"\"\n    L = coords.shape[0]\n    # Pairwise distances\n    diff = coords[:, None, :] - coords[None, :, :]\n    dist = np.linalg.norm(diff, axis=-1)  # (L, L)\n    # Set self-distance to infinity\n    np.fill_diagonal(dist, {{b1}})\n    # Get k nearest neighbors for each node\n    knn_indices = np.argsort(dist, axis=1)[:, {{b2}}]  # (L, k)\n    # Build edge index\n    src = np.repeat(np.arange(L), k)\n    dst = {{b3}}\n    edge_index = np.stack([src, dst], axis=0)  # (2, L*k)\n    edge_vectors = coords[dst] - coords[src]\n    return edge_index, edge_vectors\n\ncoords = np.random.randn(100, 3) * 10\nedge_index, edge_vecs = build_knn_graph(coords, k=10)\nprint('Edge index shape:', edge_index.shape)   # (2, 1000)\nprint('Edge vectors shape:', edge_vecs.shape)   # (1000, 3)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "value to exclude self-loops",
+                    "acceptable": ["np.inf", "float('inf')"],
+                    "hint": "Set self-distances to infinity so a node is not its own neighbor."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "slice first k neighbors",
+                    "acceptable": [":k"],
+                    "hint": "After sorting, take the first k indices to get the k nearest neighbors."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "knn_indices.??()",
+                    "acceptable": ["knn_indices.flatten()", "knn_indices.ravel()"],
+                    "hint": "Flatten the kNN indices to create the destination node array."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_radius_graph",
+            "title": "Protein Graph Construction (Radius-Based)",
+            "difficulty": "medium",
+            "description": "Construct a radius-based graph from CA coordinates. Edges connect all residue pairs within a distance cutoff. This complements kNN graphs by enforcing a physical distance constraint.",
+            "info": "Radius-based graphs connect all atom pairs within a spatial cutoff, capturing physically meaningful interactions. Unlike kNN graphs, radius graphs guarantee that all edges represent contacts within a defined distance, which is important for modeling physical interactions like van der Waals forces or hydrogen bonds. SchNet (Schutt et al., NeurIPS 2017) uses a distance cutoff to define the molecular graph for its continuous-filter convolution layers. DimeNet (Gasteiger et al., ICLR 2020) extends this with directional message passing on radius graphs. In protein structure prediction, AlphaFold-Multimer (Evans et al., bioRxiv 2022) uses distance-based cropping during training. A typical cutoff of 10-12 Angstroms captures most non-bonded interactions. Reference: Schutt et al., NeurIPS 2017; Evans et al., bioRxiv 2022.",
+            "code": "import numpy as np\n\ndef build_radius_graph(coords, cutoff=10.0):\n    \"\"\"Build radius graph from CA coordinates.\n    coords: (L, 3) array\n    cutoff: distance cutoff in Angstroms\n    Returns: edge_index (2, num_edges), distances (num_edges,)\n    \"\"\"\n    L = coords.shape[0]\n    diff = coords[:, None, :] - coords[None, :, :]\n    dist = np.linalg.norm(diff, axis=-1)  # (L, L)\n    # Find pairs within cutoff, excluding self-loops\n    mask = (dist < cutoff) & ({{b1}})\n    src, dst = {{b2}}\n    edge_index = np.stack([src, dst], axis=0)\n    distances = {{b3}}\n    return edge_index, distances\n\ncoords = np.random.randn(80, 3) * 10\nedge_index, dists = build_radius_graph(coords, cutoff=10.0)\nprint('Number of edges:', edge_index.shape[1])\nprint('All distances < cutoff:', np.all(dists < 10.0))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "exclude diagonal",
+                    "acceptable": ["dist > 0", "np.eye(L) == 0", "~np.eye(L, dtype=bool)"],
+                    "hint": "Exclude self-loops where the distance is zero (diagonal elements)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.where(??)",
+                    "acceptable": ["np.where(mask)"],
+                    "hint": "Use np.where on the mask to get the row and column indices of valid edges."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "dist[??, ??]",
+                    "acceptable": ["dist[src, dst]"],
+                    "hint": "Index into the distance matrix with source and destination indices."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_rbf_distance",
+            "title": "Radial Basis Function Distance Encoding",
+            "difficulty": "medium",
+            "description": "Encode scalar pairwise distances into a vector of radial basis function (RBF) features. RBF encoding is used in geometric GNNs to expand distances into a higher-dimensional, smooth representation.",
+            "info": "Radial basis function (RBF) expansion converts scalar distances into a multi-dimensional feature vector using a set of Gaussian functions centered at different distances. This is a key component of SchNet (Schutt et al., NeurIPS 2017), which uses RBF-expanded distances as input to continuous-filter convolutional layers. The expansion provides a smooth, differentiable representation that helps neural networks learn distance-dependent interactions. DimeNet (Gasteiger et al., ICLR 2020) and GemNet also use RBF expansions. The centers are typically evenly spaced from 0 to a maximum distance, with a fixed width parameter controlling overlap between basis functions. Reference: Schutt et al., NeurIPS 2017; Gasteiger et al., ICLR 2020.",
+            "code": "import numpy as np\n\ndef rbf_encode(distances, num_rbf=16, d_min=0.0, d_max=20.0):\n    \"\"\"Encode distances using Gaussian RBFs.\n    distances: (...,) array of distances\n    Returns: (..., num_rbf) RBF features\n    \"\"\"\n    # Evenly spaced RBF centers\n    centers = np.linspace(d_min, d_max, num_rbf)  # (num_rbf,)\n    width = {{b1}}\n    # Expand distances for broadcasting\n    d = distances[..., None]  # (..., 1)\n    # Gaussian RBF\n    rbf = {{b2}}\n    return rbf\n\n# Test\ndistances = np.array([2.0, 5.0, 10.0, 15.0])\nrbf_features = rbf_encode(distances)\nprint('RBF shape:', rbf_features.shape)  # (4, 16)\n# Each distance should peak at the nearest center\npeak_centers = np.linspace(0, 20, 16)[{{b3}}]\nprint('Peak centers:', peak_centers)  # Should be close to [2, 5, 10, 15]",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(centers[1] - centers[0]) expression",
+                    "acceptable": ["(d_max - d_min) / num_rbf", "centers[1] - centers[0]"],
+                    "hint": "The width (spread) of each Gaussian is typically the spacing between centers."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.exp(-0.5 * ((d - ??) / ??) ** 2)",
+                    "acceptable": ["np.exp(-0.5 * ((d - centers) / width) ** 2)"],
+                    "hint": "Apply the Gaussian kernel: exp(-0.5 * ((d - centers) / width)^2)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.argmax(rbf_features, axis=??)",
+                    "acceptable": ["np.argmax(rbf_features, axis=-1)", "np.argmax(rbf_features, axis=1)"],
+                    "hint": "Find the index of the maximum RBF activation for each distance."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_invariant_point_attn",
+            "title": "Invariant Point Attention - Point Projection",
+            "difficulty": "hard",
+            "description": "Implement the point projection step of Invariant Point Attention (IPA) from AlphaFold2. Given query points in local residue frames, transform them to global coordinates using the residue rotation and translation.",
+            "info": "Invariant Point Attention (IPA) is a central component of AlphaFold2's structure module (Jumper et al., Nature 2021). IPA achieves SE(3)-invariance by projecting learned query/key/value points from local residue frames into the global frame, computing attention based on both these projected points and pair features. The key operation transforms local points p_local to global coordinates via p_global = R @ p_local + t, where R and t are the residue's rotation and translation. This enables the model to reason about 3D geometry while maintaining invariance to the overall orientation of the protein. The attention weights combine Euclidean distances between projected points with sequence-based pair features. Reference: Jumper et al., Nature 2021.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef project_points_to_global(points_local, rotations, translations):\n    \"\"\"Project points from local residue frames to global coordinates.\n    points_local: (B, L, n_pts, 3) points in local frames\n    rotations: (B, L, 3, 3) rotation matrices per residue\n    translations: (B, L, 3) translation vectors per residue\n    Returns: (B, L, n_pts, 3) points in global frame\n    \"\"\"\n    # Apply rotation: R @ p for each point\n    # rotations: (B, L, 3, 3), points_local: (B, L, n_pts, 3)\n    # We need (B, L, 3, 3) @ (B, L, 3, n_pts) -> (B, L, 3, n_pts)\n    pts_transposed = points_local.transpose(-1, -2)  # (B, L, 3, n_pts)\n    rotated = {{b1}}  # (B, L, 3, n_pts)\n    rotated = rotated.transpose(-1, -2)  # (B, L, n_pts, 3)\n    # Apply translation\n    global_pts = rotated + {{b2}}\n    return global_pts\n\nB, L, n_pts = 2, 50, 4\npoints_local = torch.randn(B, L, n_pts, 3)\n# Random valid rotations (identity for simplicity)\nrotations = torch.eye(3).unsqueeze(0).unsqueeze(0).expand(B, L, 3, 3).clone()\ntranslations = torch.randn(B, L, 3)\nglobal_pts = project_points_to_global(points_local, rotations, translations)\nprint('Global points shape:', global_pts.shape)\n# With identity rotation, global = local + translation\nexpected = points_local + {{b3}}\nprint('Identity rotation check:', torch.allclose(global_pts, expected, atol=1e-5))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "rotations @ ??",
+                    "acceptable": ["rotations @ pts_transposed", "torch.matmul(rotations, pts_transposed)"],
+                    "hint": "Matrix multiply: apply rotation matrices to the transposed points."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "translations.unsqueeze(??)",
+                    "acceptable": ["translations.unsqueeze(-2)", "translations.unsqueeze(2)"],
+                    "hint": "Unsqueeze translations to broadcast over the n_pts dimension."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "translations.unsqueeze(??)",
+                    "acceptable": ["translations.unsqueeze(-2)", "translations.unsqueeze(2)"],
+                    "hint": "Same broadcast: expand translations to match (B, L, n_pts, 3) shape."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_lddt_score",
+            "title": "lDDT Score Computation",
+            "difficulty": "hard",
+            "description": "Implement the local Distance Difference Test (lDDT), a superposition-free score for assessing structural predictions. lDDT measures the fraction of inter-residue distances preserved within thresholds.",
+            "info": "lDDT (local Distance Difference Test) is a per-residue structure quality metric that does not require superposition, making it robust to domain movements (Mariani et al., Bioinformatics 2013). AlphaFold2 (Jumper et al., Nature 2021) predicts per-residue lDDT (pLDDT) as a confidence score, which has become a standard measure of prediction reliability. lDDT computes the fraction of inter-residue distances in the prediction that are within tolerance thresholds (0.5, 1, 2, 4 Angstroms) of the true distances, considering only residue pairs within 15 Angstroms in the reference structure. The score ranges from 0 to 1, with >0.9 indicating very high accuracy. Its locality makes it informative for identifying well-predicted and poorly-predicted regions. Reference: Mariani et al., Bioinformatics 2013; Jumper et al., Nature 2021.",
+            "code": "import numpy as np\n\ndef compute_lddt(pred_coords, true_coords, cutoff=15.0,\n                 thresholds=[0.5, 1.0, 2.0, 4.0]):\n    \"\"\"Compute lDDT score.\n    pred_coords, true_coords: (L, 3) CA coordinates\n    Returns: per-residue lDDT scores (L,)\n    \"\"\"\n    L = true_coords.shape[0]\n    # Compute distance matrices\n    true_dists = np.linalg.norm(\n        true_coords[:, None] - true_coords[None, :], axis=-1)  # (L, L)\n    pred_dists = np.linalg.norm(\n        pred_coords[:, None] - pred_coords[None, :], axis=-1)\n    # Mask: only consider pairs within cutoff in the TRUE structure\n    mask = (true_dists < cutoff) & ({{b1}})\n    # Distance differences\n    dist_diff = {{b2}}  # (L, L)\n    # For each threshold, compute fraction preserved\n    scores = np.zeros(L)\n    for i in range(L):\n        neighbors = mask[i]\n        if neighbors.sum() == 0:\n            scores[i] = 0\n            continue\n        diffs_i = dist_diff[i, neighbors]\n        preserved = np.mean([{{b3}} for t in thresholds])\n        scores[i] = preserved\n    return scores\n\nnp.random.seed(42)\ntrue_coords = np.random.randn(50, 3) * 10\npred_coords = true_coords + np.random.randn(50, 3) * 0.5  # small perturbation\nlddt = compute_lddt(pred_coords, true_coords)\nprint(f'Mean lDDT: {lddt.mean():.3f}')  # Should be high for small perturbation",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "exclude self-pairs",
+                    "acceptable": ["true_dists > 0", "np.eye(L) == 0", "~np.eye(L, dtype=bool)"],
+                    "hint": "Exclude diagonal (self-pairs) from the computation."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.abs(?? - ??)",
+                    "acceptable": ["np.abs(pred_dists - true_dists)"],
+                    "hint": "Take the absolute difference between predicted and true pairwise distances."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "(diffs_i < ?).mean()",
+                    "acceptable": ["(diffs_i < t).mean()"],
+                    "hint": "For each threshold t, compute the fraction of distance differences below t."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_se3_equivariant_msg",
+            "title": "SE(3)-Equivariant Message Passing",
+            "difficulty": "hard",
+            "description": "Implement a simple SE(3)-equivariant message passing layer. Messages combine scalar (invariant) and vector (equivariant) information along edges of a protein graph.",
+            "info": "SE(3)-equivariant message passing ensures that vector outputs rotate consistently with input rotations, while scalar outputs remain invariant. SE(3)-Transformers (Fuchs et al., NeurIPS 2020) achieve this by passing messages that separately update scalar and vector channels. The key principle is that scalar features can depend on rotation-invariant quantities (distances, dot products), while vector updates must be linear combinations of input vectors to preserve equivariance. EGNN (Satorras et al., ICML 2021) provides a simpler equivariant GNN using coordinate updates weighted by learned edge functions. GVP-GNN (Jing et al., ICLR 2021) extends this with Geometric Vector Perceptrons. Reference: Fuchs et al., NeurIPS 2020; Satorras et al., ICML 2021.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass EquivariantMessagePass(nn.Module):\n    def __init__(self, scalar_dim=64):\n        super().__init__()\n        # Scalar message MLP (invariant): takes scalar features + distance\n        self.scalar_mlp = nn.Sequential(\n            nn.Linear(2 * scalar_dim + 1, scalar_dim),\n            nn.ReLU(),\n            nn.Linear(scalar_dim, scalar_dim)\n        )\n        # Weight for vector message (equivariant)\n        self.vec_weight = nn.Sequential(\n            nn.Linear(2 * scalar_dim + 1, scalar_dim),\n            nn.ReLU(),\n            nn.Linear(scalar_dim, 1)\n        )\n\n    def forward(self, s, x, edge_index):\n        \"\"\"s: (N, scalar_dim) scalar features\n           x: (N, 3) coordinates\n           edge_index: (2, E) edges\n        \"\"\"\n        src, dst = edge_index\n        # Edge vectors and distances (invariant)\n        rel_vec = x[dst] - x[src]  # (E, 3)\n        dist = {{b1}}  # (E, 1)\n        # Scalar message\n        scalar_input = torch.cat([s[src], s[dst], dist], dim=-1)\n        scalar_msg = self.scalar_mlp(scalar_input)  # (E, scalar_dim)\n        # Vector message weight (scalar, so invariant)\n        w = self.vec_weight(scalar_input)  # (E, 1)\n        vec_msg = {{b2}}  # (E, 3): weighted direction vectors\n        # Aggregate messages (sum)\n        s_new = torch.zeros_like(s)\n        x_update = torch.zeros_like(x)\n        s_new.index_add_(0, {{b3}}, scalar_msg)\n        x_update.index_add_(0, dst, vec_msg)\n        return s + s_new, x + x_update\n\nN, E = 50, 200\ns = torch.randn(N, 64)\nx = torch.randn(N, 3)\nedge_index = torch.randint(0, N, (2, E))\nmodel = EquivariantMessagePass()\ns_new, x_new = model(s, x, edge_index)\nprint('Updated scalar:', s_new.shape, 'Updated coords:', x_new.shape)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.norm(??, dim=-1, keepdim=True)",
+                    "acceptable": ["torch.norm(rel_vec, dim=-1, keepdim=True)", "torch.linalg.norm(rel_vec, dim=-1, keepdim=True)"],
+                    "hint": "Compute the Euclidean distance (norm of the relative vector) as an invariant feature."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "w * ??",
+                    "acceptable": ["w * rel_vec"],
+                    "hint": "Scale the direction vector by the learned scalar weight to keep equivariance."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "destination node index",
+                    "acceptable": ["dst"],
+                    "hint": "Aggregate messages at destination nodes using index_add with the dst indices."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_docking_score",
+            "title": "Molecular Docking Scoring Function",
+            "difficulty": "medium",
+            "description": "Implement a simple physics-inspired docking scoring function that combines van der Waals and electrostatic terms. This scores the quality of a protein-ligand binding pose.",
+            "info": "Molecular docking scoring functions estimate the binding affinity of a ligand in a protein binding pocket. Classical scoring functions combine van der Waals (Lennard-Jones potential), electrostatic (Coulomb), and desolvation terms. DiffDock (Corso et al., ICLR 2023) replaces handcrafted scoring with a diffusion generative model that learns to generate binding poses directly, significantly outperforming traditional docking. AutoDock Vina (Trott & Olson, J Comput Chem 2010) remains a widely used empirical scoring function. The van der Waals term captures steric complementarity, while the electrostatic term models charge-charge interactions. Machine learning scoring functions increasingly complement physics-based approaches. Reference: Corso et al., ICLR 2023; Trott & Olson, J Comput Chem 2010.",
+            "code": "import numpy as np\n\ndef docking_score(protein_coords, ligand_coords,\n                  protein_charges, ligand_charges,\n                  epsilon=1.0, sigma=3.5, coulomb_k=332.0):\n    \"\"\"Simple docking score: vdW (Lennard-Jones) + electrostatic.\n    protein_coords: (Np, 3), ligand_coords: (Nl, 3)\n    protein_charges, ligand_charges: (Np,), (Nl,) partial charges\n    Returns: total score (scalar)\n    \"\"\"\n    # Pairwise distances between protein and ligand atoms\n    diff = protein_coords[:, None, :] - ligand_coords[None, :, :]\n    dist = np.linalg.norm(diff, axis=-1)  # (Np, Nl)\n    dist = np.clip(dist, 1e-3, None)  # avoid division by zero\n    # Lennard-Jones 12-6 potential\n    r_ratio = sigma / dist\n    vdw = 4 * epsilon * ({{b1}} - {{b2}})\n    # Coulomb electrostatic\n    q_prod = {{b3}}  # (Np, Nl)\n    electrostatic = coulomb_k * q_prod / dist\n    total = vdw.sum() + electrostatic.sum()\n    return total\n\nnp.random.seed(0)\nprot_coords = np.random.randn(100, 3) * 5\nlig_coords = np.random.randn(20, 3) * 2 + np.array([5, 0, 0])\nprot_q = np.random.randn(100) * 0.1\nlig_q = np.random.randn(20) * 0.1\nscore = docking_score(prot_coords, lig_coords, prot_q, lig_q)\nprint(f'Docking score: {score:.2f}')",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "r_ratio ** ??",
+                    "acceptable": ["r_ratio ** 12"],
+                    "hint": "The repulsive term of the Lennard-Jones potential is (sigma/r)^12."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "r_ratio ** ??",
+                    "acceptable": ["r_ratio ** 6"],
+                    "hint": "The attractive term of the Lennard-Jones potential is (sigma/r)^6."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "outer product of charges",
+                    "acceptable": ["protein_charges[:, None] * ligand_charges[None, :]"],
+                    "hint": "Compute the outer product of protein and ligand charges for all pairs."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_boltzmann_energy",
+            "title": "Boltzmann Distribution Sampling Weight",
+            "difficulty": "medium",
+            "description": "Compute Boltzmann weights from energy values to weight conformational samples. The Boltzmann distribution p(x) is proportional to exp(-E(x)/kT), fundamental to statistical mechanics of proteins.",
+            "info": "The Boltzmann distribution relates the probability of a molecular conformation to its energy: p(x) proportional to exp(-E(x)/kT). Boltzmann generators (Noe et al., Science 2019) use normalizing flows to learn a bijective mapping from a simple prior to the Boltzmann distribution of molecular systems, enabling efficient sampling of equilibrium conformations. This approach circumvents the time-scale problem of conventional molecular dynamics simulations. OpenMM (Eastman et al., PLoS Comput Biol 2017) provides energy computation for molecular systems with various force fields. Proper normalization of Boltzmann weights is critical to avoid numerical overflow, typically using the log-sum-exp trick. Reference: Noe et al., Science 2019; Eastman et al., PLoS Comput Biol 2017.",
+            "code": "import numpy as np\n\ndef boltzmann_weights(energies, temperature=300.0, kB=0.001987):\n    \"\"\"Compute normalized Boltzmann weights from energies.\n    energies: (N,) array of energies in kcal/mol\n    temperature: in Kelvin\n    kB: Boltzmann constant in kcal/(mol*K)\n    Returns: (N,) normalized probability weights\n    \"\"\"\n    kT = kB * temperature\n    # Compute log weights (use log-sum-exp for numerical stability)\n    log_weights = {{b1}}\n    # Normalize using log-sum-exp trick\n    log_weights_shifted = log_weights - {{b2}}\n    weights = np.exp(log_weights_shifted)\n    weights = weights / {{b3}}\n    return weights\n\n# Test: lower energy conformations should have higher weight\nenergies = np.array([-10.0, -5.0, 0.0, 5.0, 10.0])\nweights = boltzmann_weights(energies)\nprint('Weights:', weights)\nprint('Sum:', weights.sum())  # Should be 1.0\nprint('Lowest energy has highest weight:', np.argmax(weights) == 0)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "-energies / ??",
+                    "acceptable": ["-energies / kT"],
+                    "hint": "Log Boltzmann weight is -E / (kB * T)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.max(??)",
+                    "acceptable": ["np.max(log_weights)"],
+                    "hint": "Subtract the maximum log weight for numerical stability (log-sum-exp trick)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "weights.??()",
+                    "acceptable": ["weights.sum()", "np.sum(weights)"],
+                    "hint": "Normalize by dividing by the sum so that weights form a probability distribution."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_gvp_edge_features",
+            "title": "GVP Edge Feature Construction",
+            "difficulty": "medium",
+            "description": "Construct edge features for a GVP-GNN protein graph. Each edge has scalar features (distance, sequence separation) and a vector feature (unit direction vector from source to destination).",
+            "info": "GVP-GNN (Jing et al., ICLR 2021) constructs protein graphs with both scalar and vector features on edges. Edge scalar features typically include the pairwise distance and sequence separation (how far apart residues are in the primary sequence). The edge vector feature is the unit direction vector between connected residues, which is equivariant under rotation. These features allow the network to reason about both distance-based and direction-based geometric relationships. The model uses separate scalar and vector message passing channels to maintain equivariance. This edge featurization has been adopted in many subsequent protein structure models including ESM-IF (Hsu et al., ICML 2022). Reference: Jing et al., ICLR 2021; Hsu et al., ICML 2022.",
+            "code": "import numpy as np\n\ndef build_gvp_edge_features(coords, edge_index, seq_len):\n    \"\"\"Build scalar and vector edge features for GVP-GNN.\n    coords: (L, 3) CA coordinates\n    edge_index: (2, E) source-destination pairs\n    seq_len: length of the protein sequence\n    Returns: edge_scalars (E, 2), edge_vectors (E, 1, 3)\n    \"\"\"\n    src, dst = edge_index\n    # Direction vectors\n    rel_vec = coords[dst] - coords[src]  # (E, 3)\n    dist = np.linalg.norm(rel_vec, axis=-1, keepdims=True)  # (E, 1)\n    # Unit direction vector (equivariant vector feature)\n    unit_vec = {{b1}}  # (E, 3)\n    # Sequence separation (invariant scalar feature)\n    seq_sep = {{b2}}  # (E,)\n    seq_sep_encoded = seq_sep.astype(np.float32) / seq_len  # normalize\n    # Edge scalar features: [distance, normalized sequence separation]\n    edge_scalars = np.concatenate([dist, seq_sep_encoded[:, None]], axis=-1)  # (E, 2)\n    # Edge vector features: unit direction, shape (E, 1, 3)\n    edge_vectors = {{b3}}\n    return edge_scalars, edge_vectors\n\nL = 100\ncoords = np.random.randn(L, 3) * 10\n# Simple sequential edges\nsrc = np.arange(L - 1)\ndst = np.arange(1, L)\nedge_index = np.stack([src, dst])\nscalars, vectors = build_gvp_edge_features(coords, edge_index, L)\nprint('Edge scalars:', scalars.shape)   # (99, 2)\nprint('Edge vectors:', vectors.shape)   # (99, 1, 3)\nprint('Unit vectors normalized:', np.allclose(np.linalg.norm(vectors, axis=-1), 1.0))",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "rel_vec / ??",
+                    "acceptable": ["rel_vec / dist", "rel_vec / np.linalg.norm(rel_vec, axis=-1, keepdims=True)"],
+                    "hint": "Normalize the relative vector by its distance to get the unit direction."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.abs(?? - ??)",
+                    "acceptable": ["np.abs(src - dst)", "np.abs(dst - src)"],
+                    "hint": "Sequence separation is the absolute difference of residue indices."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "unit_vec[:, ??, :]",
+                    "acceptable": ["unit_vec[:, None, :]", "unit_vec[:, np.newaxis, :]"],
+                    "hint": "Add a middle dimension to get shape (E, 1, 3) for the vector feature channel."
+                }
+            ]
+        },
+        {
+            "id": "prot_dyn_schnet_filter",
+            "title": "SchNet Continuous-Filter Convolution",
+            "difficulty": "hard",
+            "description": "Implement the continuous-filter convolution from SchNet, which generates convolutional filters from interatomic distances via an MLP applied to RBF-expanded distances.",
+            "info": "SchNet (Schutt et al., NeurIPS 2017) introduced continuous-filter convolutions for molecular property prediction, where filter weights are generated as a function of interatomic distance rather than being fixed on a grid. Distances are first expanded into RBF features, then passed through an MLP to produce per-edge filter weights. The message for each edge is the element-wise product of the neighbor's features with the generated filter. This approach naturally handles the continuous and irregular structure of molecular graphs. SchNet achieves strong results on QM9 and MD17 benchmarks and inspired many subsequent architectures including PaiNN and DimeNet. Reference: Schutt et al., NeurIPS 2017; Schutt et al., J Chem Phys 2018.",
+            "code": "import torch\nimport torch.nn as nn\nimport numpy as np\n\nclass SchNetInteraction(nn.Module):\n    def __init__(self, hidden_dim=128, num_rbf=20):\n        super().__init__()\n        self.num_rbf = num_rbf\n        # Atom-wise linear\n        self.atom_linear = nn.Linear(hidden_dim, hidden_dim)\n        # Continuous filter: RBF -> filter weights\n        self.filter_net = nn.Sequential(\n            nn.Linear(num_rbf, hidden_dim),\n            nn.SiLU(),\n            nn.Linear(hidden_dim, hidden_dim)\n        )\n        self.output_linear = nn.Linear(hidden_dim, hidden_dim)\n\n    def rbf_expand(self, dist, num_rbf=20, cutoff=10.0):\n        centers = torch.linspace(0, cutoff, num_rbf, device=dist.device)\n        width = cutoff / num_rbf\n        return torch.exp(-0.5 * ((dist.unsqueeze(-1) - centers) / width) ** 2)\n\n    def forward(self, h, edge_index, distances):\n        \"\"\"h: (N, hidden_dim), edge_index: (2, E), distances: (E,)\"\"\"\n        src, dst = edge_index\n        # Transform neighbor features\n        h_neighbors = self.atom_linear(h[src])  # (E, hidden_dim)\n        # Generate filters from distances\n        rbf = {{b1}}  # (E, num_rbf)\n        W = {{b2}}  # (E, hidden_dim)\n        # Element-wise product: features * filter\n        messages = h_neighbors * W  # (E, hidden_dim)\n        # Aggregate\n        out = torch.zeros_like(h)\n        out.index_add_(0, {{b3}}, messages)\n        return h + self.output_linear(out)\n\nN, E, hidden = 50, 300, 128\nh = torch.randn(N, hidden)\nedge_index = torch.randint(0, N, (2, E))\ndist = torch.rand(E) * 10\nmodel = SchNetInteraction(hidden)\nh_new = model(h, edge_index, dist)\nprint('Output shape:', h_new.shape)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.rbf_expand(??, ??)",
+                    "acceptable": ["self.rbf_expand(distances, self.num_rbf)", "self.rbf_expand(distances)"],
+                    "hint": "Expand the scalar distances into RBF feature vectors."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.filter_net(??)",
+                    "acceptable": ["self.filter_net(rbf)"],
+                    "hint": "Pass the RBF features through the filter-generating network."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "aggregate to which nodes?",
+                    "acceptable": ["dst"],
+                    "hint": "Aggregate messages at the destination nodes using index_add."
+                }
+            ]
+        }
+    ]
+}

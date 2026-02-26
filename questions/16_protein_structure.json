@@ -1,0 +1,457 @@
+{
+    "topic": "Proteins - Structure Prediction",
+    "questions": [
+        {
+            "id": "prot_struct_msa_encoding",
+            "title": "MSA Row-Wise Encoding",
+            "difficulty": "easy",
+            "description": "Encode a Multiple Sequence Alignment (MSA) into a tensor suitable for the Evoformer. Each residue in each sequence is mapped to a learned embedding of dimension d_msa.",
+            "info": "Multiple Sequence Alignments (MSAs) are a cornerstone input to modern protein structure prediction. AlphaFold2 (Jumper et al., Nature 2021) processes MSAs through its Evoformer module, where each residue token in every aligned sequence is embedded into a continuous d_msa-dimensional vector. This MSA representation has shape (N_seq, L_res, d_msa). The initial embedding is typically a learned nn.Embedding over the amino acid vocabulary (including gap tokens), producing a dense representation that captures evolutionary co-variation. ESMFold (Lin et al., Science 2023) bypasses explicit MSA search by using protein language model embeddings from ESM-2, but the core idea of per-residue embedding remains. AlphaFold2 achieved a median GDT-TS of 92.4 on CASP14 free-modeling targets, demonstrating the power of MSA-based reasoning.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass MSAEmbedding(nn.Module):\n    def __init__(self, vocab_size=22, d_msa=256):\n        super().__init__()\n        # 22 tokens: 20 amino acids + gap + unknown\n        self.embed = {{prot_struct_msa_enc_b1}}\n\n    def forward(self, msa_tokens):\n        # msa_tokens: (N_seq, L_res) integer tensor\n        return {{prot_struct_msa_enc_b2}}\n\n# Example: 128 sequences, 100 residues\nmsa = torch.randint(0, 22, (128, 100))\nmodel = MSAEmbedding()\nout = model(msa)\nprint(out.shape)  # (128, 100, 256)",
+            "blanks": [
+                {
+                    "id": "prot_struct_msa_enc_b1",
+                    "placeholder": "nn.???(vocab_size, d_msa)",
+                    "acceptable": ["nn.Embedding(vocab_size, d_msa)", "nn.Embedding(22, 256)"],
+                    "hint": "Use nn.Embedding to map discrete tokens to dense vectors."
+                },
+                {
+                    "id": "prot_struct_msa_enc_b2",
+                    "placeholder": "self.???(msa_tokens)",
+                    "acceptable": ["self.embed(msa_tokens)"],
+                    "hint": "Pass the integer token tensor through the embedding layer."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_pair_repr",
+            "title": "Pair Representation Initialization",
+            "difficulty": "medium",
+            "description": "Initialize the pair representation by computing outer products of residue embeddings. The pair representation captures relationships between all pairs of residues.",
+            "info": "The pair representation is a central data structure in AlphaFold2 (Jumper et al., Nature 2021) with shape (L, L, d_pair), encoding geometric and evolutionary relationships between every pair of residues. It is initialized via an outer product of single residue features projected through linear layers, then refined through triangular attention and triangular multiplicative updates in the Evoformer. RoseTTAFold (Baek et al., Science 2021) uses a similar three-track architecture where 1D sequence, 2D pair, and 3D structure information are iteratively exchanged. The pair representation ultimately informs the structure module about inter-residue distances and orientations. AlphaFold2's Supplementary Information details how this outer product mean operation aggregates over the MSA dimension.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PairRepresentationInit(nn.Module):\n    def __init__(self, d_msa=256, d_pair=128):\n        super().__init__()\n        self.proj_left = nn.Linear(d_msa, d_pair)\n        self.proj_right = nn.Linear(d_msa, d_pair)\n\n    def forward(self, msa_repr):\n        # msa_repr: (N_seq, L, d_msa)\n        # Average over MSA sequences first\n        single = {{prot_struct_pair_b1}}\n        left = self.proj_left(single)   # (L, d_pair)\n        right = self.proj_right(single) # (L, d_pair)\n        # Outer product: (L, d_pair) x (L, d_pair) -> (L, L, d_pair)\n        pair = {{prot_struct_pair_b2}}\n        return pair\n\nmsa_repr = torch.randn(128, 100, 256)\nmodel = PairRepresentationInit()\nprint(model(msa_repr).shape)  # (100, 100, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_pair_b1",
+                    "placeholder": "msa_repr.mean(dim=???)",
+                    "acceptable": ["msa_repr.mean(dim=0)"],
+                    "hint": "Average over the MSA sequence dimension (dim=0) to get per-residue features."
+                },
+                {
+                    "id": "prot_struct_pair_b2",
+                    "placeholder": "left[???, None, :] * right[None, ???, :]",
+                    "acceptable": ["left[:, None, :] * right[None, :, :]"],
+                    "hint": "Broadcast left over dimension 1 and right over dimension 0 to form the (L, L, d_pair) outer product."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_distogram",
+            "title": "Distogram Prediction Head",
+            "difficulty": "easy",
+            "description": "Implement a distogram prediction head that classifies pairwise C-beta distances into discrete bins. The distogram is a probability distribution over distance bins for each residue pair.",
+            "info": "Distogram prediction was a key innovation in AlphaFold1 (Senior et al., Nature 2020) that replaced direct distance regression with classification over discrete distance bins, typically 64 bins spanning 2 to 22 Angstroms. AlphaFold2 (Jumper et al., Nature 2021) retains a distogram head as an auxiliary loss during training to help supervise the pair representation. The distogram is a symmetric L x L matrix where each entry is a probability distribution over distance bins, obtained by applying a linear projection followed by softmax to the pair representation. This binned approach avoids issues with predicting sharp distance distributions. The predicted distogram can also be converted to a pairwise potential for structure realization via energy minimization.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DistogramHead(nn.Module):\n    def __init__(self, d_pair=128, num_bins=64):\n        super().__init__()\n        self.linear = {{prot_struct_disto_b1}}\n\n    def forward(self, pair_repr):\n        # pair_repr: (L, L, d_pair)\n        logits = self.linear(pair_repr)  # (L, L, num_bins)\n        # Symmetrize: average (i,j) and (j,i)\n        logits = (logits + {{prot_struct_disto_b2}}) / 2\n        return torch.softmax(logits, dim=-1)\n\npair = torch.randn(100, 100, 128)\nhead = DistogramHead()\nprint(head(pair).shape)  # (100, 100, 64)",
+            "blanks": [
+                {
+                    "id": "prot_struct_disto_b1",
+                    "placeholder": "nn.???(d_pair, num_bins)",
+                    "acceptable": ["nn.Linear(d_pair, num_bins)", "nn.Linear(128, 64)"],
+                    "hint": "A linear layer projects pair features to the number of distance bins."
+                },
+                {
+                    "id": "prot_struct_disto_b2",
+                    "placeholder": "logits.???(0, 1)",
+                    "acceptable": ["logits.transpose(0, 1)", "logits.permute(1, 0, 2)"],
+                    "hint": "Transpose the first two dimensions (i, j) -> (j, i) for symmetrization."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_plddt",
+            "title": "pLDDT Confidence Score",
+            "difficulty": "medium",
+            "description": "Implement the predicted Local Distance Difference Test (pLDDT) confidence head. pLDDT estimates per-residue prediction confidence on a 0-100 scale by classifying into LDDT bins.",
+            "info": "pLDDT (predicted LDDT) is AlphaFold2's (Jumper et al., Nature 2021) primary per-residue confidence metric, estimating the Local Distance Difference Test score on a 0-100 scale. LDDT (Mariani et al., Bioinformatics 2013) measures the fraction of inter-atomic distances preserved within multiple distance thresholds (0.5, 1, 2, 4 Angstroms). AlphaFold2 predicts pLDDT by classifying single-representation features into 50 bins spanning 0-100, then computing the expected value as the confidence score. Regions with pLDDT > 90 are modeled with high confidence, 70-90 are generally well-modeled backbone, and < 50 likely represent disordered regions. The AlphaFold Protein Structure Database (Varadi et al., Nucleic Acids Research 2022) uses pLDDT to color-code all 200M+ predicted structures.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PLDDTHead(nn.Module):\n    def __init__(self, d_single=384, num_bins=50):\n        super().__init__()\n        self.linear = nn.Linear(d_single, num_bins)\n        # Bin centers: 1, 3, 5, ..., 99\n        self.register_buffer(\n            'bin_centers',\n            torch.arange(1, 100, 2).float()  # 50 values\n        )\n\n    def forward(self, single_repr):\n        # single_repr: (L, d_single)\n        logits = self.linear(single_repr)  # (L, 50)\n        probs = {{prot_struct_plddt_b1}}\n        # Expected value over bin centers\n        plddt = {{prot_struct_plddt_b2}}\n        return plddt  # (L,) values in 0-100\n\nsingle = torch.randn(100, 384)\nhead = PLDDTHead()\nprint(head(single).shape)  # (100,)",
+            "blanks": [
+                {
+                    "id": "prot_struct_plddt_b1",
+                    "placeholder": "torch.???(logits, dim=-1)",
+                    "acceptable": ["torch.softmax(logits, dim=-1)", "torch.nn.functional.softmax(logits, dim=-1)"],
+                    "hint": "Apply softmax over the bin dimension to get probabilities."
+                },
+                {
+                    "id": "prot_struct_plddt_b2",
+                    "placeholder": "(probs * self.???).sum(dim=-1)",
+                    "acceptable": ["(probs * self.bin_centers).sum(dim=-1)"],
+                    "hint": "Compute the expected value by multiplying probabilities with bin centers and summing."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_gdt_ts",
+            "title": "GDT-TS Evaluation Metric",
+            "difficulty": "easy",
+            "description": "Compute the Global Distance Test - Total Score (GDT-TS) between predicted and true C-alpha coordinates. GDT-TS averages the fraction of residues within 1, 2, 4, and 8 Angstrom cutoffs after optimal superposition.",
+            "info": "GDT-TS (Global Distance Test - Total Score) was the primary evaluation metric in CASP (Critical Assessment of protein Structure Prediction) competitions for decades (Zemla, Nucleic Acids Research 2003). It is defined as the average percentage of C-alpha atoms that fall within 1, 2, 4, and 8 Angstrom distance thresholds after optimal superposition. AlphaFold2 (Jumper et al., Nature 2021) achieved a median GDT-TS of 92.4 on CASP14 free-modeling targets, compared to roughly 60 for the next best method, representing an unprecedented leap. GDT-TS ranges from 0 to 100, where 100 indicates a perfect match. For CASP15, TM-score has increasingly been used alongside GDT-TS as TM-score is length-independent.",
+            "code": "import torch\n\ndef gdt_ts(pred_coords, true_coords):\n    \"\"\"\n    pred_coords: (L, 3) predicted C-alpha positions\n    true_coords: (L, 3) true C-alpha positions\n    Assumes structures are already superimposed.\n    \"\"\"\n    # Per-residue distances\n    distances = {{prot_struct_gdt_b1}}\n    L = distances.shape[0]\n    thresholds = [1.0, 2.0, 4.0, 8.0]\n    score = 0.0\n    for t in thresholds:\n        score += {{prot_struct_gdt_b2}}\n    return {{prot_struct_gdt_b3}}\n\npred = torch.randn(100, 3)\ntrue = pred + 0.5 * torch.randn(100, 3)\nprint(f\"GDT-TS: {gdt_ts(pred, true):.1f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_gdt_b1",
+                    "placeholder": "torch.???(pred_coords - true_coords, ???)",
+                    "acceptable": ["torch.norm(pred_coords - true_coords, dim=-1)", "torch.norm(pred_coords - true_coords, dim=1)"],
+                    "hint": "Compute the L2 norm of the difference along the coordinate dimension."
+                },
+                {
+                    "id": "prot_struct_gdt_b2",
+                    "placeholder": "(distances < t).???.item() / L * 100",
+                    "acceptable": ["(distances < t).sum().item() / L * 100", "(distances < t).float().sum().item() / L * 100"],
+                    "hint": "Count how many distances are below the threshold and express as a percentage."
+                },
+                {
+                    "id": "prot_struct_gdt_b3",
+                    "placeholder": "score / ???",
+                    "acceptable": ["score / 4", "score / len(thresholds)", "score / 4.0"],
+                    "hint": "Average over the 4 distance thresholds."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_tm_score",
+            "title": "TM-Score Computation",
+            "difficulty": "hard",
+            "description": "Implement TM-score, a length-independent metric for comparing protein structures. TM-score normalizes residue distances by a length-dependent scale factor d0.",
+            "info": "TM-score (Zhang & Skolnick, Proteins 2004) is a widely used metric for protein structure comparison that is length-independent, unlike GDT-TS and RMSD. It uses a length-dependent normalization factor d0 = 1.24 * cbrt(L - 15) - 1.8, where L is the target protein length. TM-score ranges from 0 to 1, where scores above 0.5 generally indicate the same fold and above 0.17 is expected for random structure pairs. AlphaFold2 (Jumper et al., Nature 2021) achieved average TM-scores above 0.9 on CASP14 domains. TM-score has become the primary metric in CASP15 and CASP16 assessments. The metric weights nearby residue pairs more heavily than distant ones, making it robust to local structural deviations in flexible regions.",
+            "code": "import torch\n\ndef tm_score(pred_coords, true_coords):\n    \"\"\"\n    pred_coords: (L, 3) predicted C-alpha positions\n    true_coords: (L, 3) true C-alpha positions\n    Assumes optimal superposition.\n    \"\"\"\n    L = pred_coords.shape[0]\n    # Length-dependent normalization\n    d0 = {{prot_struct_tm_b1}}\n    distances = torch.norm(pred_coords - true_coords, dim=-1)\n    # TM-score formula: sum of 1/(1 + (di/d0)^2) / L\n    scores = {{prot_struct_tm_b2}}\n    return scores.sum().item() / L\n\npred = torch.randn(100, 3)\ntrue = pred + 0.3 * torch.randn(100, 3)\nprint(f\"TM-score: {tm_score(pred, true):.3f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_tm_b1",
+                    "placeholder": "1.24 * (L - 15) ** (1/3) - ???",
+                    "acceptable": ["1.24 * (L - 15) ** (1/3) - 1.8", "1.24 * (L - 15) ** (1.0/3) - 1.8", "1.24 * (L - 15) ** (1.0/3.0) - 1.8"],
+                    "hint": "d0 = 1.24 * cbrt(L - 15) - 1.8, the length-dependent normalization factor."
+                },
+                {
+                    "id": "prot_struct_tm_b2",
+                    "placeholder": "1.0 / (1.0 + (distances / d0) ** ???)",
+                    "acceptable": ["1.0 / (1.0 + (distances / d0) ** 2)"],
+                    "hint": "Each residue contributes 1 / (1 + (di/d0)^2) to the TM-score."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_evoformer_msa_row",
+            "title": "Evoformer MSA Row-Wise Self-Attention",
+            "difficulty": "hard",
+            "description": "Implement row-wise self-attention within an MSA, where each sequence attends to its own residues. The pair representation provides a bias to the attention logits.",
+            "info": "The Evoformer in AlphaFold2 (Jumper et al., Nature 2021) alternates between MSA row-wise attention, MSA column-wise attention, and pair representation updates across 48 blocks. In row-wise attention, each MSA sequence independently performs self-attention over its L residues, but critically the attention logits receive an additive bias from the pair representation. This pair bias mechanism allows evolutionary covariance information to inform which residue positions attend to each other. The Evoformer is the computational bottleneck of AlphaFold2, with O(N_seq * L^2) complexity for row attention. OpenFold (Ahdritz et al., 2022) provides an open-source reimplementation that showed the pair bias is essential for high accuracy. RoseTTAFold (Baek et al., Science 2021) uses a similar attention-with-bias scheme in its two-track architecture.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport math\n\nclass MSARowAttention(nn.Module):\n    def __init__(self, d_msa=256, d_pair=128, num_heads=8):\n        super().__init__()\n        self.num_heads = num_heads\n        self.head_dim = d_msa // num_heads\n        self.qkv = nn.Linear(d_msa, 3 * d_msa)\n        self.pair_bias_proj = nn.Linear(d_pair, num_heads)\n        self.out_proj = nn.Linear(d_msa, d_msa)\n\n    def forward(self, msa, pair_repr):\n        # msa: (N, L, d_msa), pair_repr: (L, L, d_pair)\n        N, L, d = msa.shape\n        qkv = self.qkv(msa).reshape(N, L, 3, self.num_heads, self.head_dim)\n        q, k, v = qkv.unbind(dim=2)  # each (N, L, H, head_dim)\n        q = q.transpose(1, 2)  # (N, H, L, head_dim)\n        k = k.transpose(1, 2)\n        v = v.transpose(1, 2)\n        # Attention scores with scaling\n        attn = {{prot_struct_evo_row_b1}}\n        # Add pair bias: (L, L, d_pair) -> (L, L, H) -> (H, L, L)\n        bias = self.pair_bias_proj(pair_repr).permute(2, 0, 1)  # (H, L, L)\n        attn = attn + {{prot_struct_evo_row_b2}}\n        attn = F.softmax(attn, dim=-1)\n        out = {{prot_struct_evo_row_b3}}\n        out = out.transpose(1, 2).reshape(N, L, d)\n        return self.out_proj(out)",
+            "blanks": [
+                {
+                    "id": "prot_struct_evo_row_b1",
+                    "placeholder": "torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(???)",
+                    "acceptable": ["torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)"],
+                    "hint": "Scaled dot-product: Q @ K^T / sqrt(head_dim)."
+                },
+                {
+                    "id": "prot_struct_evo_row_b2",
+                    "placeholder": "bias.???(0)",
+                    "acceptable": ["bias.unsqueeze(0)"],
+                    "hint": "Unsqueeze the pair bias to broadcast over the N_seq batch dimension."
+                },
+                {
+                    "id": "prot_struct_evo_row_b3",
+                    "placeholder": "torch.matmul(attn, ???)",
+                    "acceptable": ["torch.matmul(attn, v)"],
+                    "hint": "Multiply attention weights with values V."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_triangular_update",
+            "title": "Triangular Multiplicative Update",
+            "difficulty": "hard",
+            "description": "Implement a simplified triangular multiplicative update (outgoing edges) for the pair representation. This enforces geometric consistency: if residue i is close to k, and k is close to j, then i should relate to j.",
+            "info": "Triangular multiplicative updates are a novel architectural innovation in AlphaFold2 (Jumper et al., Nature 2021) that enforce consistency in the pair representation by propagating information along edges of a triangle. For the 'outgoing edges' variant, the update to pair (i,j) aggregates information from pairs (i,k) and (j,k) for all intermediate residues k, implementing a form of message passing that respects the triangle inequality of distances. There are two variants: outgoing (starting node) and incoming (ending node). These updates complement triangular attention and are crucial for maintaining geometric consistency. The OpenFold (Ahdritz et al., 2022) ablation studies confirmed that removing triangular updates significantly degrades structure prediction accuracy, particularly for long-range contacts.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass TriangularMultiplicativeUpdate(nn.Module):\n    \"\"\"Outgoing edges variant.\"\"\"\n    def __init__(self, d_pair=128, d_hidden=64):\n        super().__init__()\n        self.norm = nn.LayerNorm(d_pair)\n        self.proj_left = nn.Linear(d_pair, d_hidden)\n        self.proj_right = nn.Linear(d_pair, d_hidden)\n        self.gate_left = nn.Linear(d_pair, d_hidden)\n        self.gate_right = nn.Linear(d_pair, d_hidden)\n        self.out_proj = nn.Linear(d_hidden, d_pair)\n        self.out_norm = nn.LayerNorm(d_hidden)\n\n    def forward(self, pair):\n        # pair: (L, L, d_pair)\n        p = self.norm(pair)\n        left = self.proj_left(p) * {{prot_struct_tri_b1}}\n        right = self.proj_right(p) * torch.sigmoid(self.gate_right(p))\n        # Outgoing: aggregate over k dimension\n        # left[i,k,:] * right[j,k,:] summed over k\n        out = {{prot_struct_tri_b2}}\n        out = self.out_norm(out)\n        return pair + self.out_proj(out)\n\npair = torch.randn(50, 50, 128)\nmodel = TriangularMultiplicativeUpdate()\nprint(model(pair).shape)  # (50, 50, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_tri_b1",
+                    "placeholder": "torch.sigmoid(self.???(p))",
+                    "acceptable": ["torch.sigmoid(self.gate_left(p))"],
+                    "hint": "Apply sigmoid gating using gate_left projection."
+                },
+                {
+                    "id": "prot_struct_tri_b2",
+                    "placeholder": "torch.einsum('ikd,jkd->ijd', ???, right)",
+                    "acceptable": ["torch.einsum('ikd,jkd->ijd', left, right)"],
+                    "hint": "Use einsum to contract over the shared k dimension: left[i,k,d] * right[j,k,d] -> out[i,j,d]."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_ipa_basic",
+            "title": "Invariant Point Attention - Query/Key/Value Projection",
+            "difficulty": "hard",
+            "description": "Implement the initial projections for Invariant Point Attention (IPA), which generates query, key, and value points in local residue frames. IPA is the core attention mechanism in AlphaFold2's structure module.",
+            "info": "Invariant Point Attention (IPA) is a novel attention mechanism introduced in AlphaFold2 (Jumper et al., Nature 2021) that operates on both scalar features and 3D point coordinates in local residue reference frames, making it equivariant to global rotations and translations. Each residue generates query, key, and value points in its local frame via linear projections, producing 3D coordinates that are then transformed into the global frame for attention computation. IPA uses N_head attention heads, each with N_point query/key points. The attention logits combine three terms: standard scalar dot-product attention, pairwise bias from the pair representation, and squared distances between query and key points in 3D. This design was critical for AlphaFold2's structure module, which iteratively refines backbone frames across 8 recycling steps.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass IPAProjections(nn.Module):\n    def __init__(self, d_single=384, num_heads=12, num_points=4, head_dim=16):\n        super().__init__()\n        self.num_heads = num_heads\n        self.num_points = num_points\n        self.head_dim = head_dim\n        # Scalar projections\n        self.q_scalar = nn.Linear(d_single, num_heads * head_dim)\n        self.k_scalar = nn.Linear(d_single, num_heads * head_dim)\n        self.v_scalar = nn.Linear(d_single, num_heads * head_dim)\n        # Point projections: each point has 3 coordinates\n        self.q_points = {{prot_struct_ipa_b1}}\n        self.k_points = nn.Linear(d_single, num_heads * num_points * 3)\n\n    def forward(self, single_repr):\n        L = single_repr.shape[0]\n        # Scalar queries/keys\n        q_s = self.q_scalar(single_repr).view(L, self.num_heads, self.head_dim)\n        k_s = self.k_scalar(single_repr).view(L, self.num_heads, self.head_dim)\n        # Point queries: (L, H, P, 3)\n        q_p = self.q_points(single_repr).view(L, self.num_heads, self.num_points, {{prot_struct_ipa_b2}})\n        k_p = self.k_points(single_repr).view(L, self.num_heads, self.num_points, 3)\n        return q_s, k_s, q_p, k_p\n\nsingle = torch.randn(100, 384)\nmodel = IPAProjections()\nq_s, k_s, q_p, k_p = model(single)\nprint(f\"Scalar Q: {q_s.shape}, Point Q: {q_p.shape}\")\n# Scalar Q: (100, 12, 16), Point Q: (100, 12, 4, 3)",
+            "blanks": [
+                {
+                    "id": "prot_struct_ipa_b1",
+                    "placeholder": "nn.Linear(d_single, num_heads * num_points * ???)",
+                    "acceptable": ["nn.Linear(d_single, num_heads * num_points * 3)"],
+                    "hint": "Each point has 3 spatial coordinates (x, y, z)."
+                },
+                {
+                    "id": "prot_struct_ipa_b2",
+                    "placeholder": "??? (the last dimension size)",
+                    "acceptable": ["3"],
+                    "hint": "Points live in 3D space, so the last dimension is 3."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_ipa_attention",
+            "title": "IPA Attention Logit Computation",
+            "difficulty": "hard",
+            "description": "Compute the attention logits in Invariant Point Attention by combining scalar attention, pair bias, and 3D point distance terms.",
+            "info": "The Invariant Point Attention (IPA) mechanism in AlphaFold2 (Jumper et al., Nature 2021) computes attention logits as a sum of three terms: (1) scalar dot-product attention scaled by 1/sqrt(head_dim), (2) a learned bias from the pair representation, and (3) a distance-based term computed from 3D query/key points transformed into the global frame. The point-based term sums the squared distances between all corresponding query and key points, weighted by a learned per-head weight gamma. This three-term formulation allows IPA to reason jointly about sequence features, pairwise evolutionary relationships, and 3D geometry. The structure module applies IPA iteratively to refine backbone frames, with each iteration producing more accurate atom positions. OpenFold (Ahdritz et al., 2022) confirmed that all three attention terms are necessary for optimal performance.",
+            "code": "import torch\nimport torch.nn as nn\nimport math\n\ndef ipa_attention_logits(q_scalar, k_scalar, q_points, k_points,\n                         pair_bias, head_dim, gamma):\n    \"\"\"\n    q_scalar, k_scalar: (L, H, head_dim)\n    q_points, k_points: (L, H, P, 3) - points in global frame\n    pair_bias: (L, L, H)\n    gamma: (H,) learned per-head weights\n    \"\"\"\n    # Term 1: scalar dot-product attention\n    # (L, H, d) x (L, H, d) -> (H, L, L)\n    scalar_attn = torch.einsum('ihd,jhd->hij', q_scalar, k_scalar)\n    scalar_attn = scalar_attn / {{prot_struct_ipa_attn_b1}}\n\n    # Term 2: pair bias (L, L, H) -> (H, L, L)\n    pair_term = pair_bias.permute(2, 0, 1)\n\n    # Term 3: point distance - sum of squared distances\n    # q_points: (L, H, P, 3), k_points: (L, H, P, 3)\n    diff = q_points.unsqueeze(1) - k_points.unsqueeze(0)  # (L, L, H, P, 3)\n    sq_dist = (diff ** 2).sum(dim=(-1, -2))  # (L, L, H)\n    point_term = {{prot_struct_ipa_attn_b2}}\n\n    return scalar_attn + pair_term + point_term\n\nL, H, P, d = 50, 8, 4, 16\nlogits = ipa_attention_logits(\n    torch.randn(L, H, d), torch.randn(L, H, d),\n    torch.randn(L, H, P, 3), torch.randn(L, H, P, 3),\n    torch.randn(L, L, H), d, torch.ones(H)\n)\nprint(logits.shape)  # (8, 50, 50)",
+            "blanks": [
+                {
+                    "id": "prot_struct_ipa_attn_b1",
+                    "placeholder": "math.???(head_dim)",
+                    "acceptable": ["math.sqrt(head_dim)"],
+                    "hint": "Standard scaled attention divides by sqrt(head_dim)."
+                },
+                {
+                    "id": "prot_struct_ipa_attn_b2",
+                    "placeholder": "-gamma.view(1, 1, H) * sq_dist  # then permute to (H, L, L)",
+                    "acceptable": ["(-gamma.view(1, 1, H) * sq_dist).permute(2, 0, 1)"],
+                    "hint": "Weight squared distances by -gamma (negative because closer points should have higher attention) and permute to (H, L, L)."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_backbone_frames",
+            "title": "Backbone Frame Representation",
+            "difficulty": "medium",
+            "description": "Represent protein backbone frames as rotation matrices and translation vectors. Each residue's local frame is defined by its N, C-alpha, and C atoms.",
+            "info": "AlphaFold2 (Jumper et al., Nature 2021) represents each residue's backbone as a rigid body frame consisting of a rotation matrix R in SO(3) and a translation vector t in R^3. The structure module predicts updates to these frames iteratively. The initial frame can be constructed from three backbone atoms: N, C-alpha (CA), and C. The Gram-Schmidt process orthogonalizes two vectors from CA->N and CA->C to form an orthonormal basis. This frame-based representation is central to the SE(3)-equivariance of AlphaFold2's structure module. RoseTTAFold (Baek et al., Science 2021) similarly uses frame-based representations. The AlphaFold2 supplementary materials detail how quaternion representations are used internally for numerical stability during frame updates.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef construct_backbone_frame(n_pos, ca_pos, c_pos):\n    \"\"\"\n    Construct local frame for each residue using Gram-Schmidt.\n    n_pos, ca_pos, c_pos: (L, 3) atom coordinates\n    Returns: rotation (L, 3, 3), translation (L, 3)\n    \"\"\"\n    # Translation is the CA position\n    translation = ca_pos\n\n    # First basis vector: CA -> N direction\n    v1 = {{prot_struct_frame_b1}}\n    e1 = F.normalize(v1, dim=-1)\n\n    # Second vector: CA -> C direction\n    v2 = c_pos - ca_pos\n    # Gram-Schmidt: remove e1 component from v2\n    v2 = v2 - (v2 * e1).sum(dim=-1, keepdim=True) * e1\n    e2 = F.normalize(v2, dim=-1)\n\n    # Third basis vector: cross product\n    e3 = {{prot_struct_frame_b2}}\n\n    # Rotation matrix: columns are basis vectors\n    rotation = torch.stack([e1, e2, e3], dim=-1)  # (L, 3, 3)\n    return rotation, translation\n\nL = 50\nn = torch.randn(L, 3)\nca = torch.randn(L, 3)\nc = torch.randn(L, 3)\nR, t = construct_backbone_frame(n, ca, c)\nprint(f\"R: {R.shape}, t: {t.shape}\")\n# Verify orthogonality: R^T @ R should be identity\nprint(f\"Orthogonal check: {torch.allclose(R[0].T @ R[0], torch.eye(3), atol=1e-5)}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_frame_b1",
+                    "placeholder": "n_pos - ???",
+                    "acceptable": ["n_pos - ca_pos"],
+                    "hint": "The first vector points from C-alpha to the nitrogen atom."
+                },
+                {
+                    "id": "prot_struct_frame_b2",
+                    "placeholder": "torch.???(e1, e2, dim=-1)",
+                    "acceptable": ["torch.cross(e1, e2, dim=-1)", "torch.linalg.cross(e1, e2, dim=-1)"],
+                    "hint": "The third orthonormal basis vector is the cross product of the first two."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_recycling",
+            "title": "Structure Recycling Mechanism",
+            "difficulty": "medium",
+            "description": "Implement AlphaFold2's recycling mechanism that feeds the output of one forward pass back as input to the next iteration. The predicted structure from the previous cycle is used to update the pair representation via a distance-based encoding.",
+            "info": "AlphaFold2 (Jumper et al., Nature 2021) uses a recycling mechanism where the outputs of the Evoformer and structure module are fed back as additional inputs for N_recycle iterations (typically 3). The recycled information includes: (1) the first-row MSA representation, (2) the pair representation, and (3) a distance-based encoding of the predicted structure from the previous iteration. The predicted C-beta distances from the prior cycle are binned and projected to produce a pair representation update. Recycling allows the network to iteratively refine its prediction, with each cycle improving accuracy. OpenFold (Ahdritz et al., 2022) showed that recycling provides approximately 1-2 GDT-TS points of improvement. During training, gradients are only backpropagated through the final recycling iteration to save memory.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass RecyclingEmbedder(nn.Module):\n    def __init__(self, d_msa=256, d_pair=128, num_bins=15):\n        super().__init__()\n        self.msa_norm = nn.LayerNorm(d_msa)\n        self.pair_norm = nn.LayerNorm(d_pair)\n        # Bin predicted distances into num_bins categories\n        self.dist_bins = nn.Linear(num_bins, d_pair)\n        self.register_buffer(\n            'bin_edges',\n            torch.linspace(3.25, 50.75, num_bins + 1)\n        )\n\n    def _dist_to_bins(self, pred_coords):\n        # pred_coords: (L, 3)\n        diff = pred_coords.unsqueeze(0) - pred_coords.unsqueeze(1)  # (L, L, 3)\n        dists = {{prot_struct_recycle_b1}}\n        # One-hot binning\n        one_hot = torch.zeros(dists.shape[0], dists.shape[1], len(self.bin_edges) - 1,\n                              device=dists.device)\n        for i in range(len(self.bin_edges) - 1):\n            mask = (dists >= self.bin_edges[i]) & (dists < self.bin_edges[i + 1])\n            one_hot[:, :, i] = mask.float()\n        return one_hot\n\n    def forward(self, prev_msa, prev_pair, prev_coords):\n        msa_update = {{prot_struct_recycle_b2}}\n        pair_update = self.pair_norm(prev_pair)\n        dist_features = self.dist_bins(self._dist_to_bins(prev_coords))\n        pair_update = pair_update + dist_features\n        return msa_update, pair_update\n\nprev_msa = torch.randn(1, 100, 256)  # first row only\nprev_pair = torch.randn(100, 100, 128)\nprev_coords = torch.randn(100, 3)\nmodel = RecyclingEmbedder()\nmsa_out, pair_out = model(prev_msa, prev_pair, prev_coords)\nprint(f\"MSA: {msa_out.shape}, Pair: {pair_out.shape}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_recycle_b1",
+                    "placeholder": "torch.norm(diff, dim=???)",
+                    "acceptable": ["torch.norm(diff, dim=-1)", "torch.norm(diff, dim=2)"],
+                    "hint": "Compute pairwise Euclidean distances by taking the norm along the coordinate dimension."
+                },
+                {
+                    "id": "prot_struct_recycle_b2",
+                    "placeholder": "self.???(prev_msa)",
+                    "acceptable": ["self.msa_norm(prev_msa)"],
+                    "hint": "Apply layer normalization to the recycled MSA representation."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_template_embed",
+            "title": "Template-Based Feature Embedding",
+            "difficulty": "medium",
+            "description": "Embed template features from homologous structures found via sequence search. Template information includes backbone atom positions and pairwise distances from known structures.",
+            "info": "Template-based prediction uses experimentally solved homologous protein structures to guide structure prediction. AlphaFold2 (Jumper et al., Nature 2021) processes up to 4 templates, extracting pairwise distance and angle features between template residues aligned to the query. These features are embedded through a template embedding network and added to the pair representation. For targets with good templates (sequence identity > 30%), template features can significantly boost accuracy. However, AlphaFold2 also performs remarkably well in template-free mode, achieving GDT-TS > 80 on many CASP14 free-modeling targets where no homologous structures were available. RoseTTAFold (Baek et al., Science 2021) similarly incorporates template information through its three-track architecture. The template embedding in AlphaFold2 uses a small attention-based module to process multiple templates.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass TemplateEmbedding(nn.Module):\n    def __init__(self, d_template=64, d_pair=128, num_dist_bins=39):\n        super().__init__()\n        # Template features: distance bins + unit vector (3) + backbone angles\n        self.dist_embed = {{prot_struct_templ_b1}}\n        self.proj = nn.Linear(d_template, d_pair)\n        self.norm = nn.LayerNorm(d_pair)\n\n    def forward(self, template_dists, template_feats, n_templates):\n        \"\"\"\n        template_dists: (N_templ, L, L, num_dist_bins) one-hot distances\n        template_feats: (N_templ, L, L, d_extra) extra template features\n        \"\"\"\n        dist_emb = self.dist_embed(template_dists)\n        combined = dist_emb + template_feats[..., :dist_emb.shape[-1]]\n        template_pair = self.proj(combined)\n        # Average over templates\n        template_pair = {{prot_struct_templ_b2}}\n        return self.norm(template_pair)\n\nN_templ, L = 4, 80\nmodel = TemplateEmbedding()\ndists = torch.randn(N_templ, L, L, 39)\nfeats = torch.randn(N_templ, L, L, 64)\nout = model(dists, feats, N_templ)\nprint(out.shape)  # (80, 80, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_templ_b1",
+                    "placeholder": "nn.Linear(num_dist_bins, ???)",
+                    "acceptable": ["nn.Linear(num_dist_bins, d_template)", "nn.Linear(39, 64)"],
+                    "hint": "Project binned distances to the template hidden dimension d_template."
+                },
+                {
+                    "id": "prot_struct_templ_b2",
+                    "placeholder": "template_pair.mean(dim=???)",
+                    "acceptable": ["template_pair.mean(dim=0)"],
+                    "hint": "Average the template pair representations over the template dimension (dim=0)."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_msa_column_attn",
+            "title": "MSA Column-Wise Attention",
+            "difficulty": "medium",
+            "description": "Implement column-wise attention over the MSA, where for each residue position, different sequences attend to each other. This captures evolutionary covariation between homologous sequences.",
+            "info": "MSA column-wise attention in AlphaFold2 (Jumper et al., Nature 2021) complements row-wise attention by allowing sequences at the same residue position to attend to each other. While row attention captures intra-sequence relationships, column attention captures inter-sequence evolutionary covariation: if two sequences share a mutation at position i, this pattern can be detected. The Evoformer alternates row and column attention across its 48 blocks. Due to the potentially large number of sequences (up to ~5000 in the MSA), AlphaFold2 uses a global column attention for the first few rows and a cheaper axial attention variant for the rest. ESMFold (Lin et al., Science 2023) notably bypasses MSA processing entirely, using ESM-2 language model embeddings instead, achieving competitive accuracy for single-sequence prediction without requiring MSA search.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport math\n\nclass MSAColumnAttention(nn.Module):\n    def __init__(self, d_msa=256, num_heads=8):\n        super().__init__()\n        self.num_heads = num_heads\n        self.head_dim = d_msa // num_heads\n        self.norm = nn.LayerNorm(d_msa)\n        self.to_qkv = nn.Linear(d_msa, 3 * d_msa)\n        self.out_proj = nn.Linear(d_msa, d_msa)\n\n    def forward(self, msa):\n        # msa: (N_seq, L, d_msa)\n        N, L, d = msa.shape\n        x = self.norm(msa)\n        # Transpose to process columns: (L, N_seq, d_msa)\n        x = {{prot_struct_col_b1}}\n        qkv = self.to_qkv(x).reshape(L, N, 3, self.num_heads, self.head_dim)\n        q, k, v = qkv.unbind(dim=2)\n        q = q.permute(0, 2, 1, 3)  # (L, H, N, head_dim)\n        k = k.permute(0, 2, 1, 3)\n        v = v.permute(0, 2, 1, 3)\n        attn = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)\n        attn = F.softmax(attn, dim=-1)\n        out = torch.matmul(attn, v)  # (L, H, N, head_dim)\n        out = out.permute(0, 2, 1, 3).reshape(L, N, d)\n        out = self.out_proj(out)\n        # Transpose back: (N_seq, L, d_msa)\n        return msa + {{prot_struct_col_b2}}\n\nmsa = torch.randn(128, 100, 256)\nmodel = MSAColumnAttention()\nprint(model(msa).shape)  # (128, 100, 256)",
+            "blanks": [
+                {
+                    "id": "prot_struct_col_b1",
+                    "placeholder": "x.transpose(???, ???)",
+                    "acceptable": ["x.transpose(0, 1)", "x.permute(1, 0, 2)"],
+                    "hint": "Swap the sequence and residue dimensions so each position processes across sequences."
+                },
+                {
+                    "id": "prot_struct_col_b2",
+                    "placeholder": "out.???(0, 1)",
+                    "acceptable": ["out.transpose(0, 1)"],
+                    "hint": "Transpose back from (L, N, d) to (N, L, d)."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_fape_loss",
+            "title": "Frame Aligned Point Error (FAPE) Loss",
+            "difficulty": "hard",
+            "description": "Implement a simplified FAPE loss, AlphaFold2's primary structural loss function. FAPE measures the error of predicted atom positions after alignment to each residue's local frame.",
+            "info": "The Frame Aligned Point Error (FAPE) is the primary structural loss function in AlphaFold2 (Jumper et al., Nature 2021). Unlike RMSD which uses a single global superposition, FAPE computes the error of all predicted atom positions after transforming them into each residue's local reference frame, then averages over all frames. This makes FAPE sensitive to both global and local structural accuracy. For each frame i, all atom positions are transformed using frame i's rotation and translation, and the L1 distance to similarly-transformed true positions is computed, clamped at 10 Angstroms to reduce sensitivity to outliers. FAPE is differentiable and SE(3)-invariant, making it suitable for end-to-end training. OpenFold (Ahdritz et al., 2022) provides a numerically stable implementation. The loss is computed at both the backbone level (using N, CA, C frames) and all-atom level.",
+            "code": "import torch\n\ndef fape_loss(pred_coords, true_coords, pred_frames_R, pred_frames_t,\n             true_frames_R, true_frames_t, clamp=10.0):\n    \"\"\"\n    pred_coords, true_coords: (L, 3) atom positions\n    pred_frames_R: (L, 3, 3) rotation matrices\n    pred_frames_t: (L, 3) translations\n    true_frames_R, true_frames_t: same for ground truth\n    \"\"\"\n    L = pred_coords.shape[0]\n    total_loss = 0.0\n\n    for i in range(L):\n        # Transform all atoms into frame i's local coordinate system\n        # x_local = R_i^T @ (x - t_i)\n        pred_local = torch.matmul(\n            pred_frames_R[i].T,\n            (pred_coords - pred_frames_t[i]).T\n        ).T  # (L, 3)\n        true_local = torch.matmul(\n            true_frames_R[i].T,\n            (true_coords - true_frames_t[i]).T\n        ).T  # (L, 3)\n\n        # Per-atom error in this frame\n        error = {{prot_struct_fape_b1}}\n        # Clamp to reduce outlier influence\n        error = {{prot_struct_fape_b2}}\n        total_loss += error.mean()\n\n    return total_loss / L\n\n# Minimal test\nL = 20\npred_c = torch.randn(L, 3)\ntrue_c = pred_c + 0.1 * torch.randn(L, 3)\nR = torch.eye(3).unsqueeze(0).expand(L, -1, -1)\nt = torch.randn(L, 3)\nloss = fape_loss(pred_c, true_c, R, t, R, t)\nprint(f\"FAPE loss: {loss:.4f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_fape_b1",
+                    "placeholder": "torch.norm(pred_local - ???, dim=-1)",
+                    "acceptable": ["torch.norm(pred_local - true_local, dim=-1)"],
+                    "hint": "Compute L2 distance between predicted and true positions in the local frame."
+                },
+                {
+                    "id": "prot_struct_fape_b2",
+                    "placeholder": "torch.???(error, max=clamp)",
+                    "acceptable": ["torch.clamp(error, max=clamp)", "torch.clip(error, max=clamp)"],
+                    "hint": "Clamp errors at the maximum value (10 Angstroms) to reduce sensitivity to outliers."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_residue_distance",
+            "title": "Residue-Residue Distance Matrix",
+            "difficulty": "easy",
+            "description": "Compute the pairwise C-beta distance matrix from predicted 3D coordinates. This is the fundamental representation that distograms approximate as probability distributions.",
+            "info": "Pairwise residue distance matrices are the core geometric representation underlying protein structure prediction. Early deep learning methods like DESTINI (Gao et al., BMC Bioinformatics 2019) and trRosetta (Yang et al., PNAS 2020) predicted inter-residue distance distributions and then used energy minimization to realize 3D structures. AlphaFold1 (Senior et al., Nature 2020) predicted C-beta distance distributions (C-alpha for glycine) as distograms. AlphaFold2 (Jumper et al., Nature 2021) moved to direct coordinate prediction but still uses distogram prediction as an auxiliary loss to train the pair representation. Contact prediction (distance < 8 Angstroms) was the predecessor task, championed by methods like EVcouplings (Marks et al., PLoS ONE 2011) using evolutionary covariance analysis.",
+            "code": "import torch\n\ndef compute_distance_matrix(coords):\n    \"\"\"\n    coords: (L, 3) C-beta coordinates\n    Returns: (L, L) pairwise distance matrix\n    \"\"\"\n    # Compute pairwise differences\n    diff = {{prot_struct_dist_b1}}\n    # Euclidean distances\n    distances = {{prot_struct_dist_b2}}\n    return distances\n\ndef contact_map(distances, threshold=8.0):\n    \"\"\"Binary contact map: 1 if distance < threshold.\"\"\"\n    return (distances < threshold).float()\n\ncoords = torch.randn(80, 3) * 10  # spread out\ndist_mat = compute_distance_matrix(coords)\nprint(f\"Distance matrix: {dist_mat.shape}\")\nprint(f\"Distance range: [{dist_mat.min():.1f}, {dist_mat.max():.1f}]\")\ncmap = contact_map(dist_mat)\nprint(f\"Contact fraction: {cmap.mean():.3f}\")",
+            "blanks": [
+                {
+                    "id": "prot_struct_dist_b1",
+                    "placeholder": "coords.unsqueeze(0) - coords.unsqueeze(???)",
+                    "acceptable": ["coords.unsqueeze(0) - coords.unsqueeze(1)"],
+                    "hint": "Broadcast to create (L, L, 3) pairwise differences: unsqueeze one on dim 0 and the other on dim 1."
+                },
+                {
+                    "id": "prot_struct_dist_b2",
+                    "placeholder": "torch.norm(diff, dim=???)",
+                    "acceptable": ["torch.norm(diff, dim=-1)", "torch.norm(diff, dim=2)"],
+                    "hint": "Take the L2 norm along the last (coordinate) dimension."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_triangular_attn",
+            "title": "Triangular Self-Attention (Starting Node)",
+            "difficulty": "hard",
+            "description": "Implement triangular self-attention around the starting node. For pair (i,j), attention is computed over all pairs (i,k) for varying k, with the pair representation providing bias.",
+            "info": "Triangular self-attention is one of two attention-based operations (along with triangular multiplicative update) in AlphaFold2's Evoformer (Jumper et al., Nature 2021) that enforce geometric consistency in the pair representation. In the 'starting node' variant, for each starting residue i, attention is computed over the row pair[i, :, :], allowing pair (i,j) to attend to pair (i,k) for all k. The attention logits receive an additive bias from pair[j,k,:], encoding whether the endpoints j and k are related. This is complemented by 'ending node' triangular attention where pair (i,j) attends to pairs (k,j). Together, these operations ensure that distance predictions satisfy approximate triangle inequality constraints. The AlphaFold2 Evoformer applies both triangular attention variants and both multiplicative update variants in each of its 48 blocks.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport math\n\nclass TriangleAttentionStarting(nn.Module):\n    def __init__(self, d_pair=128, num_heads=4):\n        super().__init__()\n        self.num_heads = num_heads\n        self.head_dim = d_pair // num_heads\n        self.norm = nn.LayerNorm(d_pair)\n        self.to_qkv = nn.Linear(d_pair, 3 * d_pair)\n        self.bias_proj = nn.Linear(d_pair, num_heads)\n        self.out_proj = nn.Linear(d_pair, d_pair)\n\n    def forward(self, pair):\n        # pair: (L, L, d_pair)\n        L, _, d = pair.shape\n        H = self.num_heads\n        x = self.norm(pair)\n        qkv = self.to_qkv(x).reshape(L, L, 3, H, self.head_dim)\n        q, k, v = qkv.unbind(dim=2)\n        # For starting node: attention along dim 1 (j->k) for each i\n        # q: (L, L, H, hd) -> (L, H, L, hd) where first L is i (batch)\n        q = q.permute(0, 2, 1, 3)\n        k = {{prot_struct_tri_attn_b1}}\n        v = v.permute(0, 2, 1, 3)\n        attn = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)\n        # Bias from pair[j, k] -> (L_j, L_k, H) -> broadcast for each i\n        bias = self.bias_proj(x).permute(2, 0, 1)  # (H, L, L)\n        attn = attn + {{prot_struct_tri_attn_b2}}\n        attn = F.softmax(attn, dim=-1)\n        out = torch.matmul(attn, v)  # (L, H, L, hd)\n        out = out.permute(0, 2, 1, 3).reshape(L, L, d)\n        return pair + self.out_proj(out)\n\npair = torch.randn(40, 40, 128)\nmodel = TriangleAttentionStarting()\nprint(model(pair).shape)  # (40, 40, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_tri_attn_b1",
+                    "placeholder": "k.permute(0, 2, 1, ???)",
+                    "acceptable": ["k.permute(0, 2, 1, 3)"],
+                    "hint": "Rearrange k from (L, L, H, hd) to (L, H, L, hd), same as q."
+                },
+                {
+                    "id": "prot_struct_tri_attn_b2",
+                    "placeholder": "bias.unsqueeze(???)",
+                    "acceptable": ["bias.unsqueeze(0)"],
+                    "hint": "Unsqueeze the bias at dim 0 to broadcast over the starting node (i) dimension."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_esm_embed",
+            "title": "ESMFold Single-Sequence Embedding",
+            "difficulty": "medium",
+            "description": "Implement a simplified protein language model embedding pipeline inspired by ESMFold. A transformer-based language model produces per-residue embeddings that replace MSA features.",
+            "info": "ESMFold (Lin et al., Science 2023) demonstrated that protein language models can replace explicit MSA search for structure prediction. It uses ESM-2, a 15-billion parameter transformer trained on 65 million protein sequences with masked language modeling, to produce per-residue embeddings. These embeddings are then processed by a folding trunk similar to AlphaFold2's Evoformer and structure module. ESMFold achieves competitive accuracy with AlphaFold2 on many targets while being ~60x faster since it avoids the costly MSA database search step. The key insight is that protein language models implicitly learn evolutionary information during pretraining. OmegaFold (Wu et al., 2022) independently showed similar results. ESMFold is particularly effective for orphan proteins with limited homologs in sequence databases.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SimplePLMEmbedding(nn.Module):\n    \"\"\"Simplified protein language model embedding.\"\"\"\n    def __init__(self, vocab_size=33, d_model=1280, nhead=20, num_layers=6):\n        super().__init__()\n        self.embed = nn.Embedding(vocab_size, d_model)\n        self.pos_embed = nn.Embedding(1024, d_model)  # max length 1024\n        encoder_layer = nn.TransformerEncoderLayer(\n            d_model=d_model, nhead=nhead, dim_feedforward=4*d_model,\n            batch_first=True\n        )\n        self.encoder = {{prot_struct_esm_b1}}\n        # Project to structure prediction dimensions\n        self.to_single = nn.Linear(d_model, 384)\n\n    def forward(self, tokens):\n        # tokens: (B, L) amino acid token indices\n        B, L = tokens.shape\n        positions = {{prot_struct_esm_b2}}\n        x = self.embed(tokens) + self.pos_embed(positions)\n        x = self.encoder(x)  # (B, L, d_model)\n        single = self.to_single(x)  # (B, L, 384)\n        return single\n\ntokens = torch.randint(0, 33, (2, 100))\nmodel = SimplePLMEmbedding(d_model=256, nhead=8, num_layers=2)\nprint(model(tokens).shape)  # (2, 100, 384)",
+            "blanks": [
+                {
+                    "id": "prot_struct_esm_b1",
+                    "placeholder": "nn.TransformerEncoder(encoder_layer, num_layers=???)",
+                    "acceptable": ["nn.TransformerEncoder(encoder_layer, num_layers=num_layers)", "nn.TransformerEncoder(encoder_layer, num_layers=6)"],
+                    "hint": "Stack the encoder layers using nn.TransformerEncoder with the specified number of layers."
+                },
+                {
+                    "id": "prot_struct_esm_b2",
+                    "placeholder": "torch.arange(L, device=tokens.???).unsqueeze(0)",
+                    "acceptable": ["torch.arange(L, device=tokens.device).unsqueeze(0)"],
+                    "hint": "Create position indices 0..L-1 on the same device as the input tokens."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_structure_module",
+            "title": "Structure Module Frame Update",
+            "difficulty": "hard",
+            "description": "Implement a simplified frame update step from AlphaFold2's structure module. The single representation is processed through IPA, and then a small network predicts rotation and translation updates for each residue frame.",
+            "info": "AlphaFold2's structure module (Jumper et al., Nature 2021) iteratively refines backbone frames through 8 layers, each consisting of Invariant Point Attention (IPA), a transition block, and a frame update. The frame update predicts a quaternion rotation update and translation update for each residue from its single representation. These updates are composed with the current frame to produce the updated frame. The structure module initializes all frames to identity (all residues at the origin) and progressively moves them to their predicted 3D positions. This iterative refinement was inspired by earlier work on iterative pose refinement in computer vision. The final layer additionally predicts side-chain torsion angles. RoseTTAFold (Baek et al., Science 2021) uses a similar iterative structure refinement approach in its SE(3)-transformer track.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass FrameUpdate(nn.Module):\n    def __init__(self, d_single=384):\n        super().__init__()\n        self.transition = nn.Sequential(\n            nn.LayerNorm(d_single),\n            nn.Linear(d_single, d_single),\n            nn.ReLU(),\n            nn.Linear(d_single, d_single),\n            nn.ReLU(),\n            nn.Linear(d_single, d_single)\n        )\n        # Predict 6 values: 3 for rotation (axis-angle), 3 for translation\n        self.frame_update = nn.Linear(d_single, {{prot_struct_struct_b1}})\n\n    def forward(self, single, current_t):\n        \"\"\"\n        single: (L, d_single)\n        current_t: (L, 3) current translations\n        Returns updated translations. (Rotation update simplified.)\n        \"\"\"\n        s = self.transition(single) + single  # residual\n        updates = self.frame_update(s)  # (L, 6)\n        # Split into rotation and translation updates\n        rot_update, trans_update = updates[:, :3], {{prot_struct_struct_b2}}\n        # Apply translation update\n        new_t = current_t + trans_update\n        return new_t, s\n\nL = 100\nsingle = torch.randn(L, 384)\ncurrent_t = torch.zeros(L, 3)\nmodel = FrameUpdate()\nnew_t, updated_single = model(single, current_t)\nprint(f\"New translations: {new_t.shape}\")  # (100, 3)",
+            "blanks": [
+                {
+                    "id": "prot_struct_struct_b1",
+                    "placeholder": "??? (total values: rotation + translation)",
+                    "acceptable": ["6"],
+                    "hint": "3 values for rotation (axis-angle) + 3 values for translation = 6 total."
+                },
+                {
+                    "id": "prot_struct_struct_b2",
+                    "placeholder": "updates[:, ???]",
+                    "acceptable": ["updates[:, 3:]", "updates[:, 3:6]"],
+                    "hint": "The translation update is the last 3 values (indices 3 to 6)."
+                }
+            ]
+        },
+        {
+            "id": "prot_struct_outer_product_mean",
+            "title": "Outer Product Mean for MSA-to-Pair Communication",
+            "difficulty": "medium",
+            "description": "Implement the outer product mean operation that converts MSA features into pair representation updates. This is how sequence-level information flows into the pair representation in the Evoformer.",
+            "info": "The outer product mean is a key operation in AlphaFold2's Evoformer (Jumper et al., Nature 2021) that enables information flow from the MSA representation to the pair representation. For each pair of residue positions (i, j), it computes the outer product of their MSA features averaged over all sequences, producing a (d_proj, d_proj) matrix that is flattened and projected to the pair dimension. Specifically, the MSA features at positions i and j are projected to lower dimensions, their outer product is computed, and then averaged over MSA sequences. This operation captures evolutionary covariation: correlated mutations between positions i and j result in structured outer product patterns. The outer product mean is applied after MSA row/column attention in each Evoformer block. OpenFold (Ahdritz et al., 2022) showed that this operation is crucial for converting evolutionary signal into geometric constraints.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass OuterProductMean(nn.Module):\n    def __init__(self, d_msa=256, d_pair=128, d_proj=32):\n        super().__init__()\n        self.norm = nn.LayerNorm(d_msa)\n        self.proj_left = nn.Linear(d_msa, d_proj)\n        self.proj_right = nn.Linear(d_msa, d_proj)\n        self.out_proj = nn.Linear(d_proj * d_proj, d_pair)\n\n    def forward(self, msa):\n        # msa: (N_seq, L, d_msa)\n        N, L, _ = msa.shape\n        x = self.norm(msa)\n        left = self.proj_left(x)   # (N, L, d_proj)\n        right = self.proj_right(x) # (N, L, d_proj)\n        # Outer product: for each sequence, compute (L, L, d_proj, d_proj)\n        # left[:, :, None, :, None] * right[:, None, :, None, :]\n        outer = torch.einsum('nia,njb->nijab', left, right)  # (N, L, L, d_proj, d_proj)\n        # Mean over sequences\n        outer = {{prot_struct_opm_b1}}\n        # Flatten last two dims and project\n        outer = outer.reshape(L, L, -1)\n        return {{prot_struct_opm_b2}}\n\nmsa = torch.randn(64, 80, 256)\nmodel = OuterProductMean()\nprint(model(msa).shape)  # (80, 80, 128)",
+            "blanks": [
+                {
+                    "id": "prot_struct_opm_b1",
+                    "placeholder": "outer.mean(dim=???)",
+                    "acceptable": ["outer.mean(dim=0)"],
+                    "hint": "Average the outer products over the MSA sequence dimension (dim=0)."
+                },
+                {
+                    "id": "prot_struct_opm_b2",
+                    "placeholder": "self.???(outer)",
+                    "acceptable": ["self.out_proj(outer)"],
+                    "hint": "Project the flattened outer product to the pair representation dimension using the output projection."
+                }
+            ]
+        }
+    ]
+}

@@ -6,12 +6,19 @@
             "title": "Dot Product",
             "difficulty": "easy",
             "description": "Implement a dot product between two vectors using NumPy.",
+            "info": "The dot product is a fundamental operation in linear algebra that computes the sum of element-wise products of two vectors, yielding a scalar. In machine learning, dot products measure similarity between vectors and form the basis of operations like computing neuron activations (w . x + b). Geometrically, the dot product equals |a||b|cos(theta), connecting algebraic computation to the angle between vectors. It is also the core building block of matrix multiplication, which underpins nearly every neural network layer.",
             "code": "import numpy as np\n\ndef dot_product(a, b):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "np.???",
-                    "acceptable": ["np.dot(a, b)", "np.dot(a,b)", "a @ b", "np.sum(a * b)", "np.sum(a*b)"],
+                    "acceptable": [
+                        "np.dot(a, b)",
+                        "np.dot(a,b)",
+                        "a @ b",
+                        "np.sum(a * b)",
+                        "np.sum(a*b)"
+                    ],
                     "hint": "NumPy has a function for dot products, or you can use the @ operator."
                 }
             ]
@@ -21,12 +28,19 @@
             "title": "Matrix Multiplication",
             "difficulty": "easy",
             "description": "Multiply two matrices using NumPy.",
+            "info": "Matrix multiplication is the workhorse of deep learning, used to compute forward passes through linear layers, apply transformations, and batch process data. For matrices A (m x n) and B (n x p), the result C = AB has shape (m x p), where each entry C_ij is the dot product of row i of A with column j of B. Understanding matrix multiplication shapes is essential for debugging dimension mismatches in neural networks. The computational cost is O(mnp), which motivates GPU parallelism and efficient implementations like BLAS routines.",
             "code": "import numpy as np\n\ndef matmul(A, B):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "np.???",
-                    "acceptable": ["np.matmul(A, B)", "np.matmul(A,B)", "A @ B", "np.dot(A, B)", "np.dot(A,B)"],
+                    "acceptable": [
+                        "np.matmul(A, B)",
+                        "np.matmul(A,B)",
+                        "A @ B",
+                        "np.dot(A, B)",
+                        "np.dot(A,B)"
+                    ],
                     "hint": "Use np.matmul(), np.dot(), or the @ operator."
                 }
             ]
@@ -36,12 +50,17 @@
             "title": "Matrix Transpose",
             "difficulty": "easy",
             "description": "Transpose a matrix using NumPy.",
+            "info": "The transpose operation flips a matrix over its diagonal, converting rows into columns and vice versa. In neural networks, transposing weight matrices is essential during backpropagation: if the forward pass computes y = xW, the gradient with respect to x requires multiplying by W^T. The transpose also appears in computing Gram matrices (X^T X) for least squares, covariance matrices, and attention mechanisms. For a matrix of shape (m, n), its transpose has shape (n, m).",
             "code": "import numpy as np\n\ndef transpose(X):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "X.???",
-                    "acceptable": ["X.T", "np.transpose(X)", "X.transpose()"],
+                    "acceptable": [
+                        "X.T",
+                        "np.transpose(X)",
+                        "X.transpose()"
+                    ],
                     "hint": "Use the .T attribute or np.transpose()."
                 }
             ]

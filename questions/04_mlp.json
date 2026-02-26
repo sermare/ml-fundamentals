@@ -6,24 +6,32 @@
             "title": "2-Layer MLP in PyTorch",
             "difficulty": "medium",
             "description": "Define a 2-layer MLP with ReLU activation using PyTorch. Input dim=784, hidden dim=128, output dim=10.",
+            "info": "A Multi-Layer Perceptron (MLP) is the foundational feedforward neural network architecture, consisting of fully connected layers with non-linear activations. This 2-layer MLP maps 784-dimensional inputs (flattened 28x28 images) through a 128-unit hidden layer to 10 output classes, a classic architecture for MNIST digit classification. The ReLU activation between layers introduces the non-linearity that allows the network to learn complex decision boundaries. Without the activation function, stacking linear layers would collapse into a single linear transformation.",
             "code": "import torch\nimport torch.nn as nn\n\nclass TwoLayerMLP(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = {{b1}}\n        self.fc2 = {{b2}}\n\n    def forward(self, x):\n        x = {{b3}}\n        x = self.fc2(x)\n        return x",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "nn.???(?, ?)",
-                    "acceptable": ["nn.Linear(784, 128)"],
+                    "acceptable": [
+                        "nn.Linear(784, 128)"
+                    ],
                     "hint": "First layer maps input (784) to hidden (128)."
                 },
                 {
                     "id": "b2",
                     "placeholder": "nn.???(?, ?)",
-                    "acceptable": ["nn.Linear(128, 10)"],
+                    "acceptable": [
+                        "nn.Linear(128, 10)"
+                    ],
                     "hint": "Second layer maps hidden (128) to output (10)."
                 },
                 {
                     "id": "b3",
                     "placeholder": "???(self.fc1(x))",
-                    "acceptable": ["torch.relu(self.fc1(x))", "F.relu(self.fc1(x))"],
+                    "acceptable": [
+                        "torch.relu(self.fc1(x))",
+                        "F.relu(self.fc1(x))"
+                    ],
                     "hint": "Apply ReLU activation after the first linear layer."
                 }
             ]
@@ -33,24 +41,34 @@
             "title": "MLP Forward Pass (NumPy)",
             "difficulty": "medium",
             "description": "Implement a forward pass through a 2-layer MLP using NumPy. Weights W1, W2 and biases b1, b2 are given.",
+            "info": "Understanding the forward pass at the NumPy level reveals the core mechanics of neural network computation: repeated application of linear transformations (z = xW + b) followed by non-linear activations (a = relu(z)). Each layer transforms the representation, progressively extracting higher-level features from the input. This explicit implementation clarifies what frameworks like PyTorch do behind the scenes and is essential for understanding backpropagation. The shapes must be compatible: if x is (N, D_in), W1 must be (D_in, D_hidden), producing z1 of shape (N, D_hidden).",
             "code": "import numpy as np\n\ndef forward(x, W1, b1, W2, b2):\n    z1 = {{b1}}\n    a1 = {{b2}}\n    z2 = {{b3}}\n    return z2",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "x @ ??? + ???",
-                    "acceptable": ["x @ W1 + b1", "np.dot(x, W1) + b1"],
+                    "acceptable": [
+                        "x @ W1 + b1",
+                        "np.dot(x, W1) + b1"
+                    ],
                     "hint": "Linear transformation: x @ W1 + b1."
                 },
                 {
                     "id": "b2",
                     "placeholder": "np.???(z1)",
-                    "acceptable": ["np.maximum(0, z1)", "np.maximum(z1, 0)"],
+                    "acceptable": [
+                        "np.maximum(0, z1)",
+                        "np.maximum(z1, 0)"
+                    ],
                     "hint": "Apply ReLU activation."
                 },
                 {
                     "id": "b3",
                     "placeholder": "a1 @ ??? + ???",
-                    "acceptable": ["a1 @ W2 + b2", "np.dot(a1, W2) + b2"],
+                    "acceptable": [
+                        "a1 @ W2 + b2",
+                        "np.dot(a1, W2) + b2"
+                    ],
                     "hint": "Second linear transformation: a1 @ W2 + b2."
                 }
             ]
@@ -60,30 +78,40 @@
             "title": "3-Layer MLP with Dropout",
             "difficulty": "hard",
             "description": "Define a 3-layer MLP in PyTorch with ReLU activations and 50% dropout between layers. Dims: 256 -> 128 -> 64 -> 10.",
+            "info": "Adding depth to an MLP increases its representational capacity, allowing it to learn more abstract hierarchical features. This 3-layer architecture (256->128->64->10) progressively compresses the representation while dropout prevents co-adaptation of neurons and reduces overfitting. Dropout is applied after activation but not on the output layer, since the output logits should be deterministic. The absence of an activation function on the final layer means the model outputs raw logits, which are typically passed to softmax for classification or used directly with cross-entropy loss.",
             "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass ThreeLayerMLP(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.fc1 = nn.Linear(256, 128)\n        self.fc2 = {{b1}}\n        self.fc3 = {{b2}}\n        self.dropout = {{b3}}\n\n    def forward(self, x):\n        x = self.dropout(F.relu(self.fc1(x)))\n        x = self.dropout(F.relu(self.fc2(x)))\n        x = {{b4}}\n        return x",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "nn.???(?, ?)",
-                    "acceptable": ["nn.Linear(128, 64)"],
+                    "acceptable": [
+                        "nn.Linear(128, 64)"
+                    ],
                     "hint": "Second layer: 128 -> 64."
                 },
                 {
                     "id": "b2",
                     "placeholder": "nn.???(?, ?)",
-                    "acceptable": ["nn.Linear(64, 10)"],
+                    "acceptable": [
+                        "nn.Linear(64, 10)"
+                    ],
                     "hint": "Output layer: 64 -> 10."
                 },
                 {
                     "id": "b3",
                     "placeholder": "nn.???(???)",
-                    "acceptable": ["nn.Dropout(0.5)", "nn.Dropout(p=0.5)"],
+                    "acceptable": [
+                        "nn.Dropout(0.5)",
+                        "nn.Dropout(p=0.5)"
+                    ],
                     "hint": "50% dropout."
                 },
                 {
                     "id": "b4",
                     "placeholder": "self.???(x)",
-                    "acceptable": ["self.fc3(x)"],
+                    "acceptable": [
+                        "self.fc3(x)"
+                    ],
                     "hint": "No activation on the output layer (raw logits)."
                 }
             ]

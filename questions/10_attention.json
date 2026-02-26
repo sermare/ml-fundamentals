@@ -6,24 +6,32 @@
             "title": "Scaled Dot-Product Attention",
             "difficulty": "hard",
             "description": "Implement scaled dot-product attention: Attention(Q, K, V) = softmax(Q @ K^T / sqrt(d_k)) @ V.",
+            "info": "Scaled dot-product attention is the core mechanism of the Transformer architecture that revolutionized NLP and beyond. It computes a weighted sum of values (V) where the weights are determined by the compatibility of queries (Q) with keys (K), measured by their dot product. The scaling factor 1/sqrt(d_k) prevents the dot products from growing too large in magnitude, which would push softmax into regions with extremely small gradients. This mechanism allows the model to dynamically focus on different parts of the input for each output position, providing a powerful alternative to fixed-window or recurrent approaches.",
             "code": "import numpy as np\n\ndef softmax(x, axis=-1):\n    e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))\n    return e_x / np.sum(e_x, axis=axis, keepdims=True)\n\ndef scaled_dot_product_attention(Q, K, V):\n    d_k = Q.shape[-1]\n    scores = {{b1}}\n    weights = {{b2}}\n    return {{b3}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "Q @ ??? / np.sqrt(???)",
-                    "acceptable": ["Q @ K.T / np.sqrt(d_k)"],
+                    "acceptable": [
+                        "Q @ K.T / np.sqrt(d_k)"
+                    ],
                     "hint": "Scores = Q @ K^T / sqrt(d_k)."
                 },
                 {
                     "id": "b2",
                     "placeholder": "softmax(???)",
-                    "acceptable": ["softmax(scores)", "softmax(scores, axis=-1)"],
+                    "acceptable": [
+                        "softmax(scores)",
+                        "softmax(scores, axis=-1)"
+                    ],
                     "hint": "Apply softmax to the scores."
                 },
                 {
                     "id": "b3",
                     "placeholder": "??? @ V",
-                    "acceptable": ["weights @ V"],
+                    "acceptable": [
+                        "weights @ V"
+                    ],
                     "hint": "Multiply attention weights by values."
                 }
             ]
@@ -33,24 +41,33 @@
             "title": "Multi-Head Attention (PyTorch)",
             "difficulty": "hard",
             "description": "Use PyTorch's built-in MultiheadAttention. Model dim=512, 8 attention heads.",
+            "info": "Multi-head attention extends scaled dot-product attention by running multiple attention operations in parallel, each with different learned linear projections. With 8 heads on a 512-dimensional model, each head operates on 64-dimensional queries, keys, and values, allowing different heads to attend to different types of relationships. The residual connection (x + attn_out) and layer normalization are critical components that enable training of deep Transformer stacks by facilitating gradient flow and stabilizing activations. This architecture, introduced in 'Attention Is All You Need' (Vaswani et al., 2017), forms the backbone of GPT, BERT, and virtually all modern large language models.",
             "code": "import torch.nn as nn\n\nclass TransformerBlock(nn.Module):\n    def __init__(self, d_model=512, nhead=8):\n        super().__init__()\n        self.attn = {{b1}}\n        self.norm = {{b2}}\n\n    def forward(self, x):\n        attn_out, _ = self.attn(x, x, x)\n        return self.norm({{b3}})",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "nn.???(?, ?)",
-                    "acceptable": ["nn.MultiheadAttention(d_model, nhead)", "nn.MultiheadAttention(512, 8)"],
+                    "acceptable": [
+                        "nn.MultiheadAttention(d_model, nhead)",
+                        "nn.MultiheadAttention(512, 8)"
+                    ],
                     "hint": "nn.MultiheadAttention(embed_dim, num_heads)."
                 },
                 {
                     "id": "b2",
                     "placeholder": "nn.???(d_model)",
-                    "acceptable": ["nn.LayerNorm(d_model)", "nn.LayerNorm(512)"],
+                    "acceptable": [
+                        "nn.LayerNorm(d_model)",
+                        "nn.LayerNorm(512)"
+                    ],
                     "hint": "Layer normalization over the model dimension."
                 },
                 {
                     "id": "b3",
                     "placeholder": "x + ???",
-                    "acceptable": ["x + attn_out"],
+                    "acceptable": [
+                        "x + attn_out"
+                    ],
                     "hint": "Residual connection: x + attention_output."
                 }
             ]

@@ -1,0 +1,547 @@
+{
+    "topic": "Diffusion Models - Advanced",
+    "questions": [
+        {
+            "id": "diff_adv_reverse_denoise_step",
+            "title": "Single Reverse Denoising Step",
+            "difficulty": "medium",
+            "description": "Implement a single reverse (denoising) step of a DDPM. Given the noisy input x_t, the predicted noise, and the noise schedule parameters, compute x_{t-1}.",
+            "info": "In the reverse process of DDPM (Ho et al. 2020), each denoising step computes x_{t-1} from x_t by removing the predicted noise. The formula is x_{t-1} = (1/sqrt(alpha_t)) * (x_t - (beta_t / sqrt(1 - alpha_bar_t)) * predicted_noise) + sigma_t * z, where z ~ N(0, I). The term beta_t / sqrt(1 - alpha_bar_t) scales the predicted noise to match the noise level at timestep t, and sigma_t controls the stochasticity of the reverse process. This is the core computation that allows iterative refinement from pure noise to a clean sample.",
+            "code": "import torch\n\ndef reverse_step(x_t, predicted_noise, t, alpha, alpha_bar, beta):\n    \"\"\"Single DDPM reverse step: compute x_{t-1} from x_t.\"\"\"\n    alpha_t = alpha[t]\n    alpha_bar_t = alpha_bar[t]\n    beta_t = beta[t]\n    \n    # Compute the mean of p(x_{t-1} | x_t)\n    coeff1 = {{diff_adv_rs_b1}}\n    coeff2 = beta_t / {{diff_adv_rs_b2}}\n    mean = coeff1 * (x_t - coeff2 * predicted_noise)\n    \n    # Add noise (except at t=0)\n    sigma_t = torch.sqrt(beta_t)\n    z = torch.randn_like(x_t) if t > 0 else torch.zeros_like(x_t)\n    x_prev = {{diff_adv_rs_b3}}\n    return x_prev",
+            "blanks": [
+                {
+                    "id": "diff_adv_rs_b1",
+                    "placeholder": "1.0 / torch.sqrt(???)",
+                    "acceptable": ["1.0 / torch.sqrt(alpha_t)"],
+                    "hint": "The first coefficient is 1 / sqrt(alpha_t), which rescales x_t back toward the data distribution."
+                },
+                {
+                    "id": "diff_adv_rs_b2",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(1.0 - alpha_bar_t)", "torch.sqrt(1 - alpha_bar_t)", "(1.0 - alpha_bar_t).sqrt()", "(1 - alpha_bar_t).sqrt()"],
+                    "hint": "The denominator in the noise coefficient is sqrt(1 - alpha_bar_t), the cumulative noise level."
+                },
+                {
+                    "id": "diff_adv_rs_b3",
+                    "placeholder": "mean + ??? * z",
+                    "acceptable": ["mean + sigma_t * z"],
+                    "hint": "Add scaled Gaussian noise to the computed mean: mean + sigma_t * z."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_unet_time_embed",
+            "title": "U-Net Sinusoidal Time Embedding",
+            "difficulty": "medium",
+            "description": "Implement the sinusoidal positional encoding used for timestep embedding in diffusion U-Nets, similar to transformer positional encodings.",
+            "info": "Diffusion models condition the denoising network on the current timestep t. Following the approach in DDPM (Ho et al. 2020), the timestep is encoded using sinusoidal embeddings (borrowed from the Transformer architecture). For a given timestep t and embedding dimension d, the embedding uses sin(t * freq) for the first half and cos(t * freq) for the second half, where freq = exp(-log(10000) * i / (d/2)) for position i. This provides a smooth, continuous representation of time that helps the network distinguish different noise levels.",
+            "code": "import torch\nimport math\n\ndef sinusoidal_time_embedding(t, dim):\n    \"\"\"Create sinusoidal time embeddings.\n    Args:\n        t: tensor of timesteps, shape (batch_size,)\n        dim: embedding dimension (must be even)\n    Returns:\n        embeddings of shape (batch_size, dim)\n    \"\"\"\n    half_dim = dim // 2\n    freqs = torch.exp(\n        {{diff_adv_te_b1}} * torch.arange(half_dim, device=t.device) / half_dim\n    )\n    args = t[:, None] * freqs[None, :]\n    embedding = torch.cat([{{diff_adv_te_b2}}], dim=-1)\n    return embedding",
+            "blanks": [
+                {
+                    "id": "diff_adv_te_b1",
+                    "placeholder": "-math.log(???) * ???",
+                    "acceptable": ["-math.log(10000.0)", "-math.log(10000)"],
+                    "hint": "The frequency base uses -log(10000) as the scaling factor, following the original Transformer encoding."
+                },
+                {
+                    "id": "diff_adv_te_b2",
+                    "placeholder": "torch.sin(???), torch.cos(???)",
+                    "acceptable": ["torch.sin(args), torch.cos(args)", "args.sin(), args.cos()"],
+                    "hint": "Concatenate sin and cos of the arguments to form the full embedding of size dim."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_unet_resblock",
+            "title": "U-Net Residual Block with Time Conditioning",
+            "difficulty": "hard",
+            "description": "Implement a residual block for a diffusion U-Net that incorporates the timestep embedding via addition after a projection layer.",
+            "info": "The U-Net architecture in DDPM uses residual blocks conditioned on the timestep. The time embedding is projected to match the feature channel dimension and then added to the hidden features between two convolution layers. This additive conditioning allows the network to modulate its behavior based on the noise level at each timestep. The architecture typically follows: Conv -> GroupNorm -> SiLU -> (add time embedding) -> Conv -> GroupNorm -> SiLU -> residual connection. GroupNorm is preferred over BatchNorm in diffusion models for stability.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass ResidualBlock(nn.Module):\n    def __init__(self, in_ch, out_ch, time_emb_dim):\n        super().__init__()\n        self.conv1 = nn.Conv2d(in_ch, out_ch, 3, padding=1)\n        self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1)\n        self.norm1 = nn.GroupNorm(8, out_ch)\n        self.norm2 = nn.GroupNorm(8, out_ch)\n        self.act = nn.SiLU()\n        self.time_mlp = nn.Linear(time_emb_dim, out_ch)\n        self.residual_conv = nn.Conv2d(in_ch, out_ch, 1) if in_ch != out_ch else nn.Identity()\n\n    def forward(self, x, t_emb):\n        h = self.act(self.norm1(self.conv1(x)))\n        # Project time embedding and add to features\n        t_proj = {{diff_adv_rb_b1}}\n        h = h + t_proj[:, :, {{diff_adv_rb_b2}}]\n        h = self.act(self.norm2(self.conv2(h)))\n        return h + {{diff_adv_rb_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_rb_b1",
+                    "placeholder": "self.act(self.???(t_emb))",
+                    "acceptable": ["self.act(self.time_mlp(t_emb))", "self.time_mlp(t_emb)"],
+                    "hint": "Project the time embedding through the linear layer (optionally with activation) to match channel dimension."
+                },
+                {
+                    "id": "diff_adv_rb_b2",
+                    "placeholder": "None, ???",
+                    "acceptable": ["None, None"],
+                    "hint": "Unsqueeze the time projection to broadcast over spatial dimensions: [:, :, None, None] for (B, C, 1, 1)."
+                },
+                {
+                    "id": "diff_adv_rb_b3",
+                    "placeholder": "self.???(x)",
+                    "acceptable": ["self.residual_conv(x)"],
+                    "hint": "Apply the residual connection, using a 1x1 conv if channel dimensions differ."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_ddpm_forward_process",
+            "title": "DDPM Forward Process (q-sample)",
+            "difficulty": "easy",
+            "description": "Implement the forward diffusion process that adds noise to clean data x_0 to get x_t in a single step using the reparameterization trick.",
+            "info": "The forward process in DDPM (Ho et al. 2020) is defined as q(x_t | x_0) = N(x_t; sqrt(alpha_bar_t) * x_0, (1 - alpha_bar_t) * I). Thanks to the reparameterization trick, we can sample x_t directly as x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * epsilon, where epsilon ~ N(0, I). This closed-form expression avoids sequential noising steps during training, making it efficient to jump to any arbitrary timestep t. The alpha_bar_t is the cumulative product of (1 - beta_t) values.",
+            "code": "import torch\n\ndef q_sample(x_0, t, alpha_bar, noise=None):\n    \"\"\"Forward diffusion: sample x_t from x_0.\n    Args:\n        x_0: clean data, shape (B, C, H, W)\n        t: timesteps, shape (B,)\n        alpha_bar: cumulative product schedule\n        noise: optional pre-sampled noise\n    \"\"\"\n    if noise is None:\n        noise = torch.randn_like(x_0)\n    \n    sqrt_alpha_bar = {{diff_adv_fp_b1}}\n    sqrt_one_minus_alpha_bar = {{diff_adv_fp_b2}}\n    \n    # Reshape for broadcasting over (C, H, W)\n    sqrt_alpha_bar = sqrt_alpha_bar[:, None, None, None]\n    sqrt_one_minus_alpha_bar = sqrt_one_minus_alpha_bar[:, None, None, None]\n    \n    return {{diff_adv_fp_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_fp_b1",
+                    "placeholder": "torch.sqrt(???[t])",
+                    "acceptable": ["torch.sqrt(alpha_bar[t])", "alpha_bar[t].sqrt()"],
+                    "hint": "Extract sqrt(alpha_bar) at the given timesteps t."
+                },
+                {
+                    "id": "diff_adv_fp_b2",
+                    "placeholder": "torch.sqrt(1.0 - ???[t])",
+                    "acceptable": ["torch.sqrt(1.0 - alpha_bar[t])", "torch.sqrt(1 - alpha_bar[t])", "(1.0 - alpha_bar[t]).sqrt()", "(1 - alpha_bar[t]).sqrt()"],
+                    "hint": "Compute sqrt(1 - alpha_bar_t) for the noise scaling coefficient."
+                },
+                {
+                    "id": "diff_adv_fp_b3",
+                    "placeholder": "??? * x_0 + ??? * noise",
+                    "acceptable": ["sqrt_alpha_bar * x_0 + sqrt_one_minus_alpha_bar * noise"],
+                    "hint": "Reparameterization: x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_ddpm_training_loss",
+            "title": "DDPM Training Loss (Noise Prediction)",
+            "difficulty": "easy",
+            "description": "Implement the simplified DDPM training loss: sample a random timestep, noise the data, predict the noise with the model, and compute MSE loss.",
+            "info": "The simplified training objective in DDPM (Ho et al. 2020) is L_simple = E_{t, x_0, epsilon}[||epsilon - epsilon_theta(x_t, t)||^2]. During each training step: (1) sample a random timestep t, (2) sample noise epsilon ~ N(0, I), (3) create noisy x_t via the forward process, (4) predict the noise with the model, and (5) compute MSE between true and predicted noise. This simplified loss drops the weighting term from the variational lower bound but works better empirically. The model learns to predict the noise component at each timestep.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef ddpm_training_step(model, x_0, alpha_bar, T):\n    \"\"\"One DDPM training step.\n    Args:\n        model: noise prediction network epsilon_theta(x_t, t)\n        x_0: clean data batch, shape (B, C, H, W)\n        alpha_bar: cumulative alpha schedule, shape (T,)\n        T: total number of timesteps\n    Returns:\n        loss: scalar MSE loss\n    \"\"\"\n    B = x_0.shape[0]\n    # Sample random timesteps\n    t = {{diff_adv_tl_b1}}\n    # Sample Gaussian noise\n    noise = torch.randn_like(x_0)\n    # Create noisy samples\n    x_t = q_sample(x_0, t, alpha_bar, noise)\n    # Predict the noise\n    predicted_noise = {{diff_adv_tl_b2}}\n    # Compute simplified loss\n    loss = {{diff_adv_tl_b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "diff_adv_tl_b1",
+                    "placeholder": "torch.randint(?, ?, (B,))",
+                    "acceptable": ["torch.randint(0, T, (B,), device=x_0.device)", "torch.randint(0, T, (B,))"],
+                    "hint": "Sample random integers from 0 to T-1 for each element in the batch."
+                },
+                {
+                    "id": "diff_adv_tl_b2",
+                    "placeholder": "model(???, ???)",
+                    "acceptable": ["model(x_t, t)"],
+                    "hint": "The model takes the noisy input x_t and the timestep t to predict the noise."
+                },
+                {
+                    "id": "diff_adv_tl_b3",
+                    "placeholder": "F.mse_loss(???, ???)",
+                    "acceptable": ["F.mse_loss(predicted_noise, noise)", "F.mse_loss(noise, predicted_noise)"],
+                    "hint": "MSE between the true noise epsilon and the predicted noise epsilon_theta."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_ddpm_sampling_loop",
+            "title": "DDPM Full Sampling Loop",
+            "difficulty": "medium",
+            "description": "Implement the full DDPM sampling loop that iteratively denoises from pure Gaussian noise x_T to a clean sample x_0.",
+            "info": "DDPM sampling (Ho et al. 2020) starts from x_T ~ N(0, I) and iteratively applies the learned reverse process for t = T-1, T-2, ..., 0. At each step, the model predicts the noise in x_t, then computes x_{t-1} using the reverse process formula. The loop must iterate backwards through all T timesteps, which makes DDPM sampling slow compared to methods like DDIM. The use of torch.no_grad() is essential during sampling since we only need forward passes. Each step removes a small amount of noise, gradually revealing the generated sample.",
+            "code": "import torch\n\n@torch.no_grad()\ndef ddpm_sample(model, shape, T, alpha, alpha_bar, beta, device):\n    \"\"\"Generate samples using DDPM reverse process.\n    Args:\n        model: trained noise prediction network\n        shape: shape of samples to generate (B, C, H, W)\n        T: number of diffusion timesteps\n    Returns:\n        x_0: generated samples\n    \"\"\"\n    # Start from pure noise\n    x = {{diff_adv_sl_b1}}\n    \n    for t_val in {{diff_adv_sl_b2}}:\n        t_batch = torch.full((shape[0],), t_val, device=device, dtype=torch.long)\n        predicted_noise = model(x, t_batch)\n        x = reverse_step(x, predicted_noise, t_val, alpha, alpha_bar, beta)\n    \n    return {{diff_adv_sl_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_sl_b1",
+                    "placeholder": "torch.randn(???, device=???)",
+                    "acceptable": ["torch.randn(shape, device=device)"],
+                    "hint": "Initialize x_T as pure Gaussian noise with the given shape on the specified device."
+                },
+                {
+                    "id": "diff_adv_sl_b2",
+                    "placeholder": "reversed(range(???))",
+                    "acceptable": ["reversed(range(T))", "range(T - 1, -1, -1)", "range(T-1, -1, -1)"],
+                    "hint": "Iterate backwards from t = T-1 down to t = 0."
+                },
+                {
+                    "id": "diff_adv_sl_b3",
+                    "placeholder": "x.clamp(?, ?)",
+                    "acceptable": ["x.clamp(-1, 1)", "x.clamp(-1.0, 1.0)", "x"],
+                    "hint": "Clamp the final output to [-1, 1] for image generation (common practice)."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_ddim_step",
+            "title": "DDIM Deterministic Sampling Step",
+            "difficulty": "hard",
+            "description": "Implement a single DDIM (Denoising Diffusion Implicit Models) sampling step, which enables deterministic generation and faster sampling.",
+            "info": "DDIM (Song et al. 2020) generalizes DDPM by introducing a non-Markovian reverse process. The key formula is: x_{t-1} = sqrt(alpha_bar_{t-1}) * x0_pred + sqrt(1 - alpha_bar_{t-1} - sigma^2) * eps_pred + sigma * noise, where x0_pred = (x_t - sqrt(1 - alpha_bar_t) * eps_pred) / sqrt(alpha_bar_t). When sigma=0, sampling becomes fully deterministic, enabling consistent generation from the same initial noise. DDIM also allows skipping timesteps (e.g., using only 50 out of 1000 steps) for much faster generation without retraining the model.",
+            "code": "import torch\n\ndef ddim_step(x_t, predicted_noise, t, t_prev, alpha_bar, eta=0.0):\n    \"\"\"Single DDIM sampling step.\n    Args:\n        x_t: noisy sample at timestep t\n        predicted_noise: model's noise prediction\n        t, t_prev: current and previous timestep indices\n        alpha_bar: cumulative alpha schedule\n        eta: controls stochasticity (0 = deterministic DDIM)\n    \"\"\"\n    alpha_bar_t = alpha_bar[t]\n    alpha_bar_prev = alpha_bar[t_prev] if t_prev >= 0 else torch.tensor(1.0)\n    \n    # Predict x_0 from x_t and predicted noise\n    x0_pred = {{diff_adv_ddim_b1}}\n    \n    # Compute sigma for stochasticity\n    sigma = eta * torch.sqrt((1 - alpha_bar_prev) / (1 - alpha_bar_t) * (1 - alpha_bar_t / alpha_bar_prev))\n    \n    # Direction pointing to x_t\n    dir_xt = {{diff_adv_ddim_b2}}\n    \n    noise = torch.randn_like(x_t) if eta > 0 else torch.zeros_like(x_t)\n    x_prev = {{diff_adv_ddim_b3}}\n    return x_prev",
+            "blanks": [
+                {
+                    "id": "diff_adv_ddim_b1",
+                    "placeholder": "(x_t - ??? * predicted_noise) / ???",
+                    "acceptable": ["(x_t - torch.sqrt(1 - alpha_bar_t) * predicted_noise) / torch.sqrt(alpha_bar_t)", "(x_t - (1 - alpha_bar_t).sqrt() * predicted_noise) / alpha_bar_t.sqrt()"],
+                    "hint": "Predict x_0: (x_t - sqrt(1 - alpha_bar_t) * eps_pred) / sqrt(alpha_bar_t)."
+                },
+                {
+                    "id": "diff_adv_ddim_b2",
+                    "placeholder": "torch.sqrt(1 - ??? - sigma**2) * ???",
+                    "acceptable": ["torch.sqrt(1 - alpha_bar_prev - sigma**2) * predicted_noise", "torch.sqrt(1 - alpha_bar_prev - sigma ** 2) * predicted_noise"],
+                    "hint": "The direction term is sqrt(1 - alpha_bar_{t-1} - sigma^2) * predicted_noise."
+                },
+                {
+                    "id": "diff_adv_ddim_b3",
+                    "placeholder": "torch.sqrt(???) * x0_pred + dir_xt + sigma * noise",
+                    "acceptable": ["torch.sqrt(alpha_bar_prev) * x0_pred + dir_xt + sigma * noise", "alpha_bar_prev.sqrt() * x0_pred + dir_xt + sigma * noise"],
+                    "hint": "x_{t-1} = sqrt(alpha_bar_{t-1}) * x0_pred + direction + sigma * noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_ddim_skip_steps",
+            "title": "DDIM Subsequence Timestep Schedule",
+            "difficulty": "easy",
+            "description": "Create a subsequence of timesteps for accelerated DDIM sampling, selecting evenly spaced steps from the full schedule.",
+            "info": "One of DDIM's key advantages (Song et al. 2020) is the ability to sample using a subsequence of the original T timesteps. Instead of iterating through all 1000 steps, we can select S evenly spaced timesteps (e.g., S=50) and perform the reverse process only at those steps. This yields a 20x speedup with minimal quality loss. The subsequence is constructed by taking every (T/S)-th timestep from the original schedule. This works because the DDIM formulation directly maps between any two noise levels without requiring intermediate steps.",
+            "code": "import torch\n\ndef make_ddim_schedule(T, num_steps):\n    \"\"\"Create evenly-spaced timestep subsequence for DDIM.\n    Args:\n        T: original number of timesteps (e.g. 1000)\n        num_steps: desired number of sampling steps (e.g. 50)\n    Returns:\n        timesteps: list of timestep indices in descending order\n    \"\"\"\n    step_size = {{diff_adv_ds_b1}}\n    timesteps = {{diff_adv_ds_b2}}\n    return timesteps\n\n# Example: T=1000, num_steps=5 -> [999, 799, 599, 399, 199]",
+            "blanks": [
+                {
+                    "id": "diff_adv_ds_b1",
+                    "placeholder": "T // ???",
+                    "acceptable": ["T // num_steps"],
+                    "hint": "The step size is the total timesteps divided by the desired number of steps."
+                },
+                {
+                    "id": "diff_adv_ds_b2",
+                    "placeholder": "list(range(T - 1, ???, ???))",
+                    "acceptable": ["list(range(T - 1, -1, -step_size))", "list(range(T - 1, 0, -step_size))", "list(range(T-1, -1, -step_size))", "list(range(T-1, 0, -step_size))"],
+                    "hint": "Generate descending timesteps from T-1 down to 0, skipping by step_size."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_classifier_free_guidance",
+            "title": "Classifier-Free Guidance",
+            "difficulty": "hard",
+            "description": "Implement classifier-free guidance which combines conditional and unconditional noise predictions using a guidance scale.",
+            "info": "Classifier-free guidance (Ho & Salimans, 2022) is the dominant technique for conditional generation in modern diffusion models (Stable Diffusion, DALL-E 2, Imagen). During training, the condition (e.g., text) is randomly dropped with some probability, so the model learns both conditional and unconditional generation. At inference, the guided prediction is: eps_guided = eps_uncond + w * (eps_cond - eps_uncond), where w is the guidance scale. Higher w values (typically 5-15) produce outputs that more strongly match the condition at the cost of diversity. This requires two forward passes per step (or a single batched pass).",
+            "code": "import torch\n\ndef classifier_free_guidance_step(model, x_t, t, cond, guidance_scale):\n    \"\"\"Perform one denoising step with classifier-free guidance.\n    Args:\n        model: noise prediction model that takes (x, t, cond)\n              pass cond=None for unconditional prediction\n        x_t: noisy input\n        t: current timestep\n        cond: conditioning (e.g., text embedding)\n        guidance_scale: w, strength of guidance (w=1 means no guidance)\n    Returns:\n        guided noise prediction\n    \"\"\"\n    # Get conditional and unconditional predictions\n    eps_cond = {{diff_adv_cfg_b1}}\n    eps_uncond = {{diff_adv_cfg_b2}}\n    \n    # Apply guidance formula\n    eps_guided = {{diff_adv_cfg_b3}}\n    return eps_guided",
+            "blanks": [
+                {
+                    "id": "diff_adv_cfg_b1",
+                    "placeholder": "model(x_t, t, ???)",
+                    "acceptable": ["model(x_t, t, cond)"],
+                    "hint": "The conditional prediction passes the actual conditioning signal (e.g., text embedding)."
+                },
+                {
+                    "id": "diff_adv_cfg_b2",
+                    "placeholder": "model(x_t, t, ???)",
+                    "acceptable": ["model(x_t, t, None)"],
+                    "hint": "The unconditional prediction passes None (or a null/empty embedding) as the condition."
+                },
+                {
+                    "id": "diff_adv_cfg_b3",
+                    "placeholder": "eps_uncond + ??? * (eps_cond - eps_uncond)",
+                    "acceptable": ["eps_uncond + guidance_scale * (eps_cond - eps_uncond)"],
+                    "hint": "Guided prediction = unconditional + guidance_scale * (conditional - unconditional)."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_score_function",
+            "title": "Score Function from Noise Prediction",
+            "difficulty": "medium",
+            "description": "Derive the score function (gradient of log probability) from the noise prediction network, connecting score-based and denoising perspectives.",
+            "info": "Score-based generative models (Song & Ermon, 2019) learn the score function: the gradient of the log probability density, nabla_x log p(x). In the DDPM framework, the score at noise level t relates to the noise prediction as: score(x_t, t) = -epsilon_theta(x_t, t) / sqrt(1 - alpha_bar_t). This connection was formalized in Song et al. (2020) 'Score-Based Generative Modeling through SDEs', unifying denoising diffusion and score matching into a single framework. The score function points toward higher-density regions of the data distribution.",
+            "code": "import torch\n\ndef get_score_from_noise_pred(noise_pred, alpha_bar_t):\n    \"\"\"Convert noise prediction to score function.\n    score(x_t) = -eps_theta(x_t, t) / sqrt(1 - alpha_bar_t)\n    Args:\n        noise_pred: predicted noise eps_theta(x_t, t)\n        alpha_bar_t: cumulative product alpha_bar at timestep t\n    Returns:\n        score: estimated nabla_x log p(x_t)\n    \"\"\"\n    return {{diff_adv_sf_b1}}\n\ndef get_noise_pred_from_score(score, alpha_bar_t):\n    \"\"\"Convert score function back to noise prediction.\"\"\"\n    return {{diff_adv_sf_b2}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_sf_b1",
+                    "placeholder": "-noise_pred / ???",
+                    "acceptable": ["-noise_pred / torch.sqrt(1 - alpha_bar_t)", "-noise_pred / torch.sqrt(1.0 - alpha_bar_t)", "-noise_pred / (1 - alpha_bar_t).sqrt()", "-noise_pred / (1.0 - alpha_bar_t).sqrt()"],
+                    "hint": "Score = -epsilon / sqrt(1 - alpha_bar_t). The negative sign reflects that noise points away from data."
+                },
+                {
+                    "id": "diff_adv_sf_b2",
+                    "placeholder": "-score * ???",
+                    "acceptable": ["-score * torch.sqrt(1 - alpha_bar_t)", "-score * torch.sqrt(1.0 - alpha_bar_t)", "-score * (1 - alpha_bar_t).sqrt()", "-score * (1.0 - alpha_bar_t).sqrt()"],
+                    "hint": "Invert the relationship: epsilon = -score * sqrt(1 - alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_langevin_dynamics",
+            "title": "Langevin Dynamics Sampling",
+            "difficulty": "hard",
+            "description": "Implement annealed Langevin dynamics for sampling from a distribution using the score function, as proposed in NCSN (Song & Ermon, 2019).",
+            "info": "Langevin dynamics is a Markov Chain Monte Carlo (MCMC) method that uses the score function to sample from a distribution. The update rule is: x_{i+1} = x_i + (step_size / 2) * score(x_i) + sqrt(step_size) * z, where z ~ N(0, I). In Noise Conditional Score Networks (NCSN, Song & Ermon 2019), annealed Langevin dynamics runs multiple steps at each noise level, starting from high noise and gradually decreasing. The step_size/2 term follows from the continuous Langevin SDE discretization. This was a precursor to the diffusion model framework.",
+            "code": "import torch\n\ndef langevin_dynamics_step(x, score_fn, step_size):\n    \"\"\"One step of Langevin dynamics.\n    x_{i+1} = x_i + (step_size/2) * score(x_i) + sqrt(step_size) * z\n    Args:\n        x: current sample\n        score_fn: function that returns nabla_x log p(x)\n        step_size: Langevin step size (epsilon)\n    Returns:\n        x_next: updated sample\n    \"\"\"\n    z = torch.randn_like(x)\n    score = score_fn(x)\n    x_next = {{diff_adv_ld_b1}}\n    return x_next\n\ndef annealed_langevin(score_model, shape, sigmas, n_steps_each, step_size, device):\n    \"\"\"Annealed Langevin dynamics across noise levels.\"\"\"\n    x = torch.randn(shape, device=device)\n    for sigma in sigmas:\n        for _ in range(n_steps_each):\n            score = score_model(x, sigma)\n            z = torch.randn_like(x)\n            step = {{diff_adv_ld_b2}} * (sigma ** 2)\n            x = x + (step / 2) * score + {{diff_adv_ld_b3}} * z\n    return x",
+            "blanks": [
+                {
+                    "id": "diff_adv_ld_b1",
+                    "placeholder": "x + ??? * score + ??? * z",
+                    "acceptable": ["x + (step_size / 2) * score + torch.sqrt(torch.tensor(step_size)) * z", "x + step_size / 2 * score + (step_size ** 0.5) * z", "x + 0.5 * step_size * score + step_size ** 0.5 * z"],
+                    "hint": "Langevin update: x + (step_size/2) * score + sqrt(step_size) * z."
+                },
+                {
+                    "id": "diff_adv_ld_b2",
+                    "placeholder": "step_size * ???",
+                    "acceptable": ["step_size"],
+                    "hint": "The annealed step size is scaled by sigma^2; the base step_size multiplied by sigma^2 outside."
+                },
+                {
+                    "id": "diff_adv_ld_b3",
+                    "placeholder": "torch.sqrt(torch.tensor(???))",
+                    "acceptable": ["torch.sqrt(torch.tensor(step))", "step ** 0.5", "torch.sqrt(step)", "step.sqrt()"],
+                    "hint": "The noise coefficient is sqrt(step), the square root of the annealed step size."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_conditional_guidance_scale",
+            "title": "Conditional Generation with Dynamic Guidance",
+            "difficulty": "medium",
+            "description": "Implement a sampling function that supports dynamic guidance scale scheduling, where guidance strength varies during the sampling process.",
+            "info": "In practice, the classifier-free guidance scale does not need to be constant throughout sampling. Research has shown that using higher guidance in later (less noisy) steps and lower guidance in early (more noisy) steps can improve sample quality. The guidance scale can follow a linear schedule from w_min to w_max across the sampling trajectory. Some works (e.g., eDiff-I from NVIDIA) also use different guidance for different components. Dynamic guidance helps balance diversity (lower guidance) in global structure and fidelity (higher guidance) in fine details.",
+            "code": "import torch\n\ndef get_dynamic_guidance_scale(t, T, w_min=1.0, w_max=7.5):\n    \"\"\"Linear interpolation of guidance scale based on timestep.\n    Higher guidance at lower t (less noise), lower guidance at higher t.\n    Args:\n        t: current timestep\n        T: total timesteps\n        w_min: minimum guidance scale (at t=T, noisiest)\n        w_max: maximum guidance scale (at t=0, cleanest)\n    \"\"\"\n    progress = {{diff_adv_dg_b1}}\n    return w_min + (w_max - w_min) * progress\n\n@torch.no_grad()\ndef guided_sample(model, shape, T, alpha, alpha_bar, beta, cond, w_min, w_max, device):\n    x = torch.randn(shape, device=device)\n    for t_val in reversed(range(T)):\n        t_batch = torch.full((shape[0],), t_val, device=device, dtype=torch.long)\n        w = {{diff_adv_dg_b2}}\n        eps_cond = model(x, t_batch, cond)\n        eps_uncond = model(x, t_batch, None)\n        eps = {{diff_adv_dg_b3}}\n        x = reverse_step(x, eps, t_val, alpha, alpha_bar, beta)\n    return x",
+            "blanks": [
+                {
+                    "id": "diff_adv_dg_b1",
+                    "placeholder": "1.0 - ??? / ???",
+                    "acceptable": ["1.0 - t / T", "(T - t) / T"],
+                    "hint": "Progress goes from 0 (at t=T) to 1 (at t=0). Compute as 1 - t/T."
+                },
+                {
+                    "id": "diff_adv_dg_b2",
+                    "placeholder": "get_dynamic_guidance_scale(???, ???, ???, ???)",
+                    "acceptable": ["get_dynamic_guidance_scale(t_val, T, w_min, w_max)"],
+                    "hint": "Call the guidance scale function with the current timestep and total timesteps."
+                },
+                {
+                    "id": "diff_adv_dg_b3",
+                    "placeholder": "eps_uncond + w * (??? - ???)",
+                    "acceptable": ["eps_uncond + w * (eps_cond - eps_uncond)"],
+                    "hint": "Apply classifier-free guidance: eps_uncond + w * (eps_cond - eps_uncond)."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_ema_weights",
+            "title": "EMA (Exponential Moving Average) for Model Weights",
+            "difficulty": "medium",
+            "description": "Implement an EMA class that maintains a shadow copy of model parameters, commonly used in diffusion model training for stable sampling.",
+            "info": "Exponential Moving Average (EMA) of model weights is a critical technique in diffusion model training (used in DDPM, Stable Diffusion, etc.). The EMA parameters are updated as: ema_param = decay * ema_param + (1 - decay) * model_param. Typical decay values are 0.999 or 0.9999. The EMA model is used only for sampling/evaluation, not training. It produces smoother, higher-quality samples by averaging out training noise. The technique was popularized in GANs and is now standard in diffusion models. The copy_to method allows swapping EMA weights into the model for inference.",
+            "code": "import torch\nimport copy\n\nclass EMA:\n    def __init__(self, model, decay=0.9999):\n        self.decay = decay\n        self.shadow = copy.deepcopy(model.state_dict())\n    \n    @torch.no_grad()\n    def update(self, model):\n        \"\"\"Update EMA parameters after each training step.\"\"\"\n        for key, param in model.state_dict().items():\n            self.shadow[key] = {{diff_adv_ema_b1}}\n    \n    def copy_to(self, model):\n        \"\"\"Copy EMA weights into the model for inference.\"\"\"\n        {{diff_adv_ema_b2}}\n    \n    def store_and_swap(self, model):\n        \"\"\"Store current model weights and load EMA weights.\"\"\"\n        self.backup = {{diff_adv_ema_b3}}\n        self.copy_to(model)",
+            "blanks": [
+                {
+                    "id": "diff_adv_ema_b1",
+                    "placeholder": "self.decay * ??? + (1 - self.decay) * ???",
+                    "acceptable": ["self.decay * self.shadow[key] + (1 - self.decay) * param", "self.decay * self.shadow[key] + (1.0 - self.decay) * param"],
+                    "hint": "EMA update: decay * old_ema + (1 - decay) * new_param. Blend old shadow with current param."
+                },
+                {
+                    "id": "diff_adv_ema_b2",
+                    "placeholder": "model.load_state_dict(???)",
+                    "acceptable": ["model.load_state_dict(self.shadow)"],
+                    "hint": "Load the shadow (EMA) parameters into the model using load_state_dict."
+                },
+                {
+                    "id": "diff_adv_ema_b3",
+                    "placeholder": "copy.deepcopy(model.???())",
+                    "acceptable": ["copy.deepcopy(model.state_dict())"],
+                    "hint": "Deep copy the model's current state_dict as a backup before swapping in EMA weights."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_noise_schedule",
+            "title": "Linear and Cosine Noise Schedules",
+            "difficulty": "easy",
+            "description": "Implement both the linear beta schedule (from DDPM) and the cosine schedule (from Improved DDPM) for the noise variance.",
+            "info": "The noise schedule defines how much noise is added at each timestep and is crucial for diffusion model performance. The original DDPM (Ho et al. 2020) uses a linear schedule: beta_t linearly interpolates from beta_start to beta_end. Improved DDPM (Nichol & Dhariwal, 2021) introduced the cosine schedule, which provides a more gradual noise increase, preventing the image from being destroyed too quickly. The cosine schedule defines alpha_bar_t = cos((t/T + s) / (1 + s) * pi/2)^2 where s=0.008 is a small offset. The cosine schedule generally produces better results, especially for high-resolution images.",
+            "code": "import torch\nimport math\n\ndef linear_schedule(T, beta_start=1e-4, beta_end=0.02):\n    \"\"\"Linear noise schedule from DDPM.\"\"\"\n    return {{diff_adv_ns_b1}}\n\ndef cosine_schedule(T, s=0.008):\n    \"\"\"Cosine noise schedule from Improved DDPM.\"\"\"\n    steps = torch.arange(T + 1, dtype=torch.float64)\n    f_t = {{diff_adv_ns_b2}}\n    alpha_bar = f_t / f_t[0]\n    betas = 1 - (alpha_bar[1:] / alpha_bar[:-1])\n    return {{diff_adv_ns_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_ns_b1",
+                    "placeholder": "torch.linspace(???, ???, ???)",
+                    "acceptable": ["torch.linspace(beta_start, beta_end, T)"],
+                    "hint": "Use torch.linspace to create T evenly spaced values from beta_start to beta_end."
+                },
+                {
+                    "id": "diff_adv_ns_b2",
+                    "placeholder": "torch.cos((steps / T + s) / (1 + s) * ??? ) ** 2",
+                    "acceptable": ["torch.cos((steps / T + s) / (1 + s) * math.pi / 2) ** 2", "torch.cos(((steps / T + s) / (1 + s)) * math.pi / 2) ** 2"],
+                    "hint": "f(t) = cos((t/T + s) / (1 + s) * pi/2)^2. Use math.pi for pi."
+                },
+                {
+                    "id": "diff_adv_ns_b3",
+                    "placeholder": "torch.clamp(betas, ???, ???)",
+                    "acceptable": ["torch.clamp(betas, 0.0, 0.999)", "torch.clamp(betas, 0, 0.999)", "betas.clamp(0.0, 0.999)", "betas.clamp(0, 0.999)"],
+                    "hint": "Clamp betas to a maximum of 0.999 to prevent numerical issues at the end of the schedule."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_v_prediction",
+            "title": "V-Prediction Parameterization",
+            "difficulty": "hard",
+            "description": "Implement the v-prediction parameterization (Salimans & Ho, 2022) as an alternative to noise prediction, and show how to convert between v, epsilon, and x_0.",
+            "info": "V-prediction (Salimans & Ho, 2022 - 'Progressive Distillation for Fast Sampling of Diffusion Models') parameterizes the model to predict v = sqrt(alpha_bar_t) * epsilon - sqrt(1 - alpha_bar_t) * x_0, instead of predicting epsilon or x_0 directly. This parameterization has been shown to be more numerically stable, especially at high noise levels, and enables progressive distillation for faster sampling. From v, we can recover both x_0 and epsilon. Stable Diffusion v2 and many modern models use v-prediction for improved training stability.",
+            "code": "import torch\n\ndef compute_v_target(x_0, noise, alpha_bar_t):\n    \"\"\"Compute the v-prediction target.\n    v = sqrt(alpha_bar_t) * noise - sqrt(1 - alpha_bar_t) * x_0\n    \"\"\"\n    return {{diff_adv_vp_b1}}\n\ndef predict_x0_from_v(x_t, v_pred, alpha_bar_t):\n    \"\"\"Recover x_0 from v-prediction.\n    x_0 = sqrt(alpha_bar_t) * x_t - sqrt(1 - alpha_bar_t) * v\n    \"\"\"\n    return {{diff_adv_vp_b2}}\n\ndef predict_noise_from_v(x_t, v_pred, alpha_bar_t):\n    \"\"\"Recover noise (epsilon) from v-prediction.\n    eps = sqrt(alpha_bar_t) * v + sqrt(1 - alpha_bar_t) * x_t\n    \"\"\"\n    return {{diff_adv_vp_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_vp_b1",
+                    "placeholder": "torch.sqrt(???) * noise - torch.sqrt(???) * x_0",
+                    "acceptable": ["torch.sqrt(alpha_bar_t) * noise - torch.sqrt(1 - alpha_bar_t) * x_0", "torch.sqrt(alpha_bar_t) * noise - torch.sqrt(1.0 - alpha_bar_t) * x_0", "alpha_bar_t.sqrt() * noise - (1 - alpha_bar_t).sqrt() * x_0"],
+                    "hint": "v = sqrt(alpha_bar_t) * epsilon - sqrt(1 - alpha_bar_t) * x_0."
+                },
+                {
+                    "id": "diff_adv_vp_b2",
+                    "placeholder": "torch.sqrt(???) * x_t - torch.sqrt(???) * v_pred",
+                    "acceptable": ["torch.sqrt(alpha_bar_t) * x_t - torch.sqrt(1 - alpha_bar_t) * v_pred", "torch.sqrt(alpha_bar_t) * x_t - torch.sqrt(1.0 - alpha_bar_t) * v_pred", "alpha_bar_t.sqrt() * x_t - (1 - alpha_bar_t).sqrt() * v_pred"],
+                    "hint": "x_0 = sqrt(alpha_bar_t) * x_t - sqrt(1 - alpha_bar_t) * v."
+                },
+                {
+                    "id": "diff_adv_vp_b3",
+                    "placeholder": "torch.sqrt(???) * v_pred + torch.sqrt(???) * x_t",
+                    "acceptable": ["torch.sqrt(alpha_bar_t) * v_pred + torch.sqrt(1 - alpha_bar_t) * x_t", "torch.sqrt(alpha_bar_t) * v_pred + torch.sqrt(1.0 - alpha_bar_t) * x_t", "alpha_bar_t.sqrt() * v_pred + (1 - alpha_bar_t).sqrt() * x_t"],
+                    "hint": "eps = sqrt(alpha_bar_t) * v + sqrt(1 - alpha_bar_t) * x_t."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_unet_downblock",
+            "title": "U-Net Encoder (Down) Block",
+            "difficulty": "medium",
+            "description": "Implement a down-sampling block for the diffusion U-Net encoder with residual blocks and spatial downsampling.",
+            "info": "The U-Net architecture used in diffusion models (Ronneberger et al., 2015; adapted by Ho et al., 2020) consists of an encoder (down) path and decoder (up) path with skip connections. Each encoder block typically contains residual convolution blocks followed by spatial downsampling (usually 2x2 stride-2 convolution or average pooling). The encoder progressively reduces spatial resolution while increasing channel depth, building a hierarchy of features. Skip connections from encoder to decoder are crucial for preserving spatial details during the denoising process.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DownBlock(nn.Module):\n    def __init__(self, in_ch, out_ch, time_emb_dim, num_layers=2):\n        super().__init__()\n        self.res_blocks = nn.ModuleList()\n        for i in range(num_layers):\n            ch_in = in_ch if i == 0 else out_ch\n            self.res_blocks.append(ResidualBlock(ch_in, out_ch, time_emb_dim))\n        self.downsample = {{diff_adv_db_b1}}\n\n    def forward(self, x, t_emb):\n        skip_connections = []\n        for block in self.res_blocks:\n            x = {{diff_adv_db_b2}}\n            skip_connections.append(x)\n        x = {{diff_adv_db_b3}}\n        return x, skip_connections",
+            "blanks": [
+                {
+                    "id": "diff_adv_db_b1",
+                    "placeholder": "nn.Conv2d(out_ch, out_ch, ?, stride=?, padding=?)",
+                    "acceptable": ["nn.Conv2d(out_ch, out_ch, 3, stride=2, padding=1)", "nn.Conv2d(out_ch, out_ch, 4, stride=2, padding=1)"],
+                    "hint": "Use a strided convolution for downsampling: kernel_size=3, stride=2, padding=1 halves spatial dims."
+                },
+                {
+                    "id": "diff_adv_db_b2",
+                    "placeholder": "block(x, ???)",
+                    "acceptable": ["block(x, t_emb)"],
+                    "hint": "Pass both the feature map x and the time embedding t_emb to each residual block."
+                },
+                {
+                    "id": "diff_adv_db_b3",
+                    "placeholder": "self.???(x)",
+                    "acceptable": ["self.downsample(x)"],
+                    "hint": "Apply the downsampling layer to reduce spatial resolution by 2x."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_unet_upblock",
+            "title": "U-Net Decoder (Up) Block with Skip Connections",
+            "difficulty": "hard",
+            "description": "Implement an up-sampling block for the diffusion U-Net decoder that incorporates skip connections from the encoder.",
+            "info": "The decoder (up) path of the U-Net first upsamples the spatial dimensions, then concatenates skip connections from the corresponding encoder level along the channel dimension. This channel concatenation is followed by residual blocks that process the combined features. Skip connections are essential because they provide fine-grained spatial information that was lost during encoding. In diffusion U-Nets, upsampling is typically done via nearest-neighbor interpolation followed by a convolution (rather than transposed convolution) to avoid checkerboard artifacts.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass UpBlock(nn.Module):\n    def __init__(self, in_ch, out_ch, skip_ch, time_emb_dim, num_layers=2):\n        super().__init__()\n        self.upsample = nn.Sequential(\n            nn.Upsample(scale_factor=2, mode='nearest'),\n            nn.Conv2d(in_ch, in_ch, 3, padding=1)\n        )\n        self.res_blocks = nn.ModuleList()\n        for i in range(num_layers):\n            ch_in = (in_ch + skip_ch) if i == 0 else out_ch\n            self.res_blocks.append(ResidualBlock(ch_in, out_ch, time_emb_dim))\n\n    def forward(self, x, skip_connections, t_emb):\n        x = self.upsample(x)\n        # Concatenate skip connection along channel dim\n        skip = skip_connections.pop()\n        x = {{diff_adv_ub_b1}}\n        for block in self.res_blocks:\n            x = {{diff_adv_ub_b2}}\n        return {{diff_adv_ub_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_ub_b1",
+                    "placeholder": "torch.cat([x, skip], dim=???)",
+                    "acceptable": ["torch.cat([x, skip], dim=1)", "torch.cat((x, skip), dim=1)"],
+                    "hint": "Concatenate along the channel dimension (dim=1 for NCHW format)."
+                },
+                {
+                    "id": "diff_adv_ub_b2",
+                    "placeholder": "block(???, ???)",
+                    "acceptable": ["block(x, t_emb)"],
+                    "hint": "Pass the concatenated features and time embedding to each residual block."
+                },
+                {
+                    "id": "diff_adv_ub_b3",
+                    "placeholder": "x",
+                    "acceptable": ["x"],
+                    "hint": "Return the processed feature map after all residual blocks."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_self_attention_unet",
+            "title": "Self-Attention Layer in Diffusion U-Net",
+            "difficulty": "hard",
+            "description": "Implement a self-attention layer for the diffusion U-Net, typically applied at lower spatial resolutions (e.g., 16x16 or 8x8).",
+            "info": "Self-attention layers are incorporated at specific resolution levels in diffusion U-Nets (typically 16x16 or 8x8) to capture long-range dependencies. As noted in DDPM (Ho et al., 2020) and ADM (Dhariwal & Nichol, 2021), attention at lower resolutions significantly improves sample quality without prohibitive computational cost. The spatial feature map is reshaped to a sequence, multi-head self-attention is applied, and the result is reshaped back. GroupNorm is applied before attention (pre-norm), and a residual connection preserves the original features.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SpatialSelfAttention(nn.Module):\n    def __init__(self, channels, num_heads=4):\n        super().__init__()\n        self.channels = channels\n        self.norm = nn.GroupNorm(8, channels)\n        self.qkv = nn.Conv1d(channels, channels * 3, 1)\n        self.proj_out = nn.Conv1d(channels, channels, 1)\n        self.num_heads = num_heads\n\n    def forward(self, x):\n        B, C, H, W = x.shape\n        h = self.norm(x)\n        # Reshape spatial dims to sequence\n        h = {{diff_adv_sa_b1}}\n        qkv = self.qkv(h).chunk(3, dim=1)\n        q, k, v = qkv\n        # Scaled dot-product attention\n        scale = {{diff_adv_sa_b2}}\n        attn = torch.bmm(q.transpose(1, 2), k) * scale\n        attn = torch.softmax(attn, dim=-1)\n        h = torch.bmm(v, attn.transpose(1, 2))\n        h = self.proj_out(h)\n        # Reshape back and residual\n        return {{diff_adv_sa_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_sa_b1",
+                    "placeholder": "h.reshape(B, C, ???)",
+                    "acceptable": ["h.reshape(B, C, H * W)", "h.reshape(B, C, -1)", "h.view(B, C, H * W)", "h.view(B, C, -1)"],
+                    "hint": "Flatten the spatial dimensions (H, W) into a single sequence dimension: (B, C, H*W)."
+                },
+                {
+                    "id": "diff_adv_sa_b2",
+                    "placeholder": "(C // self.num_heads) ** ???",
+                    "acceptable": ["(C // self.num_heads) ** -0.5", "1.0 / (C // self.num_heads) ** 0.5", "(self.channels // self.num_heads) ** -0.5"],
+                    "hint": "The attention scaling factor is 1/sqrt(d_k) where d_k = C / num_heads."
+                },
+                {
+                    "id": "diff_adv_sa_b3",
+                    "placeholder": "x + h.reshape(B, C, ???, ???)",
+                    "acceptable": ["x + h.reshape(B, C, H, W)", "x + h.view(B, C, H, W)"],
+                    "hint": "Reshape back to (B, C, H, W) and add the residual connection with the original input x."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_noise_vs_x0_loss",
+            "title": "Noise Prediction vs x0 Prediction Loss",
+            "difficulty": "medium",
+            "description": "Implement training loss computation for both noise-prediction and x0-prediction parameterizations, showing they are equivalent up to a weighting factor.",
+            "info": "Diffusion models can be parameterized to predict either the noise epsilon (DDPM default) or the clean data x_0. With noise prediction, the loss is ||epsilon - epsilon_theta(x_t, t)||^2. With x_0 prediction, the loss is ||x_0 - x0_theta(x_t, t)||^2. These are mathematically equivalent up to a timestep-dependent weighting: predicting x_0 from the noise prediction is x0_pred = (x_t - sqrt(1-alpha_bar_t)*eps_pred) / sqrt(alpha_bar_t). In practice, noise prediction works better for generation quality, while x_0 prediction can be better for certain tasks like inpainting. The choice of parameterization affects the implicit loss weighting across timesteps.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef noise_prediction_loss(model, x_0, t, alpha_bar):\n    \"\"\"Standard DDPM noise prediction loss.\"\"\"\n    noise = torch.randn_like(x_0)\n    x_t = q_sample(x_0, t, alpha_bar, noise)\n    noise_pred = model(x_t, t)\n    return {{diff_adv_nx_b1}}\n\ndef x0_prediction_loss(model, x_0, t, alpha_bar):\n    \"\"\"x_0 prediction loss (model directly predicts clean data).\"\"\"\n    noise = torch.randn_like(x_0)\n    x_t = q_sample(x_0, t, alpha_bar, noise)\n    x0_pred = model(x_t, t)\n    return {{diff_adv_nx_b2}}\n\ndef x0_from_noise_pred(x_t, noise_pred, alpha_bar_t):\n    \"\"\"Convert noise prediction to x_0 prediction.\"\"\"\n    return {{diff_adv_nx_b3}}",
+            "blanks": [
+                {
+                    "id": "diff_adv_nx_b1",
+                    "placeholder": "F.mse_loss(???, ???)",
+                    "acceptable": ["F.mse_loss(noise_pred, noise)", "F.mse_loss(noise, noise_pred)"],
+                    "hint": "MSE between predicted noise and true noise."
+                },
+                {
+                    "id": "diff_adv_nx_b2",
+                    "placeholder": "F.mse_loss(???, ???)",
+                    "acceptable": ["F.mse_loss(x0_pred, x_0)", "F.mse_loss(x_0, x0_pred)"],
+                    "hint": "MSE between predicted clean image and true clean image."
+                },
+                {
+                    "id": "diff_adv_nx_b3",
+                    "placeholder": "(x_t - ??? * noise_pred) / ???",
+                    "acceptable": ["(x_t - torch.sqrt(1 - alpha_bar_t) * noise_pred) / torch.sqrt(alpha_bar_t)", "(x_t - (1 - alpha_bar_t).sqrt() * noise_pred) / alpha_bar_t.sqrt()"],
+                    "hint": "x_0 = (x_t - sqrt(1 - alpha_bar_t) * eps) / sqrt(alpha_bar_t) from the forward process formula."
+                }
+            ]
+        },
+        {
+            "id": "diff_adv_cfg_training",
+            "title": "Classifier-Free Guidance Training with Random Dropout",
+            "difficulty": "medium",
+            "description": "Implement the training procedure for classifier-free guidance where the conditioning signal is randomly dropped with a fixed probability.",
+            "info": "Classifier-free guidance (Ho & Salimans, 2022) requires a specific training procedure: during training, the conditioning signal (e.g., class label or text embedding) is randomly replaced with a null/unconditional token with probability p_uncond (typically 0.1 to 0.2). This teaches the model both conditional and unconditional generation simultaneously in a single network. At inference time, both predictions are available without needing a separate classifier. The null condition is often represented as a zero vector or a learned unconditional embedding. This dropout-based training is simple yet remarkably effective.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef cfg_training_step(model, x_0, t, cond, alpha_bar, p_uncond=0.1):\n    \"\"\"Training step with random condition dropout for CFG.\n    Args:\n        model: noise prediction model(x_t, t, cond)\n        x_0: clean data (B, C, H, W)\n        t: timesteps (B,)\n        cond: conditioning tensors (B, cond_dim)\n        alpha_bar: noise schedule\n        p_uncond: probability of dropping the condition\n    \"\"\"\n    noise = torch.randn_like(x_0)\n    x_t = q_sample(x_0, t, alpha_bar, noise)\n    \n    # Randomly drop conditioning\n    drop_mask = {{diff_adv_ct_b1}}\n    cond_input = {{diff_adv_ct_b2}}\n    \n    noise_pred = model(x_t, t, cond_input)\n    loss = {{diff_adv_ct_b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "diff_adv_ct_b1",
+                    "placeholder": "torch.rand(???) < p_uncond",
+                    "acceptable": ["torch.rand(cond.shape[0], device=cond.device) < p_uncond", "torch.rand(x_0.shape[0], device=x_0.device) < p_uncond", "(torch.rand(cond.shape[0]) < p_uncond)"],
+                    "hint": "Create a boolean mask of shape (B,) where each entry is True with probability p_uncond."
+                },
+                {
+                    "id": "diff_adv_ct_b2",
+                    "placeholder": "torch.where(drop_mask[???, ???], ???, cond)",
+                    "acceptable": ["torch.where(drop_mask[:, None], torch.zeros_like(cond), cond)", "torch.where(drop_mask.unsqueeze(-1), torch.zeros_like(cond), cond)"],
+                    "hint": "Where the mask is True, replace conditioning with zeros (null condition); otherwise keep original. Expand mask for broadcasting."
+                },
+                {
+                    "id": "diff_adv_ct_b3",
+                    "placeholder": "F.mse_loss(???, ???)",
+                    "acceptable": ["F.mse_loss(noise_pred, noise)", "F.mse_loss(noise, noise_pred)"],
+                    "hint": "Standard MSE loss between predicted and true noise, same as normal DDPM training."
+                }
+            ]
+        }
+    ]
+}

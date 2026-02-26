@@ -6,12 +6,15 @@
             "title": "Sigmoid Derivative",
             "difficulty": "easy",
             "description": "Implement the derivative of the sigmoid function. Recall: sigmoid'(x) = sigmoid(x) * (1 - sigmoid(x)).",
+            "info": "The sigmoid derivative is a classic example of how activation function gradients control the flow of information during backpropagation. The elegant formula sigmoid'(x) = sigmoid(x)*(1 - sigmoid(x)) means the derivative can be computed directly from the output, avoiding recomputation of the exponential. However, this derivative peaks at 0.25 (when sigmoid = 0.5) and approaches zero for large |x|, causing the vanishing gradient problem in deep networks. This saturation behavior is why sigmoid was largely replaced by ReLU in hidden layers.",
             "code": "import numpy as np\n\ndef sigmoid(x):\n    return 1 / (1 + np.exp(-x))\n\ndef sigmoid_derivative(x):\n    s = sigmoid(x)\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "s * ???",
-                    "acceptable": ["s * (1 - s)"],
+                    "acceptable": [
+                        "s * (1 - s)"
+                    ],
                     "hint": "sigmoid'(x) = sigmoid(x) * (1 - sigmoid(x))."
                 }
             ]
@@ -21,12 +24,19 @@
             "title": "ReLU Derivative",
             "difficulty": "easy",
             "description": "Implement the derivative of the ReLU function.",
+            "info": "The ReLU derivative is remarkably simple: it is 1 for positive inputs and 0 for negative inputs, acting as a binary gate that either passes or blocks the gradient. This simplicity is a key advantage of ReLU over sigmoid and tanh, as it avoids gradient attenuation through multiple layers. However, the zero gradient for negative inputs can cause 'dead neurons' that permanently stop learning if they always receive negative inputs. Understanding this derivative is essential for implementing backpropagation and for appreciating why variants like Leaky ReLU were developed.",
             "code": "import numpy as np\n\ndef relu_derivative(x):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "(x ??? 0).astype(???)",
-                    "acceptable": ["(x > 0).astype(float)", "(x > 0).astype(np.float64)", "(x > 0).astype(int)", "np.where(x > 0, 1, 0)", "np.where(x > 0, 1.0, 0.0)"],
+                    "acceptable": [
+                        "(x > 0).astype(float)",
+                        "(x > 0).astype(np.float64)",
+                        "(x > 0).astype(int)",
+                        "np.where(x > 0, 1, 0)",
+                        "np.where(x > 0, 1.0, 0.0)"
+                    ],
                     "hint": "ReLU derivative is 1 when x > 0, else 0."
                 }
             ]
@@ -36,24 +46,32 @@
             "title": "Chain Rule - Gradient through Linear + ReLU",
             "difficulty": "hard",
             "description": "Given upstream gradient dL/da1, compute dL/dW1 for a layer: z1 = x @ W1 + b1, a1 = relu(z1). x has shape (N, D_in), W1 has shape (D_in, D_out).",
+            "info": "The chain rule is the mathematical foundation of backpropagation, enabling gradient computation through compositions of functions. For a layer z = xW + b followed by a = relu(z), the gradient flows backward: first through ReLU (multiplying by the indicator z > 0), then through the linear layer. The weight gradient dW = x^T @ dz accumulates how each weight contributed to the loss, while dx = dz @ W^T propagates the gradient to earlier layers. This pattern of transposing weight matrices during backpropagation is why understanding matrix shapes is critical for debugging neural networks.",
             "code": "import numpy as np\n\ndef backward_linear_relu(x, z1, da1, W1):\n    # Gradient through ReLU\n    dz1 = da1 * {{b1}}\n    # Gradient w.r.t. weights\n    dW1 = {{b2}}\n    # Gradient w.r.t. input\n    dx = {{b3}}\n    return dW1, dx",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "(z1 ??? 0)",
-                    "acceptable": ["(z1 > 0)", "(z1 > 0).astype(float)"],
+                    "acceptable": [
+                        "(z1 > 0)",
+                        "(z1 > 0).astype(float)"
+                    ],
                     "hint": "ReLU passes gradient only where z1 > 0."
                 },
                 {
                     "id": "b2",
                     "placeholder": "x.T @ ???",
-                    "acceptable": ["x.T @ dz1"],
+                    "acceptable": [
+                        "x.T @ dz1"
+                    ],
                     "hint": "dW = x^T @ dz (chain rule through the linear layer)."
                 },
                 {
                     "id": "b3",
                     "placeholder": "dz1 @ ???",
-                    "acceptable": ["dz1 @ W1.T"],
+                    "acceptable": [
+                        "dz1 @ W1.T"
+                    ],
                     "hint": "dx = dz @ W^T."
                 }
             ]

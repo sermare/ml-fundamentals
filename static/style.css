@@ -217,8 +217,50 @@ body {
 
 .description {
     color: #8b949e;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
     line-height: 1.6;
+}
+
+/* Info panel */
+.info-panel {
+    margin-bottom: 20px;
+}
+
+.info-toggle {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #58a6ff;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    text-align: left;
+}
+
+.info-toggle:hover {
+    background: #1f6feb15;
+    border-color: #58a6ff;
+}
+
+.info-toggle.open {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom-color: transparent;
+}
+
+.info-content {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-top: none;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    padding: 16px 20px;
+    font-size: 0.85rem;
+    line-height: 1.8;
+    color: #c9d1d9;
+    white-space: pre-wrap;
 }
 
 /* Code block */
@@ -266,6 +308,13 @@ body {
     border-style: solid;
 }
 
+.code-container .blank-input.revealed {
+    border-color: #d29922;
+    background: #d2992215;
+    border-style: solid;
+    color: #d29922;
+}
+
 /* Actions */
 .actions {
     display: flex;
@@ -290,6 +339,17 @@ body {
 
 .btn-check:hover {
     background: #2ea043;
+}
+
+.btn-reveal {
+    background: #1f1d2e;
+    color: #d29922;
+    border: 1px solid #d2992255;
+}
+
+.btn-reveal:hover {
+    background: #d2992215;
+    border-color: #d29922;
 }
 
 .btn-reset {
@@ -320,6 +380,12 @@ body {
     background: #f8514915;
     border: 1px solid #f85149;
     color: #f85149;
+}
+
+.feedback.revealed {
+    background: #d2992215;
+    border: 1px solid #d29922;
+    color: #d29922;
 }
 
 .feedback .hint {

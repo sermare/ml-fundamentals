@@ -6,12 +6,17 @@
             "title": "ReLU from Scratch",
             "difficulty": "easy",
             "description": "Implement the ReLU activation function using NumPy.",
+            "info": "ReLU (Rectified Linear Unit) is the most widely used activation function in modern deep learning. It outputs x when x > 0 and 0 otherwise, introducing non-linearity while avoiding the vanishing gradient problem that plagues sigmoid and tanh. ReLU's simplicity and effectiveness were key enablers of deep network training, as demonstrated in AlexNet (Krizhevsky et al., 2012). Its gradient is either 0 or 1, making backpropagation computationally efficient.",
             "code": "import numpy as np\n\ndef relu(x):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "np.???",
-                    "acceptable": ["np.maximum(0, x)", "np.maximum(x, 0)", "np.where(x > 0, x, 0)"],
+                    "acceptable": [
+                        "np.maximum(0, x)",
+                        "np.maximum(x, 0)",
+                        "np.where(x > 0, x, 0)"
+                    ],
                     "hint": "ReLU returns max(0, x). NumPy has np.maximum()."
                 }
             ]
@@ -21,12 +26,15 @@
             "title": "Sigmoid from Scratch",
             "difficulty": "easy",
             "description": "Implement the sigmoid activation function.",
+            "info": "The sigmoid function maps any real number to the range (0, 1), making it suitable for binary classification outputs and probabilistic interpretations. Mathematically defined as sigma(x) = 1/(1 + e^(-x)), it has an elegant derivative: sigma'(x) = sigma(x)(1 - sigma(x)). However, sigmoid suffers from vanishing gradients for large |x| values and its outputs are not zero-centered, which can slow convergence. It remains important in logistic regression, gating mechanisms in LSTMs, and binary cross-entropy loss.",
             "code": "import numpy as np\n\ndef sigmoid(x):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "1 / (1 + ???)",
-                    "acceptable": ["1 / (1 + np.exp(-x))"],
+                    "acceptable": [
+                        "1 / (1 + np.exp(-x))"
+                    ],
                     "hint": "Sigmoid = 1 / (1 + e^(-x))."
                 }
             ]
@@ -36,18 +44,28 @@
             "title": "Softmax from Scratch",
             "difficulty": "medium",
             "description": "Implement the numerically stable softmax function. Subtract the max for stability.",
+            "info": "Softmax generalizes the sigmoid function to multiple classes by converting a vector of raw logits into a probability distribution. Each output is in (0, 1) and the outputs sum to 1, making it ideal for multi-class classification. The numerical stability trick of subtracting the maximum value prevents overflow in the exponential computation without changing the result, since softmax is invariant to constant shifts. Softmax is almost always paired with cross-entropy loss, and their combined gradient simplifies elegantly to (p - y).",
             "code": "import numpy as np\n\ndef softmax(x):\n    e_x = np.exp(x - {{b1}})\n    return e_x / {{b2}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "np.???",
-                    "acceptable": ["np.max(x)", "np.max(x, axis=-1, keepdims=True)", "x.max()"],
+                    "acceptable": [
+                        "np.max(x)",
+                        "np.max(x, axis=-1, keepdims=True)",
+                        "x.max()"
+                    ],
                     "hint": "Subtract the maximum value for numerical stability."
                 },
                 {
                     "id": "b2",
                     "placeholder": "np.???",
-                    "acceptable": ["np.sum(e_x)", "e_x.sum()", "np.sum(e_x, axis=-1, keepdims=True)", "e_x.sum(axis=-1, keepdims=True)"],
+                    "acceptable": [
+                        "np.sum(e_x)",
+                        "e_x.sum()",
+                        "np.sum(e_x, axis=-1, keepdims=True)",
+                        "e_x.sum(axis=-1, keepdims=True)"
+                    ],
                     "hint": "Divide by the sum of all exponentiated values."
                 }
             ]
@@ -57,12 +75,16 @@
             "title": "Tanh from Scratch",
             "difficulty": "easy",
             "description": "Implement the tanh activation function using NumPy.",
+            "info": "The hyperbolic tangent (tanh) activation function maps inputs to the range (-1, 1) and is zero-centered, unlike sigmoid. It is defined as tanh(x) = (e^x - e^(-x))/(e^x + e^(-x)), and is essentially a rescaled sigmoid: tanh(x) = 2*sigmoid(2x) - 1. Tanh was the preferred activation before ReLU became dominant, and it still appears in RNN/LSTM architectures where bounded outputs help control information flow. Like sigmoid, it suffers from vanishing gradients at extreme values.",
             "code": "import numpy as np\n\ndef tanh(x):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "np.???",
-                    "acceptable": ["np.tanh(x)", "(np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))"],
+                    "acceptable": [
+                        "np.tanh(x)",
+                        "(np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))"
+                    ],
                     "hint": "NumPy has a built-in np.tanh() function."
                 }
             ]
@@ -72,12 +94,17 @@
             "title": "Leaky ReLU",
             "difficulty": "easy",
             "description": "Implement Leaky ReLU with a slope of 0.01 for negative values.",
+            "info": "Leaky ReLU addresses the 'dying ReLU' problem where neurons that output zero for all inputs can never recover because their gradient is permanently zero. By allowing a small, non-zero gradient (typically alpha=0.01) for negative inputs, Leaky ReLU ensures that every neuron can continue learning. The function is f(x) = x if x > 0, and f(x) = alpha*x otherwise. Variants like Parametric ReLU (PReLU) learn the alpha value during training, while ELU uses an exponential curve for negative values.",
             "code": "import numpy as np\n\ndef leaky_relu(x, alpha=0.01):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "np.???",
-                    "acceptable": ["np.where(x > 0, x, alpha * x)", "np.maximum(alpha * x, x)", "np.maximum(x, alpha * x)"],
+                    "acceptable": [
+                        "np.where(x > 0, x, alpha * x)",
+                        "np.maximum(alpha * x, x)",
+                        "np.maximum(x, alpha * x)"
+                    ],
                     "hint": "Like ReLU, but negative values are scaled by alpha instead of zeroed."
                 }
             ]

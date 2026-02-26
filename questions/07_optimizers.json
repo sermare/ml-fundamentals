@@ -6,12 +6,15 @@
             "title": "SGD Update Rule",
             "difficulty": "easy",
             "description": "Implement the vanilla SGD parameter update step.",
+            "info": "Stochastic Gradient Descent (SGD) is the simplest and most fundamental optimization algorithm in deep learning. The update rule param = param - lr * grad moves parameters in the direction of steepest descent by an amount proportional to the learning rate. Despite its simplicity, SGD with proper learning rate scheduling remains competitive with more sophisticated optimizers on many tasks. The stochastic element comes from computing gradients on mini-batches rather than the full dataset, which introduces noise that can help escape local minima.",
             "code": "def sgd_step(param, grad, lr):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "param - ???",
-                    "acceptable": ["param - lr * grad"],
+                    "acceptable": [
+                        "param - lr * grad"
+                    ],
                     "hint": "SGD: param = param - lr * gradient."
                 }
             ]
@@ -21,18 +24,23 @@
             "title": "SGD with Momentum",
             "difficulty": "medium",
             "description": "Implement SGD with momentum. v is the velocity, mu is momentum coefficient (e.g. 0.9).",
+            "info": "Momentum accelerates SGD by accumulating a velocity vector that smooths out gradient oscillations and builds speed in consistent directions. The velocity v = mu*v - lr*grad acts as an exponentially weighted moving average of past gradients, where mu (typically 0.9) controls how much history is retained. This dramatically helps with navigating ravines in the loss landscape, where the gradient oscillates across the narrow dimension while making slow progress along the long dimension. Momentum is analogous to a ball rolling downhill with inertia, gaining speed on consistent slopes.",
             "code": "def sgd_momentum_step(param, grad, v, lr, mu=0.9):\n    v = {{b1}}\n    param = {{b2}}\n    return param, v",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "mu * ??? - lr * ???",
-                    "acceptable": ["mu * v - lr * grad"],
+                    "acceptable": [
+                        "mu * v - lr * grad"
+                    ],
                     "hint": "v = mu * v - lr * grad."
                 },
                 {
                     "id": "b2",
                     "placeholder": "param + ???",
-                    "acceptable": ["param + v"],
+                    "acceptable": [
+                        "param + v"
+                    ],
                     "hint": "param = param + v."
                 }
             ]
@@ -42,24 +50,31 @@
             "title": "PyTorch Training Loop Basics",
             "difficulty": "easy",
             "description": "Complete the standard PyTorch training loop steps: zero gradients, compute loss, backprop, step.",
+            "info": "The PyTorch training loop follows a specific three-step pattern that must be executed in the correct order: zero gradients, backward pass, optimizer step. Calling optimizer.zero_grad() is essential because PyTorch accumulates gradients by default (useful for gradient accumulation across mini-batches, but problematic if forgotten). The loss.backward() call computes gradients via automatic differentiation and stores them in each parameter's .grad attribute. Finally, optimizer.step() applies the update rule using the computed gradients. This pattern is the backbone of virtually every PyTorch training script.",
             "code": "for inputs, targets in dataloader:\n    {{b1}}\n    outputs = model(inputs)\n    loss = criterion(outputs, targets)\n    {{b2}}\n    {{b3}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "optimizer.???()",
-                    "acceptable": ["optimizer.zero_grad()"],
+                    "acceptable": [
+                        "optimizer.zero_grad()"
+                    ],
                     "hint": "Zero out the gradients before each step."
                 },
                 {
                     "id": "b2",
                     "placeholder": "loss.???()",
-                    "acceptable": ["loss.backward()"],
+                    "acceptable": [
+                        "loss.backward()"
+                    ],
                     "hint": "Backpropagate the loss."
                 },
                 {
                     "id": "b3",
                     "placeholder": "optimizer.???()",
-                    "acceptable": ["optimizer.step()"],
+                    "acceptable": [
+                        "optimizer.step()"
+                    ],
                     "hint": "Update the parameters."
                 }
             ]

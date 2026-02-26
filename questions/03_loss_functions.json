@@ -6,12 +6,16 @@
             "title": "Mean Squared Error",
             "difficulty": "easy",
             "description": "Implement the Mean Squared Error loss function.",
+            "info": "MSE is the standard loss function for regression tasks, computing the average of squared differences between predictions and targets. It penalizes larger errors quadratically, making the model particularly sensitive to outliers. The gradient of MSE is proportional to the residual (y_pred - y_true), which provides a clear and stable learning signal. MSE corresponds to maximum likelihood estimation under the assumption of Gaussian-distributed errors, connecting it to fundamental statistical theory.",
             "code": "import numpy as np\n\ndef mse(y_true, y_pred):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "np.???",
-                    "acceptable": ["np.mean((y_true - y_pred) ** 2)", "np.mean((y_pred - y_true) ** 2)"],
+                    "acceptable": [
+                        "np.mean((y_true - y_pred) ** 2)",
+                        "np.mean((y_pred - y_true) ** 2)"
+                    ],
                     "hint": "MSE = mean of (y_true - y_pred)^2."
                 }
             ]
@@ -21,18 +25,23 @@
             "title": "Binary Cross-Entropy",
             "difficulty": "medium",
             "description": "Implement the binary cross-entropy loss. Assume y_pred is already a probability between 0 and 1.",
+            "info": "Binary cross-entropy (BCE) is the standard loss function for binary classification, derived from the negative log-likelihood of a Bernoulli distribution. It measures the divergence between the predicted probability and the true binary label. BCE is defined as -[y*log(p) + (1-y)*log(1-p)], where it heavily penalizes confident wrong predictions. When combined with a sigmoid output, the gradient simplifies to (p - y), avoiding the saturation problem that would arise with MSE on probabilities.",
             "code": "import numpy as np\n\ndef binary_cross_entropy(y_true, y_pred):\n    return -np.mean({{b1}} + {{b2}})",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "y_true * ???",
-                    "acceptable": ["y_true * np.log(y_pred)"],
+                    "acceptable": [
+                        "y_true * np.log(y_pred)"
+                    ],
                     "hint": "First term: y * log(p)."
                 },
                 {
                     "id": "b2",
                     "placeholder": "(1 - y_true) * ???",
-                    "acceptable": ["(1 - y_true) * np.log(1 - y_pred)"],
+                    "acceptable": [
+                        "(1 - y_true) * np.log(1 - y_pred)"
+                    ],
                     "hint": "Second term: (1 - y) * log(1 - p)."
                 }
             ]
@@ -42,12 +51,16 @@
             "title": "Categorical Cross-Entropy",
             "difficulty": "medium",
             "description": "Implement categorical cross-entropy. y_true is one-hot encoded, y_pred are probabilities.",
+            "info": "Categorical cross-entropy extends binary cross-entropy to multi-class problems, measuring the difference between two probability distributions: the true one-hot distribution and the predicted probability distribution. It is defined as -sum(y_true * log(y_pred)) and only penalizes the predicted probability of the correct class. When paired with softmax, the gradient simplifies to (softmax_output - y_true), enabling efficient backpropagation. Cross-entropy is deeply connected to information theory, where it measures the expected number of bits needed to encode data from one distribution using another.",
             "code": "import numpy as np\n\ndef cross_entropy(y_true, y_pred):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "-np.???",
-                    "acceptable": ["-np.sum(y_true * np.log(y_pred))", "-np.mean(np.sum(y_true * np.log(y_pred), axis=-1))"],
+                    "acceptable": [
+                        "-np.sum(y_true * np.log(y_pred))",
+                        "-np.mean(np.sum(y_true * np.log(y_pred), axis=-1))"
+                    ],
                     "hint": "CE = -sum(y_true * log(y_pred))."
                 }
             ]

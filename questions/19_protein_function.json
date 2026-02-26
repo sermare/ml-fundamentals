@@ -1,0 +1,565 @@
+{
+    "topic": "Proteins - Function & Evaluation",
+    "questions": [
+        {
+            "id": "prot_func_go_multilabel",
+            "title": "GO Term Prediction as Multi-Label Classification",
+            "difficulty": "medium",
+            "description": "Set up a multi-label classification model for Gene Ontology (GO) term prediction. Given protein embeddings, predict which GO terms apply using binary cross-entropy loss.",
+            "info": "Gene Ontology (GO) provides a structured vocabulary for annotating protein functions across three ontologies: Molecular Function (MF), Biological Process (BP), and Cellular Component (CC). Predicting GO terms is inherently a multi-label classification problem since a single protein can be annotated with multiple GO terms simultaneously. DeepGO (Kulmanov et al., Bioinformatics 2018) demonstrated that deep learning models taking sequence and interaction network features as input can effectively predict GO terms, outperforming traditional BLAST-based methods. The standard loss function for multi-label GO prediction is Binary Cross-Entropy (BCE), applied independently to each GO term output. Reference: Kulmanov et al., 'DeepGO: predicting protein functions from sequence and interactions using a deep ontology-aware classifier', Bioinformatics 2018; Radivojac et al., 'A large-scale evaluation of computational protein function prediction', Nature Methods 2013.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass GOTermPredictor(nn.Module):\n    def __init__(self, embed_dim=1280, num_go_terms=500):\n        super().__init__()\n        self.classifier = nn.Sequential(\n            nn.Linear(embed_dim, 512),\n            nn.ReLU(),\n            nn.Dropout(0.3),\n            nn.Linear(512, num_go_terms),\n            {{b1}}\n        )\n\n    def forward(self, x):\n        return self.classifier(x)\n\nmodel = GOTermPredictor()\ncriterion = {{b2}}\n\n# Example: batch of 16 proteins, 500 GO terms\nembeddings = torch.randn(16, 1280)\nlabels = torch.zeros(16, 500).bernoulli_(0.05)  # sparse labels\n\nlogits = model(embeddings)\nloss = criterion(logits, {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "nn.???() # output activation for multi-label",
+                    "acceptable": ["nn.Sigmoid()"],
+                    "hint": "Multi-label classification uses sigmoid (not softmax) to independently predict each label."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # multi-label loss",
+                    "acceptable": ["nn.BCELoss()", "nn.BCEWithLogitsLoss()"],
+                    "hint": "Binary Cross-Entropy loss is used for multi-label classification where each label is independent."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "labels.???() # target dtype",
+                    "acceptable": ["labels.float()", "labels.to(torch.float)"],
+                    "hint": "BCE loss requires float targets, not integer labels."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_fmax_metric",
+            "title": "Fmax Metric for GO Prediction Evaluation",
+            "difficulty": "hard",
+            "description": "Implement the Fmax metric used in CAFA challenges to evaluate GO term predictions. Fmax is the maximum F1-score over all possible thresholds.",
+            "info": "The Fmax (maximum F-measure) metric is the primary evaluation metric used in the Critical Assessment of Functional Annotation (CAFA) challenges. It computes precision and recall at each threshold t in [0, 1], then takes the maximum F1-score across all thresholds. This protein-centric evaluation averages precision and recall over all proteins before combining them. CAFA (Radivojac et al., Nature Methods 2013) established this as the standard for benchmarking GO prediction methods because it accounts for the hierarchical and multi-label nature of GO annotations. The metric is threshold-independent, making it robust to different score calibrations across methods. Reference: Radivojac et al., 'A large-scale evaluation of computational protein function prediction', Nature Methods 2013; Zhou et al., 'The CAFA challenge reports improved protein function prediction and new functional annotations for hundreds of genes through experimental screens', Genome Biology 2019.",
+            "code": "import numpy as np\n\ndef compute_fmax(y_true, y_scores, thresholds=None):\n    \"\"\"Compute Fmax: max F1 over all thresholds.\n    y_true: (n_proteins, n_terms) binary\n    y_scores: (n_proteins, n_terms) predicted probabilities\n    \"\"\"\n    if thresholds is None:\n        thresholds = np.arange(0.01, 1.0, 0.01)\n\n    best_f1 = 0.0\n    for t in thresholds:\n        y_pred = (y_scores >= {{b1}}).astype(int)\n\n        # Protein-centric precision and recall\n        precision_per_protein = []\n        recall_per_protein = []\n        for i in range(y_true.shape[0]):\n            tp = np.sum(y_pred[i] * y_true[i])\n            pred_pos = {{b2}}\n            true_pos = np.sum(y_true[i])\n            if pred_pos > 0:\n                precision_per_protein.append(tp / pred_pos)\n            if true_pos > 0:\n                recall_per_protein.append(tp / true_pos)\n\n        if len(precision_per_protein) == 0 or len(recall_per_protein) == 0:\n            continue\n        avg_prec = np.mean(precision_per_protein)\n        avg_rec = np.mean(recall_per_protein)\n\n        if avg_prec + avg_rec > 0:\n            f1 = {{b3}}\n            best_f1 = max(best_f1, f1)\n\n    return best_f1",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? # threshold variable",
+                    "acceptable": ["t"],
+                    "hint": "Compare scores against the current threshold t from the loop."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.sum(???) # total predicted positives",
+                    "acceptable": ["np.sum(y_pred[i])"],
+                    "hint": "Sum the predicted positive labels for protein i."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "2 * ??? * ??? / (??? + ???) # F1 formula",
+                    "acceptable": ["2 * avg_prec * avg_rec / (avg_prec + avg_rec)"],
+                    "hint": "F1 = 2 * precision * recall / (precision + recall)."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_ec_number",
+            "title": "Enzyme Classification (EC Number Prediction)",
+            "difficulty": "medium",
+            "description": "Build a hierarchical enzyme classification model that predicts Enzyme Commission (EC) numbers from protein sequence embeddings.",
+            "info": "Enzyme Commission (EC) numbers provide a hierarchical four-level classification system for enzymes (e.g., EC 2.7.11.1 for protein kinases). Predicting EC numbers from protein sequences is a core task in computational biology. DeepEC (Ryu et al., PNAS 2019) used convolutional neural networks for high-accuracy EC prediction from raw sequences. ProteInfer (Sanderson et al., Cell Systems 2023) later showed that dilated convolutional models trained on UniProt can predict both EC numbers and GO terms with competitive accuracy. Since EC classification is hierarchical, the top-level class (1-7) identifies the general reaction type, and multi-class cross-entropy is appropriate for this first level. Reference: Sanderson et al., 'ProteInfer, deep neural networks for protein functional inference', Cell Systems 2023; Ryu et al., 'Deep learning enables high-quality and high-throughput prediction of enzyme commission numbers', PNAS 2019.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass ECClassifier(nn.Module):\n    \"\"\"Predict top-level EC class (7 main classes).\"\"\"\n    def __init__(self, embed_dim=1280, num_ec_classes=7):\n        super().__init__()\n        self.head = nn.Sequential(\n            nn.Linear(embed_dim, 256),\n            nn.ReLU(),\n            nn.Dropout(0.2),\n            nn.Linear(256, {{b1}})\n        )\n\n    def forward(self, x):\n        return self.head(x)\n\nmodel = ECClassifier()\ncriterion = {{b2}}\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\n# Example training step\nembeddings = torch.randn(32, 1280)\nlabels = torch.randint(0, 7, (32,))  # EC class labels 0-6\n\nlogits = model(embeddings)\nloss = criterion(logits, labels)\nloss.{{b3}}\noptimizer.step()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? # output dimension",
+                    "acceptable": ["num_ec_classes", "7"],
+                    "hint": "The output dimension should match the number of EC classes."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # multi-class loss",
+                    "acceptable": ["nn.CrossEntropyLoss()"],
+                    "hint": "For single-label multi-class classification, use CrossEntropyLoss."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "???() # compute gradients",
+                    "acceptable": ["backward()"],
+                    "hint": "Call backward() on the loss to compute gradients."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_ppi_prediction",
+            "title": "Protein-Protein Interaction Prediction",
+            "difficulty": "medium",
+            "description": "Implement a siamese network for predicting protein-protein interactions (PPI) from paired embeddings.",
+            "info": "Protein-protein interaction (PPI) prediction is crucial for understanding cellular networks and signaling pathways. Modern approaches encode each protein independently with a pretrained language model, then combine the embeddings to predict whether the pair interacts. D-SCRIPT (Sledzieski et al., Cell Systems 2021) used pretrained protein embeddings with a projection module for cross-species PPI prediction. The TAPE benchmark (Rao et al., NeurIPS 2019) established standardized evaluation tasks including contact prediction, which relates to physical interactions between residues. A common architecture uses a siamese encoder that processes both proteins through shared weights, then combines representations via element-wise product or concatenation for binary classification. Reference: Sledzieski et al., 'D-SCRIPT translates genome to phenome with sequence-based, structure-aware, genome-scale predictions of protein-protein interactions', Cell Systems 2021; Rao et al., 'Evaluating protein transfer learning with TAPE', NeurIPS 2019.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PPIPredictor(nn.Module):\n    def __init__(self, embed_dim=1280, hidden_dim=256):\n        super().__init__()\n        # Shared encoder for both proteins\n        self.encoder = nn.Sequential(\n            nn.Linear(embed_dim, hidden_dim),\n            nn.ReLU(),\n            nn.LayerNorm(hidden_dim)\n        )\n        # Classifier on combined representation\n        self.classifier = nn.Sequential(\n            nn.Linear(hidden_dim, 64),\n            nn.ReLU(),\n            nn.Linear(64, 1)\n        )\n\n    def forward(self, emb_a, emb_b):\n        h_a = self.encoder(emb_a)\n        h_b = self.encoder(emb_b)\n        # Element-wise product captures interaction\n        combined = {{b1}}\n        return self.classifier(combined)\n\nmodel = PPIPredictor()\ncriterion = {{b2}}\n\nemb_a = torch.randn(16, 1280)\nemb_b = torch.randn(16, 1280)\nlabels = torch.randint(0, 2, (16, 1)).float()\n\npred = model(emb_a, emb_b)\nloss = criterion(pred, {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "h_a ??? h_b # element-wise interaction",
+                    "acceptable": ["h_a * h_b"],
+                    "hint": "Element-wise (Hadamard) product captures pairwise feature interactions between the two protein representations."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # binary classification loss",
+                    "acceptable": ["nn.BCEWithLogitsLoss()"],
+                    "hint": "BCEWithLogitsLoss combines sigmoid activation with binary cross-entropy for numerical stability."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? # target tensor",
+                    "acceptable": ["labels"],
+                    "hint": "Pass the labels tensor directly as the target."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_binding_site",
+            "title": "Binding Site Prediction (Per-Residue Classification)",
+            "difficulty": "hard",
+            "description": "Implement a per-residue binding site predictor using 1D convolutions over per-residue embeddings from a protein language model.",
+            "info": "Binding site prediction identifies which residues in a protein interact with ligands, DNA, or other proteins. This is formulated as a per-residue binary classification task where each residue is labeled as binding or non-binding. ScanNet (Tubiana et al., Nature Methods 2022) used geometric deep learning on protein structures for binding site prediction. For sequence-based approaches, per-residue embeddings from protein language models like ESM-2 (Lin et al., Science 2023) are fed into convolutional or recurrent layers to capture local sequence context. The key challenge is class imbalance, as binding residues are typically a small fraction of the protein. Evaluation uses per-residue AUROC and AUPRC metrics. Reference: Tubiana et al., 'ScanNet: an interpretable geometric deep learning model for structure-based protein binding site prediction', Nature Methods 2022; Lin et al., 'Evolutionary-scale prediction of atomic-level protein structure with a language model', Science 2023.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass BindingSitePredictor(nn.Module):\n    def __init__(self, embed_dim=1280, hidden_dim=128):\n        super().__init__()\n        self.conv_layers = nn.Sequential(\n            nn.Conv1d(embed_dim, hidden_dim, kernel_size=7, padding=3),\n            nn.ReLU(),\n            nn.BatchNorm1d(hidden_dim),\n            nn.Conv1d(hidden_dim, hidden_dim, kernel_size=5, padding=2),\n            nn.ReLU(),\n            nn.BatchNorm1d(hidden_dim),\n        )\n        self.output = nn.Conv1d(hidden_dim, 1, kernel_size=1)\n\n    def forward(self, x):\n        # x: (batch, seq_len, embed_dim)\n        x = {{b1}}  # Conv1d expects (batch, channels, length)\n        h = self.conv_layers(x)\n        logits = self.output(h)  # (batch, 1, seq_len)\n        return logits.squeeze(1)  # (batch, seq_len)\n\nmodel = BindingSitePredictor()\n# Use pos_weight to handle class imbalance (few binding residues)\ncriterion = nn.BCEWithLogitsLoss(pos_weight={{b2}})\n\n# Example: batch of 8 proteins, each 100 residues\nper_residue_emb = torch.randn(8, 100, 1280)\nbinding_labels = torch.zeros(8, 100)\nbinding_labels[:, 40:50] = 1.0  # residues 40-49 are binding\n\nlogits = model(per_residue_emb)\nloss = criterion(logits, {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x.???  # reshape for Conv1d",
+                    "acceptable": ["x.transpose(1, 2)", "x.permute(0, 2, 1)"],
+                    "hint": "Conv1d expects (batch, channels, length), so transpose the last two dimensions."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.tensor([???]) # upweight positive class",
+                    "acceptable": ["torch.tensor([10.0])", "torch.tensor([5.0])", "torch.tensor([9.0])"],
+                    "hint": "Use a positive weight > 1 (e.g., 10.0) to account for the rarity of binding residues."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? # target labels",
+                    "acceptable": ["binding_labels"],
+                    "hint": "Pass the binding_labels tensor as the target for the loss function."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_fitness_spearman",
+            "title": "Spearman Correlation for Fitness Prediction",
+            "difficulty": "easy",
+            "description": "Evaluate a fitness prediction model using Spearman rank correlation, the standard metric for assessing variant effect predictions against deep mutational scanning (DMS) data.",
+            "info": "Spearman rank correlation is the primary metric for evaluating protein fitness predictions against experimental deep mutational scanning (DMS) data. Unlike Pearson correlation, Spearman correlation measures the monotonic relationship between predicted and measured fitness values, making it robust to nonlinear score transformations. ProteinGym (Notin et al., NeurIPS 2023) established a comprehensive benchmark of 217 DMS assays and uses Spearman correlation as the main ranking metric for comparing mutation effect predictors. The FLIP benchmark (Dallago et al., NeurIPS 2021 Datasets) also adopted Spearman correlation for evaluating fitness landscape predictions across multiple protein families. High Spearman correlation (>0.5) indicates the model captures relative fitness ordering well. Reference: Notin et al., 'ProteinGym: Large-Scale Benchmarks for Protein Fitness Prediction and Design', NeurIPS 2023; Dallago et al., 'FLIP: Benchmark tasks in fitness landscape inference for proteins', NeurIPS 2021 Datasets and Benchmarks.",
+            "code": "from scipy import stats\nimport numpy as np\n\n# Simulated DMS experimental fitness values and model predictions\nnp.random.seed(42)\nn_variants = 500\ntrue_fitness = np.random.randn(n_variants)\npredicted_scores = 0.6 * true_fitness + 0.4 * np.random.randn(n_variants)\n\n# Compute Spearman rank correlation\ncorrelation, pvalue = stats.{{b1}}(true_fitness, predicted_scores)\n\nprint(f\"Spearman rho: {correlation:.4f}\")\nprint(f\"P-value: {pvalue:.2e}\")\nprint(f\"Significant: {pvalue < {{b2}}}\")\n\n# Also compute for comparison\npearson_r, _ = stats.{{b3}}(true_fitness, predicted_scores)\nprint(f\"Pearson r: {pearson_r:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "stats.???() # rank correlation function",
+                    "acceptable": ["spearmanr"],
+                    "hint": "Use scipy.stats.spearmanr to compute Spearman rank correlation."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? # significance threshold",
+                    "acceptable": ["0.05"],
+                    "hint": "The standard significance threshold (alpha) is 0.05."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "stats.???() # linear correlation function",
+                    "acceptable": ["pearsonr"],
+                    "hint": "Use scipy.stats.pearsonr to compute Pearson linear correlation."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_auroc_auprc",
+            "title": "AUROC and AUPRC for Function Classification",
+            "difficulty": "easy",
+            "description": "Compute AUROC and AUPRC metrics to evaluate a binary protein function classifier, handling the class imbalance typical in GO annotation.",
+            "info": "Area Under the Receiver Operating Characteristic curve (AUROC) and Area Under the Precision-Recall Curve (AUPRC) are standard metrics for evaluating binary classifiers in protein function prediction. AUROC measures how well the model ranks positive examples above negative ones, while AUPRC is more informative when classes are imbalanced, as is common in GO term prediction where most proteins lack a given annotation. The CAFA challenges (Radivojac et al., Nature Methods 2013) use both term-centric AUROC and protein-centric Fmax. AUPRC is preferred over AUROC in highly imbalanced settings because AUROC can be misleadingly high when the negative class dominates. The TAPE benchmark (Rao et al., NeurIPS 2019) also employs these metrics for evaluating downstream tasks. Reference: Radivojac et al., 'A large-scale evaluation of computational protein function prediction', Nature Methods 2013; Rao et al., 'Evaluating protein transfer learning with TAPE', NeurIPS 2019.",
+            "code": "from sklearn.metrics import roc_auc_score, average_precision_score\nimport numpy as np\n\nnp.random.seed(42)\n# Imbalanced dataset: only 5% positive (typical for GO terms)\nn = 1000\ny_true = np.zeros(n)\ny_true[:50] = 1  # 50 positive out of 1000\nnp.random.shuffle(y_true)\n\n# Model prediction scores (probabilities)\ny_scores = np.random.beta(2, 5, n)\ny_scores[y_true == 1] += 0.3  # positive examples score higher\ny_scores = np.clip(y_scores, 0, 1)\n\n# Compute metrics\nauroc = {{b1}}(y_true, y_scores)\nauprc = {{b2}}(y_true, y_scores)\n\nprint(f\"AUROC: {auroc:.4f}\")\nprint(f\"AUPRC: {auprc:.4f}\")\nprint(f\"Random baseline AUPRC: {{{b3}}:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???(y_true, y_scores) # ROC AUC",
+                    "acceptable": ["roc_auc_score"],
+                    "hint": "Use roc_auc_score from sklearn.metrics to compute AUROC."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???(y_true, y_scores) # precision-recall AUC",
+                    "acceptable": ["average_precision_score"],
+                    "hint": "Use average_precision_score from sklearn.metrics to compute AUPRC."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.???(y_true) # baseline = prevalence",
+                    "acceptable": ["np.mean(y_true)", "y_true.mean()"],
+                    "hint": "The random baseline for AUPRC equals the prevalence (mean) of positives."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_dms_fitness",
+            "title": "Fitness Landscape from DMS Data",
+            "difficulty": "medium",
+            "description": "Build a supervised model to predict protein fitness from one-hot encoded mutations using deep mutational scanning (DMS) data.",
+            "info": "Deep mutational scanning (DMS) experiments measure the functional effect of thousands of single amino acid substitutions in a protein, generating fitness landscape data. The FLIP benchmark (Dallago et al., NeurIPS 2021 Datasets) provides curated DMS datasets across multiple protein families including AAV, GFP, and thermostability assays, with standardized train/test splits. ProteinGym (Notin et al., NeurIPS 2023) aggregates 217 DMS assays spanning diverse functions and organisms for benchmarking mutation effect predictors. Supervised models trained on DMS data typically take mutation features as input and regress onto the measured fitness score. The simplest encoding represents each mutation as a one-hot vector over the sequence position and amino acid identity. Reference: Dallago et al., 'FLIP: Benchmark tasks in fitness landscape inference for proteins', NeurIPS 2021 Datasets and Benchmarks; Notin et al., 'ProteinGym: Large-Scale Benchmarks for Protein Fitness Prediction and Design', NeurIPS 2023.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass FitnessPredictor(nn.Module):\n    def __init__(self, seq_len=200, num_aa=20):\n        super().__init__()\n        input_dim = seq_len * num_aa  # one-hot mutation encoding\n        self.net = nn.Sequential(\n            nn.Linear(input_dim, 256),\n            nn.ReLU(),\n            nn.Dropout(0.2),\n            nn.Linear(256, 64),\n            nn.ReLU(),\n            nn.Linear(64, {{b1}})  # scalar fitness\n        )\n\n    def forward(self, x):\n        return self.net(x).squeeze(-1)\n\nmodel = FitnessPredictor()\ncriterion = {{b2}}\n\n# One-hot encoded mutations: (batch, seq_len * 20)\nmutations = torch.zeros(32, 200 * 20)\nfor i in range(32):\n    pos = torch.randint(0, 200, (1,)).item()\n    aa = torch.randint(0, 20, (1,)).item()\n    mutations[i, pos * 20 + aa] = 1.0\n\nfitness = torch.randn(32)  # experimental fitness values\npred = model(mutations)\nloss = criterion(pred, {{b3}})",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? # output size for regression",
+                    "acceptable": ["1"],
+                    "hint": "Regression to a single scalar fitness value requires output dimension 1."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "nn.???() # regression loss",
+                    "acceptable": ["nn.MSELoss()", "nn.HuberLoss()"],
+                    "hint": "Mean Squared Error (MSE) loss is standard for regression tasks."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? # target fitness values",
+                    "acceptable": ["fitness"],
+                    "hint": "Pass the fitness tensor as the regression target."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_zero_shot_mutation",
+            "title": "Zero-Shot Mutation Effect Prediction",
+            "difficulty": "hard",
+            "description": "Implement zero-shot mutation effect scoring using masked language model log-likelihood ratios, following the ESM approach.",
+            "info": "Zero-shot mutation effect prediction uses pretrained protein language models to score mutations without any task-specific training data. The approach computes the log-likelihood ratio between the mutant and wildtype amino acids at the mutated position using the masked language modeling objective. ESM-1v (Meier et al., NeurIPS 2021) showed that this simple approach achieves state-of-the-art correlation with DMS experiments, and the ProteinGym benchmark (Notin et al., NeurIPS 2023) confirmed that ESM-based zero-shot scoring remains highly competitive. The score is computed as log P(mutant_aa | context) - log P(wildtype_aa | context), where the context is the surrounding sequence with the target position masked. Positive scores indicate the mutation is predicted to be beneficial. Reference: Meier et al., 'Language models enable zero-shot prediction of the effects of mutations on protein function', NeurIPS 2021; Notin et al., 'ProteinGym: Large-Scale Benchmarks for Protein Fitness Prediction and Design', NeurIPS 2023.",
+            "code": "import torch\nimport torch.nn.functional as F\nimport numpy as np\n\ndef zero_shot_mutation_score(log_probs, position, wildtype_idx, mutant_idx):\n    \"\"\"Score a mutation using masked LM log-likelihood ratio.\n    log_probs: (seq_len, vocab_size) log-probabilities from masked LM\n    position: int, 0-indexed mutation position\n    wildtype_idx: int, vocab index of wildtype amino acid\n    mutant_idx: int, vocab index of mutant amino acid\n    Returns: float, mutation effect score\n    \"\"\"\n    log_p_mut = log_probs[position, {{b1}}]\n    log_p_wt = log_probs[position, {{b2}}]\n    return (log_p_mut - log_p_wt).item()\n\n# Simulate masked LM output\ntorch.manual_seed(42)\nseq_len, vocab_size = 100, 33  # 20 AAs + special tokens\nlogits = torch.randn(seq_len, vocab_size)\nlog_probs = {{b3}}(logits, dim=-1)\n\n# Score mutation at position 50: Ala(5) -> Val(10)\nscore = zero_shot_mutation_score(log_probs, position=50,\n                                  wildtype_idx=5, mutant_idx=10)\nprint(f\"Mutation effect score: {score:.4f}\")\nprint(f\"Interpretation: {'Beneficial' if score > 0 else 'Deleterious'}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? # index for mutant",
+                    "acceptable": ["mutant_idx"],
+                    "hint": "Index into the log-probability vector using the mutant amino acid index."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? # index for wildtype",
+                    "acceptable": ["wildtype_idx"],
+                    "hint": "Index into the log-probability vector using the wildtype amino acid index."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "F.???(logits, dim=-1) # convert to log-probs",
+                    "acceptable": ["F.log_softmax"],
+                    "hint": "Use F.log_softmax to convert raw logits to log-probabilities."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_stability_ddg",
+            "title": "Stability Prediction (ddG Regression)",
+            "difficulty": "medium",
+            "description": "Train a model to predict change in protein stability (ddG) upon mutation using protein embeddings and mutation features.",
+            "info": "Protein stability prediction estimates the change in Gibbs free energy of folding (ddG) caused by a mutation. Negative ddG values indicate stabilizing mutations, while positive values indicate destabilizing ones. ThermoMPNN (Dieckhaus et al., 2024) and other structure-aware models combine structural features with sequence information for ddG prediction. The FLIP benchmark (Dallago et al., NeurIPS 2021 Datasets) includes thermostability prediction tasks from the Meltome dataset. ProTherm (Kumar et al., NAR 2006) provides experimental ddG measurements for training. A common approach concatenates the wildtype protein embedding with a mutation feature vector encoding the position and amino acid change, then regresses onto the experimental ddG value. Reference: Dallago et al., 'FLIP: Benchmark tasks in fitness landscape inference for proteins', NeurIPS 2021 Datasets and Benchmarks; Dieckhaus et al., 'Transfer learning to leverage larger datasets for improved prediction of protein stability changes', 2024.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass StabilityPredictor(nn.Module):\n    def __init__(self, embed_dim=1280, mut_feat_dim=40):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(embed_dim + mut_feat_dim, 256),\n            nn.ReLU(),\n            nn.Dropout(0.3),\n            nn.Linear(256, 64),\n            nn.ReLU(),\n            nn.Linear(64, 1)\n        )\n\n    def forward(self, protein_emb, mutation_feat):\n        combined = {{b1}}\n        return self.net(combined).squeeze(-1)\n\nmodel = StabilityPredictor()\ncriterion = nn.MSELoss()\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-4)\n\n# Training data\nprotein_emb = torch.randn(32, 1280)  # protein embeddings\nmut_feat = torch.randn(32, 40)  # mutation features (position + AA one-hots)\nddg_true = torch.randn(32) * 2  # experimental ddG in kcal/mol\n\n# Training step\noptimizer.{{b2}}\nddg_pred = model(protein_emb, mut_feat)\nloss = criterion(ddg_pred, ddg_true)\nloss.backward()\noptimizer.{{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???([ , ], dim=-1) # concatenate features",
+                    "acceptable": ["torch.cat([protein_emb, mutation_feat], dim=-1)", "torch.cat([protein_emb, mutation_feat], dim=1)"],
+                    "hint": "Use torch.cat to concatenate protein embedding and mutation features along the feature dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???() # reset gradients",
+                    "acceptable": ["zero_grad()"],
+                    "hint": "Call zero_grad() on the optimizer to clear accumulated gradients before backprop."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "???() # update weights",
+                    "acceptable": ["step()"],
+                    "hint": "Call step() on the optimizer to update model parameters using computed gradients."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_go_hierarchy",
+            "title": "GO Hierarchy-Aware Loss Function",
+            "difficulty": "hard",
+            "description": "Implement a hierarchy-aware loss for GO prediction that enforces parent-child consistency in the Gene Ontology DAG.",
+            "info": "The Gene Ontology is structured as a directed acyclic graph (DAG) where child terms imply their parent terms (true-path rule). A protein annotated with 'kinase activity' must also be annotated with 'transferase activity'. DeepGOPlus (Kulmanov & Hoehndorf, Bioinformatics 2020) enforced this hierarchy by propagating predictions upward through the GO DAG. The CAFA challenges (Radivojac et al., Nature Methods 2013) require predictions to satisfy the true-path rule for valid evaluation. Hierarchy-aware losses add a penalty when a child term has higher probability than its parent, encouraging ontologically consistent predictions. This can be implemented as a max-margin constraint: for each parent-child pair, the parent score should be at least as high as the child score. Reference: Kulmanov & Hoehndorf, 'DeepGOPlus: improved protein function prediction from sequence', Bioinformatics 2020; Radivojac et al., 'A large-scale evaluation of computational protein function prediction', Nature Methods 2013.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef hierarchy_aware_loss(predictions, targets, parent_child_pairs, alpha=0.1):\n    \"\"\"BCE loss + hierarchy consistency penalty.\n    predictions: (batch, num_terms) predicted probabilities\n    targets: (batch, num_terms) binary labels\n    parent_child_pairs: list of (parent_idx, child_idx) tuples\n    \"\"\"\n    # Standard BCE loss\n    bce_loss = nn.functional.binary_cross_entropy(\n        predictions, targets, reduction='mean'\n    )\n\n    # Hierarchy penalty: parent should have >= child probability\n    hierarchy_penalty = 0.0\n    for parent_idx, child_idx in parent_child_pairs:\n        parent_prob = predictions[:, parent_idx]\n        child_prob = predictions[:, child_idx]\n        # Penalize when child_prob > parent_prob\n        violation = {{b1}}\n        hierarchy_penalty += violation.mean()\n\n    if len(parent_child_pairs) > 0:\n        hierarchy_penalty /= {{b2}}\n\n    total_loss = bce_loss + alpha * hierarchy_penalty\n    return {{b3}}\n\n# Example with 10 GO terms and 3 parent-child relationships\npredictions = torch.sigmoid(torch.randn(16, 10))\ntargets = torch.zeros(16, 10).bernoulli_(0.1)\npairs = [(0, 3), (0, 5), (1, 7)]  # term 0 is parent of 3 and 5, etc.\n\nloss = hierarchy_aware_loss(predictions, targets, pairs)\nprint(f\"Hierarchy-aware loss: {loss.item():.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(child_prob - parent_prob, ???) # ReLU-style penalty",
+                    "acceptable": ["torch.clamp(child_prob - parent_prob, min=0)", "torch.relu(child_prob - parent_prob)", "F.relu(child_prob - parent_prob)"],
+                    "hint": "Use torch.clamp with min=0 (or torch.relu) so only violations (child > parent) are penalized."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "len(???) # normalize by number of constraints",
+                    "acceptable": ["len(parent_child_pairs)"],
+                    "hint": "Normalize the penalty by the number of parent-child pairs."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? # return combined loss",
+                    "acceptable": ["total_loss"],
+                    "hint": "Return the total_loss which combines BCE loss and the hierarchy penalty."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_tape_remote_homology",
+            "title": "Remote Homology Detection (TAPE Benchmark)",
+            "difficulty": "medium",
+            "description": "Set up a protein fold classification model for remote homology detection using the TAPE benchmark task structure.",
+            "info": "Remote homology detection classifies proteins into fold categories based on structural similarity, even when sequence similarity is low. The TAPE benchmark (Rao et al., NeurIPS 2019) includes remote homology detection as one of five supervised tasks for evaluating protein representations, with 1195 fold classes. In this task, models must generalize across superfamily boundaries: test set proteins share no superfamily membership with training proteins. This tests whether learned representations capture structural information beyond simple sequence similarity. Pretrained protein language models like ESM (Rives et al., PNAS 2021) significantly improved performance on this task compared to alignment-based methods, demonstrating that self-supervised pretraining captures structural features. Reference: Rao et al., 'Evaluating protein transfer learning with TAPE', NeurIPS 2019; Rives et al., 'Biological structure and function emerge from scaling unsupervised learning to 250 million protein sequences', PNAS 2021.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass RemoteHomologyClassifier(nn.Module):\n    \"\"\"Classify proteins into fold classes (TAPE benchmark).\"\"\"\n    def __init__(self, embed_dim=1280, num_folds=1195):\n        super().__init__()\n        self.pool = nn.AdaptiveAvgPool1d(1)  # pool over sequence\n        self.classifier = nn.Sequential(\n            nn.Linear(embed_dim, 512),\n            nn.ReLU(),\n            nn.Dropout(0.5),\n            nn.Linear(512, num_folds)\n        )\n\n    def forward(self, per_residue_emb):\n        # per_residue_emb: (batch, seq_len, embed_dim)\n        x = per_residue_emb.transpose(1, 2)  # (batch, embed, seq_len)\n        pooled = self.pool(x).{{b1}}  # (batch, embed_dim)\n        return self.classifier(pooled)\n\nmodel = RemoteHomologyClassifier()\ncriterion = nn.CrossEntropyLoss()\n\n# Variable-length sequences padded to max_len=256\nemb = torch.randn(8, 256, 1280)\nfold_labels = torch.randint(0, 1195, (8,))\n\nlogits = model(emb)\nloss = criterion(logits, fold_labels)\n\n# Accuracy computation\npredictions = torch.{{b2}}(logits, dim=-1)\naccuracy = (predictions == fold_labels).{{b3}}().item()\nprint(f\"Accuracy: {accuracy:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???(1, 2) # remove pooled dimension",
+                    "acceptable": ["squeeze(1, 2)", "squeeze(-1)"],
+                    "hint": "Use squeeze to remove the length dimension after adaptive pooling reduces it to 1."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(logits, dim=-1) # get predicted class",
+                    "acceptable": ["argmax"],
+                    "hint": "Use torch.argmax to get the index of the highest logit for each sample."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": ".???().item() # compute mean",
+                    "acceptable": ["float().mean()", "sum().item() / len(fold_labels)"],
+                    "hint": "Convert the boolean tensor to float and compute the mean for accuracy."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_proteingym_eval",
+            "title": "ProteinGym-Style DMS Benchmark Evaluation",
+            "difficulty": "medium",
+            "description": "Implement evaluation code for scoring mutation effect predictors across multiple DMS assays, following the ProteinGym protocol.",
+            "info": "ProteinGym (Notin et al., NeurIPS 2023) is a large-scale benchmark comprising 217 deep mutational scanning assays for standardized evaluation of mutation effect predictors. The benchmark reports per-assay Spearman correlation between predicted scores and experimental measurements, then aggregates results using the mean across all assays. This approach prevents bias toward assays with more variants. The benchmark evaluates both zero-shot methods (using pretrained models without DMS training data) and supervised methods (trained on partial DMS data). Results showed that combining evolutionary and structure-based information yields the best predictions, with methods like Tranception and ESM-1v performing well in the zero-shot setting. Reference: Notin et al., 'ProteinGym: Large-Scale Benchmarks for Protein Fitness Prediction and Design', NeurIPS 2023; Meier et al., 'Language models enable zero-shot prediction of the effects of mutations on protein function', NeurIPS 2021.",
+            "code": "import numpy as np\nfrom scipy.stats import spearmanr\n\ndef evaluate_across_assays(predictions_dict, ground_truth_dict):\n    \"\"\"Evaluate mutation effect predictor across multiple DMS assays.\n    predictions_dict: {assay_name: np.array of predicted scores}\n    ground_truth_dict: {assay_name: np.array of experimental fitness}\n    Returns: per-assay Spearman and mean Spearman\n    \"\"\"\n    per_assay_results = {}\n\n    for assay_name in predictions_dict:\n        pred = predictions_dict[assay_name]\n        true = ground_truth_dict[assay_name]\n\n        rho, pval = {{b1}}(pred, true)\n        per_assay_results[assay_name] = {\n            'spearman': rho,\n            'pvalue': pval,\n            'n_variants': len(pred)\n        }\n\n    # Aggregate: mean Spearman across assays (unweighted)\n    all_spearman = [r['spearman'] for r in per_assay_results.values()]\n    mean_spearman = {{b2}}\n\n    return per_assay_results, mean_spearman\n\n# Simulate 5 DMS assays with different sizes\nnp.random.seed(42)\nassay_names = ['GFP', 'AAV', 'TEM-1', 'GB1', 'Pab1']\npredictions = {}\nground_truth = {}\nfor name in assay_names:\n    n = np.random.randint(200, 2000)\n    gt = np.random.randn(n)\n    predictions[name] = 0.5 * gt + 0.5 * np.random.randn(n)\n    ground_truth[name] = gt\n\nresults, mean_rho = evaluate_across_assays(predictions, ground_truth)\nfor name, res in results.items():\n    print(f\"{name}: rho={res['spearman']:.3f}, n={res[{{b3}}]}\")\nprint(f\"\\nMean Spearman: {mean_rho:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???(pred, true) # Spearman correlation",
+                    "acceptable": ["spearmanr"],
+                    "hint": "Use the imported spearmanr function from scipy.stats."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.???(all_spearman) # aggregate metric",
+                    "acceptable": ["np.mean(all_spearman)"],
+                    "hint": "Compute the unweighted mean of Spearman correlations across assays."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "'???' # key for number of variants",
+                    "acceptable": ["'n_variants'", "\"n_variants\""],
+                    "hint": "Access the 'n_variants' key from the results dictionary."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_flip_splits",
+            "title": "FLIP Benchmark Data Splitting Strategy",
+            "difficulty": "medium",
+            "description": "Implement the train/test splitting strategies from the FLIP benchmark including random, mutant-based, and position-based splits.",
+            "info": "The FLIP benchmark (Dallago et al., NeurIPS 2021 Datasets) introduced multiple data splitting strategies to test different generalization capabilities of fitness prediction models. Random splits test interpolation ability, while position-based splits test generalization to unseen mutation positions. The mutant-count split groups variants by the number of simultaneous mutations, testing extrapolation from single to multiple mutations. These splits reveal that many models achieve high random-split performance but fail to generalize across positions or mutation depths, highlighting the gap between interpolation and extrapolation in protein fitness prediction. FLIP covers proteins including AAV capsid, GFP fluorescence, GB1 binding, and thermostability datasets. Reference: Dallago et al., 'FLIP: Benchmark tasks in fitness landscape inference for proteins', NeurIPS 2021 Datasets and Benchmarks.",
+            "code": "import numpy as np\nfrom sklearn.model_selection import train_test_split\n\ndef flip_random_split(X, y, test_size=0.2, random_state=42):\n    \"\"\"Standard random split.\"\"\"\n    return train_test_split(X, y, test_size=test_size,\n                           random_state=random_state)\n\ndef flip_position_split(X, y, positions, held_out_positions):\n    \"\"\"Hold out mutations at specific positions.\"\"\"\n    test_mask = np.isin(positions, held_out_positions)\n    train_mask = {{b1}}\n    return X[train_mask], X[test_mask], y[train_mask], y[test_mask]\n\ndef flip_mutation_depth_split(X, y, num_mutations, max_train_depth=1):\n    \"\"\"Train on single mutants, test on higher-order.\"\"\"\n    train_mask = num_mutations {{b2}} max_train_depth\n    test_mask = num_mutations > max_train_depth\n    return X[train_mask], X[test_mask], y[train_mask], y[test_mask]\n\n# Example data: 1000 variants\nnp.random.seed(42)\nn_variants = 1000\nX = np.random.randn(n_variants, 128)\ny = np.random.randn(n_variants)\npositions = np.random.randint(1, 237, n_variants)  # GFP has 237 positions\nnum_mutations = np.random.choice([1, 1, 1, 2, 2, 3], n_variants)\n\n# Position split: hold out positions 100-120\nX_tr, X_te, y_tr, y_te = flip_position_split(\n    X, y, positions, held_out_positions={{b3}})\nprint(f\"Position split - Train: {len(X_tr)}, Test: {len(X_te)}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "~??? # boolean negation for train",
+                    "acceptable": ["~test_mask"],
+                    "hint": "The train mask is the boolean negation (~) of the test mask."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? # comparison operator",
+                    "acceptable": ["<="],
+                    "hint": "Training includes variants with mutation count less than or equal to max_train_depth."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? # range or list of held-out positions",
+                    "acceptable": ["list(range(100, 121))", "np.arange(100, 121)", "list(range(100, 120))", "np.arange(100, 120)"],
+                    "hint": "Create a list or array of positions 100 through 120 to hold out."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_multilabel_auroc",
+            "title": "Per-Term AUROC for Multi-Label GO Prediction",
+            "difficulty": "medium",
+            "description": "Compute per-GO-term AUROC scores and macro-averaged AUROC for multi-label protein function prediction.",
+            "info": "In multi-label GO term prediction, evaluation must account for the independent nature of each GO term prediction. The term-centric evaluation computes AUROC for each GO term separately, then averages across terms. The CAFA challenges (Radivojac et al., Nature Methods 2013) use both term-centric and protein-centric evaluation views. DeepGO (Kulmanov et al., Bioinformatics 2018) reported per-ontology AUROC scores across MF, BP, and CC sub-ontologies. A key consideration is that GO terms with very few positive examples may have unreliable AUROC estimates, so terms with fewer than a minimum number of positive annotations are often excluded from the macro-average. ProteInfer (Sanderson et al., Cell Systems 2023) demonstrated strong multi-label classification performance across thousands of GO terms. Reference: Kulmanov et al., 'DeepGO: predicting protein functions from sequence and interactions using a deep ontology-aware classifier', Bioinformatics 2018; Sanderson et al., 'ProteInfer, deep neural networks for protein functional inference', Cell Systems 2023.",
+            "code": "import numpy as np\nfrom sklearn.metrics import roc_auc_score\n\ndef per_term_auroc(y_true, y_scores, min_positive=5):\n    \"\"\"Compute per-GO-term AUROC with minimum support filter.\n    y_true: (n_proteins, n_terms) binary\n    y_scores: (n_proteins, n_terms) predicted probabilities\n    \"\"\"\n    n_terms = y_true.shape[1]\n    term_aurocs = []\n\n    for i in range(n_terms):\n        n_pos = {{b1}}\n        n_neg = y_true.shape[0] - n_pos\n\n        # Need both positive and negative examples, with minimum support\n        if n_pos >= min_positive and n_neg >= min_positive:\n            auc = roc_auc_score(y_true[:, i], y_scores[:, i])\n            term_aurocs.append(auc)\n\n    macro_auroc = {{b2}} if term_aurocs else 0.0\n    return term_aurocs, macro_auroc\n\n# Simulated data: 500 proteins, 100 GO terms\nnp.random.seed(42)\ny_true = np.random.binomial(1, 0.1, (500, 100))\ny_scores = np.random.beta(2, 5, (500, 100))\ny_scores[y_true == 1] += np.random.uniform(0.2, 0.5, y_true.sum())\ny_scores = np.clip(y_scores, 0, 1)\n\nterm_aucs, macro = per_term_auroc(y_true, y_scores)\nprint(f\"Terms evaluated: {{{b3}}}\")\nprint(f\"Macro AUROC: {macro:.4f}\")\nprint(f\"Best term AUROC: {max(term_aucs):.4f}\")\nprint(f\"Worst term AUROC: {min(term_aucs):.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sum(y_true[:, ???]) # count positives for term i",
+                    "acceptable": ["np.sum(y_true[:, i])", "y_true[:, i].sum()"],
+                    "hint": "Sum the binary labels for term i across all proteins."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.???(term_aurocs) # macro average",
+                    "acceptable": ["np.mean(term_aurocs)"],
+                    "hint": "Macro-averaged AUROC is the simple mean of per-term AUROCs."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "len(???) # number of evaluated terms",
+                    "acceptable": ["len(term_aucs)", "len(term_aurocs)"],
+                    "hint": "Count how many terms had sufficient positive/negative examples to compute AUROC."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_ppi_graph",
+            "title": "GNN-Based Protein Interaction Network Prediction",
+            "difficulty": "hard",
+            "description": "Implement a graph neural network layer for predicting interactions in a protein-protein interaction network using message passing.",
+            "info": "Graph neural networks (GNNs) are naturally suited for protein-protein interaction (PPI) networks where proteins are nodes and interactions are edges. DeepGO (Kulmanov et al., Bioinformatics 2018) incorporated protein interaction network features alongside sequence information for GO prediction, demonstrating that network context improves function prediction. GNN-based approaches propagate information along the PPI graph, allowing a protein's predicted function to be informed by its interaction partners. Message passing neural networks (MPNNs) iteratively update node representations by aggregating features from neighboring nodes. The node update rule combines the current node embedding with aggregated neighbor messages. Link prediction in PPI networks is typically formulated by scoring pairs of node embeddings with a dot product or learned classifier. Reference: Kulmanov et al., 'DeepGO: predicting protein functions from sequence and interactions using a deep ontology-aware classifier', Bioinformatics 2018; Zitnik & Leskovec, 'Predicting multicellular function through multi-layer tissue networks', Bioinformatics 2017.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass PPIGraphConv(nn.Module):\n    \"\"\"Simple graph convolution for PPI networks.\"\"\"\n    def __init__(self, in_dim, out_dim):\n        super().__init__()\n        self.linear = nn.Linear(in_dim, out_dim)\n        self.activation = nn.ReLU()\n\n    def forward(self, node_features, adj_matrix):\n        # adj_matrix: (n_nodes, n_nodes) normalized adjacency\n        # Aggregate neighbor features\n        aggregated = {{b1}}  # message passing\n        out = self.linear(aggregated)\n        return self.activation(out)\n\nclass PPILinkPredictor(nn.Module):\n    def __init__(self, embed_dim=1280, hidden_dim=256):\n        super().__init__()\n        self.conv1 = PPIGraphConv(embed_dim, hidden_dim)\n        self.conv2 = PPIGraphConv(hidden_dim, hidden_dim)\n\n    def forward(self, node_features, adj_matrix, edge_pairs):\n        h = self.conv1(node_features, adj_matrix)\n        h = self.conv2(h, adj_matrix)\n        # Score edges by dot product of node embeddings\n        src, dst = edge_pairs[:, 0], edge_pairs[:, 1]\n        scores = (h[src] * h[dst]).{{b2}}\n        return scores\n\n# Example: 50 proteins in a PPI network\nn_nodes = 50\nadj = torch.zeros(n_nodes, n_nodes)\nfor _ in range(100):\n    i, j = torch.randint(0, n_nodes, (2,))\n    adj[i, j] = adj[j, i] = 1.0\n# Add self-loops and normalize\nadj = adj + {{b3}}\nadj = adj / adj.sum(dim=1, keepdim=True)\n\nnode_feat = torch.randn(n_nodes, 1280)\nedge_pairs = torch.randint(0, n_nodes, (20, 2))\n\nmodel = PPILinkPredictor()\nscores = model(node_feat, adj, edge_pairs)\nprint(f\"Edge scores shape: {scores.shape}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? @ node_features # graph convolution",
+                    "acceptable": ["adj_matrix @ node_features", "torch.mm(adj_matrix, node_features)", "torch.matmul(adj_matrix, node_features)"],
+                    "hint": "Multiply the adjacency matrix by node features to aggregate neighbor information."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "sum(dim=???) # dot product score",
+                    "acceptable": ["sum(dim=-1)", "sum(dim=1)"],
+                    "hint": "Sum the element-wise product along the feature dimension to compute dot product scores."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.???(n_nodes) # self-loop matrix",
+                    "acceptable": ["torch.eye(n_nodes)"],
+                    "hint": "Add an identity matrix (torch.eye) to include self-loops in the adjacency matrix."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_supervised_mutation",
+            "title": "Supervised Mutation Effect Prediction with ESM Embeddings",
+            "difficulty": "medium",
+            "description": "Build a supervised regression model that uses ESM-2 embeddings of wildtype and mutant sequences to predict mutation effects.",
+            "info": "Supervised mutation effect prediction uses labeled DMS data to train models on protein representations from language models. Unlike zero-shot approaches, supervised methods can learn assay-specific relationships between sequence features and experimental measurements. The ProteinGym benchmark (Notin et al., NeurIPS 2023) showed that supervised methods generally outperform zero-shot approaches when sufficient training data is available, but may overfit to specific assay conditions. A common approach computes the difference between mutant and wildtype embeddings as input features, capturing the representational shift caused by the mutation. ESM-2 (Lin et al., Science 2023) provides high-quality embeddings that capture evolutionary and structural information. The FLIP benchmark (Dallago et al., NeurIPS 2021 Datasets) provides standardized train/test splits for fair comparison. Reference: Notin et al., 'ProteinGym: Large-Scale Benchmarks for Protein Fitness Prediction and Design', NeurIPS 2023; Dallago et al., 'FLIP: Benchmark tasks in fitness landscape inference for proteins', NeurIPS 2021 Datasets and Benchmarks.",
+            "code": "import torch\nimport torch.nn as nn\nfrom scipy.stats import spearmanr\n\nclass SupervisedMutationPredictor(nn.Module):\n    def __init__(self, embed_dim=1280):\n        super().__init__()\n        # Input: difference between mutant and wildtype embeddings\n        self.regressor = nn.Sequential(\n            nn.Linear(embed_dim, 256),\n            nn.ReLU(),\n            nn.Dropout(0.2),\n            nn.Linear(256, 64),\n            nn.ReLU(),\n            nn.Linear(64, 1)\n        )\n\n    def forward(self, wt_emb, mut_emb):\n        delta = {{b1}}  # embedding difference\n        return self.regressor(delta).squeeze(-1)\n\nmodel = SupervisedMutationPredictor()\ncriterion = nn.MSELoss()\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\n# Simulated training data\nwt_embeddings = torch.randn(64, 1280).expand(64, -1)  # same WT\nmut_embeddings = wt_embeddings + 0.1 * torch.randn(64, 1280)\nfitness_labels = torch.randn(64)\n\n# Train step\nmodel.train()\npred = model(wt_embeddings, mut_embeddings)\nloss = criterion(pred, fitness_labels)\noptimizer.zero_grad()\nloss.backward()\noptimizer.step()\n\n# Evaluate\nmodel.{{b2}}\nwith torch.{{b3}}:\n    pred_eval = model(wt_embeddings, mut_embeddings)\n    rho, _ = spearmanr(pred_eval.numpy(), fitness_labels.numpy())\n    print(f\"Spearman rho: {rho:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? - ??? # embedding change from mutation",
+                    "acceptable": ["mut_emb - wt_emb"],
+                    "hint": "Compute the difference: mutant embedding minus wildtype embedding."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "???() # switch to evaluation mode",
+                    "acceptable": ["eval()"],
+                    "hint": "Call eval() to switch the model to evaluation mode (disables dropout)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.???(): # disable gradient computation",
+                    "acceptable": ["no_grad()"],
+                    "hint": "Use torch.no_grad() context to disable gradient tracking during evaluation."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_cafa_smin",
+            "title": "Smin Metric for Ontology-Aware Evaluation (CAFA)",
+            "difficulty": "hard",
+            "description": "Implement the Smin (minimum semantic distance) metric used in CAFA alongside Fmax for ontology-aware evaluation of GO predictions.",
+            "info": "The Smin metric, used alongside Fmax in CAFA evaluations, measures the minimum semantic distance between predicted and true GO annotation sets across all thresholds. It is based on information content (IC) of GO terms, weighting more specific (rarer) terms higher than general ones. The information content of a GO term is calculated as the negative log of its annotation frequency: IC(t) = -log2(freq(t)). Smin combines remaining uncertainty (ru) -- IC of true terms not predicted -- and misinformation (mi) -- IC of predicted terms that are not true. The CAFA challenge (Radivojac et al., Nature Methods 2013) uses Smin to complement Fmax because it accounts for the specificity of GO terms, penalizing more for missing or hallucinating specific functional annotations. Lower Smin indicates better predictions. Reference: Radivojac et al., 'A large-scale evaluation of computational protein function prediction', Nature Methods 2013; Clark & Radivojac, 'Information-theoretic evaluation of predicted ontological annotations', Bioinformatics 2013.",
+            "code": "import numpy as np\n\ndef compute_smin(y_true, y_scores, ic_values, thresholds=None):\n    \"\"\"Compute Smin: minimum semantic distance over thresholds.\n    y_true: (n_proteins, n_terms) binary annotations\n    y_scores: (n_proteins, n_terms) predicted probabilities\n    ic_values: (n_terms,) information content per GO term\n    \"\"\"\n    if thresholds is None:\n        thresholds = np.arange(0.01, 1.0, 0.01)\n\n    best_smin = float('inf')\n    for t in thresholds:\n        y_pred = (y_scores >= t).astype(int)\n\n        ru_list, mi_list = [], []\n        for i in range(y_true.shape[0]):\n            # Remaining uncertainty: IC of true terms NOT predicted\n            fn_terms = (y_true[i] == 1) & (y_pred[i] == 0)\n            ru = np.sum(ic_values[{{b1}}])\n\n            # Misinformation: IC of predicted terms that are NOT true\n            fp_terms = (y_true[i] == 0) & (y_pred[i] == 1)\n            mi = np.sum(ic_values[fp_terms])\n\n            ru_list.append(ru)\n            mi_list.append(mi)\n\n        avg_ru = np.mean(ru_list)\n        avg_mi = np.mean(mi_list)\n        smin = np.sqrt(avg_ru**2 + {{b2}})\n        best_smin = {{b3}}\n\n    return best_smin\n\n# Example: 100 proteins, 50 GO terms\nnp.random.seed(42)\ny_true = np.random.binomial(1, 0.1, (100, 50))\ny_scores = np.random.beta(2, 5, (100, 50))\ny_scores[y_true == 1] += 0.3\ny_scores = np.clip(y_scores, 0, 1)\n\n# IC values: rarer terms have higher IC\nterm_freq = np.random.uniform(0.01, 0.5, 50)\nic_values = -np.log2(term_freq)\n\nsmin = compute_smin(y_true, y_scores, ic_values)\nprint(f\"Smin: {smin:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? # boolean mask for false negatives",
+                    "acceptable": ["fn_terms"],
+                    "hint": "Use the fn_terms boolean mask to select IC values of missed true annotations."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "avg_mi**??? # squared misinformation",
+                    "acceptable": ["avg_mi**2"],
+                    "hint": "Smin = sqrt(ru^2 + mi^2), so square the average misinformation term."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "???(best_smin, smin) # keep minimum",
+                    "acceptable": ["min(best_smin, smin)"],
+                    "hint": "Take the minimum semantic distance across all thresholds."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_proteinfer_dilated",
+            "title": "Dilated Convolutions for Function Prediction (ProteInfer-Style)",
+            "difficulty": "hard",
+            "description": "Implement dilated convolutional layers as used in ProteInfer for predicting protein functions directly from amino acid sequences.",
+            "info": "ProteInfer (Sanderson et al., Cell Systems 2023) uses dilated convolutional neural networks to predict protein functions (GO terms and EC numbers) directly from amino acid sequences. Dilated convolutions expand the receptive field exponentially without increasing the number of parameters, allowing the model to capture long-range sequence dependencies important for function prediction. ProteInfer stacks multiple convolutional blocks with exponentially increasing dilation rates (1, 2, 4, 8, ...), similar to WaveNet architecture. The model was trained on UniProt annotations and achieved competitive performance with methods using pretrained language model embeddings, demonstrating that task-specific architectures can be effective. Global average pooling converts variable-length sequence representations to fixed-size vectors for classification. Reference: Sanderson et al., 'ProteInfer, deep neural networks for protein functional inference', Cell Systems 2023.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass DilatedBlock(nn.Module):\n    def __init__(self, channels, kernel_size=3, dilation=1):\n        super().__init__()\n        padding = dilation * (kernel_size - 1) // 2  # same padding\n        self.conv = nn.Conv1d(channels, channels,\n                              kernel_size=kernel_size,\n                              dilation={{b1}},\n                              padding=padding)\n        self.norm = nn.BatchNorm1d(channels)\n        self.activation = nn.ReLU()\n\n    def forward(self, x):\n        residual = x\n        out = self.activation(self.norm(self.conv(x)))\n        return out + residual  # residual connection\n\nclass ProteInferStyle(nn.Module):\n    def __init__(self, vocab_size=21, embed_dim=128, num_terms=500):\n        super().__init__()\n        self.embedding = nn.Embedding(vocab_size, embed_dim)\n        # Dilated conv stack with increasing dilation rates\n        self.conv_stack = nn.Sequential(\n            DilatedBlock(embed_dim, dilation=1),\n            DilatedBlock(embed_dim, dilation=2),\n            DilatedBlock(embed_dim, dilation=4),\n            DilatedBlock(embed_dim, dilation=8),\n            DilatedBlock(embed_dim, dilation=16),\n        )\n        self.pool = nn.AdaptiveAvgPool1d({{b2}})  # global average pool\n        self.classifier = nn.Linear(embed_dim, num_terms)\n\n    def forward(self, x):\n        # x: (batch, seq_len) token indices\n        h = self.embedding(x).transpose(1, 2)  # (batch, embed, seq_len)\n        h = self.conv_stack(h)\n        h = self.pool(h).squeeze(-1)  # (batch, embed_dim)\n        return {{b3}}  # (batch, num_terms)\n\nmodel = ProteInferStyle()\nseqs = torch.randint(0, 21, (8, 300))  # batch of 8, length 300\nlogits = model(seqs)\nprint(f\"Output shape: {logits.shape}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? # dilation rate parameter",
+                    "acceptable": ["dilation"],
+                    "hint": "Pass the dilation parameter to the Conv1d layer to set its dilation rate."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? # global pool output size",
+                    "acceptable": ["1"],
+                    "hint": "Global average pooling reduces the sequence dimension to 1."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "self.???(h) # final classification",
+                    "acceptable": ["self.classifier(h)"],
+                    "hint": "Pass the pooled features through the classifier layer to get per-term logits."
+                }
+            ]
+        },
+        {
+            "id": "prot_func_cross_val_fitness",
+            "title": "Cross-Validation for Fitness Prediction Evaluation",
+            "difficulty": "easy",
+            "description": "Implement k-fold cross-validation with Spearman correlation for evaluating a fitness prediction model on DMS data.",
+            "info": "Cross-validation is essential for reliable evaluation of supervised fitness prediction models, especially when DMS datasets are small. The FLIP benchmark (Dallago et al., NeurIPS 2021 Datasets) uses predefined splits rather than random cross-validation to test specific generalization capabilities. However, when evaluating on a single DMS assay without predefined splits, k-fold cross-validation provides robust performance estimates. For each fold, the model is trained on k-1 folds and evaluated on the held-out fold using Spearman correlation, then results are averaged. Scikit-learn's KFold class provides the splitting functionality. This approach avoids overfitting to a single train/test split and gives confidence intervals on model performance. Reference: Dallago et al., 'FLIP: Benchmark tasks in fitness landscape inference for proteins', NeurIPS 2021 Datasets and Benchmarks; Notin et al., 'ProteinGym: Large-Scale Benchmarks for Protein Fitness Prediction and Design', NeurIPS 2023.",
+            "code": "import numpy as np\nfrom sklearn.model_selection import KFold\nfrom sklearn.linear_model import Ridge\nfrom scipy.stats import spearmanr\n\nnp.random.seed(42)\nn_variants = 500\nX = np.random.randn(n_variants, 128)  # mutation features\ny = np.random.randn(n_variants)  # fitness values\n\nkf = KFold(n_splits={{b1}}, shuffle=True, random_state=42)\nfold_correlations = []\n\nfor fold, (train_idx, test_idx) in enumerate(kf.split(X)):\n    X_train, X_test = X[train_idx], X[test_idx]\n    y_train, y_test = y[train_idx], y[test_idx]\n\n    # Simple ridge regression baseline\n    model = Ridge(alpha=1.0)\n    model.{{b2}}(X_train, y_train)\n    y_pred = model.predict(X_test)\n\n    rho, _ = spearmanr(y_pred, y_test)\n    fold_correlations.append(rho)\n    print(f\"Fold {fold+1}: Spearman rho = {rho:.4f}\")\n\nmean_rho = np.mean(fold_correlations)\nstd_rho = np.{{b3}}(fold_correlations)\nprint(f\"\\nMean Spearman: {mean_rho:.4f} +/- {std_rho:.4f}\")",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? # number of folds",
+                    "acceptable": ["5"],
+                    "hint": "5-fold cross-validation is the most common choice."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "model.???() # train the model",
+                    "acceptable": ["fit"],
+                    "hint": "Use the fit() method to train the scikit-learn model on training data."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "np.???(fold_correlations) # standard deviation",
+                    "acceptable": ["std"],
+                    "hint": "Use np.std to compute the standard deviation across folds."
+                }
+            ]
+        }
+    ]
+}

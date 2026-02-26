@@ -1,0 +1,565 @@
+{
+    "topic": "Proteins - Design & Generation",
+    "questions": [
+        {
+            "id": "prot_design_inverse_folding_mpnn",
+            "title": "ProteinMPNN Message Passing Update",
+            "difficulty": "medium",
+            "description": "Implement the core message passing step in ProteinMPNN for inverse folding. Given node features and edge features on a k-nearest-neighbor graph, compute updated node embeddings by aggregating neighbor messages.",
+            "info": "ProteinMPNN (Dauparas et al., Science 2022) is a message-passing neural network for fixed-backbone sequence design. It operates on a k-nearest-neighbor graph built from C-alpha distances, where node features represent residue states and edge features encode geometric relationships (distances, orientations). The key innovation is an autoregressive decoding order that avoids information leakage during sequence design. ProteinMPNN achieves ~50% native sequence recovery on monomers and generalizes well to novel backbones. It is widely used as the default inverse folding method in modern protein design pipelines. Reference: Dauparas et al., 'Robust deep learning-based protein sequence design using ProteinMPNN', Science 378, 49-56 (2022).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass MPNNLayer(nn.Module):\n    \"\"\"Single message passing layer for ProteinMPNN-style inverse folding.\"\"\"\n    def __init__(self, node_dim=128, edge_dim=64, hidden_dim=128):\n        super().__init__()\n        self.message_mlp = nn.Sequential(\n            nn.Linear(2 * node_dim + edge_dim, hidden_dim),\n            nn.ReLU(),\n            nn.Linear(hidden_dim, hidden_dim)\n        )\n        self.update_mlp = nn.Sequential(\n            nn.Linear(node_dim + hidden_dim, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, node_dim)\n        )\n\n    def forward(self, node_feats, edge_feats, edge_index):\n        # node_feats: (N, node_dim), edge_feats: (E, edge_dim)\n        # edge_index: (2, E) with [src, dst]\n        src, dst = edge_index\n        # Compute messages from source to destination\n        msg_input = torch.cat([node_feats[src], node_feats[dst], edge_feats], dim=-1)\n        messages = {{b1}}\n        # Aggregate messages per destination node\n        agg = torch.zeros_like(node_feats)\n        agg.index_add_(0, {{b2}}, messages)\n        # Update node features with residual connection\n        updated = self.update_mlp(torch.cat([node_feats, agg], dim=-1))\n        return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.???(msg_input)",
+                    "acceptable": ["self.message_mlp(msg_input)"],
+                    "hint": "Pass the concatenated message input through the message MLP."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "index for destination nodes",
+                    "acceptable": ["dst"],
+                    "hint": "Aggregate messages at destination nodes using the destination index."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "residual connection",
+                    "acceptable": ["node_feats + updated", "updated + node_feats"],
+                    "hint": "Add the original node features to the update (residual connection)."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_rfdiffusion_noise",
+            "title": "RFdiffusion Forward Noising on Frames",
+            "difficulty": "hard",
+            "description": "Implement the forward noising process for RFdiffusion on SE(3) rigid body frames. Each residue frame is represented by a rotation matrix and a translation vector. Apply Gaussian noise to translations and IGSO(3) noise to rotations.",
+            "info": "RFdiffusion (Watson et al., Nature 2023) adapts denoising diffusion probabilistic models to protein structure generation by operating on SE(3) residue frames. The forward process adds Gaussian noise to translations and isotropic Gaussian noise on SO(3) (IGSO3) to rotations. The reverse process uses a fine-tuned RoseTTAFold network to predict denoised structures. RFdiffusion excels at unconditional backbone generation, motif scaffolding, and binder design. It achieved experimental success rates of up to 15% for de novo binder design. The model represents each residue as a rigid body frame (rotation + translation), following the SE(3) diffusion framework. Reference: Watson et al., 'De novo design of protein structure and function with RFdiffusion', Nature 620, 1089-1100 (2023).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef random_rotation_perturbation(R, noise_scale):\n    \"\"\"Apply IGSO(3) noise to rotation matrices.\n    Sample axis-angle perturbation, convert to rotation matrix, apply.\"\"\"\n    # Sample random axis\n    axis = F.normalize(torch.randn(R.shape[0], 3), dim=-1)\n    # Sample angle magnitude from Gaussian\n    angle = torch.randn(R.shape[0]) * noise_scale\n    # Rodrigues formula: R_perturb = I + sin(a)*K + (1-cos(a))*K^2\n    K = torch.zeros(R.shape[0], 3, 3)\n    K[:, 0, 1] = -axis[:, 2]\n    K[:, 0, 2] = axis[:, 1]\n    K[:, 1, 0] = axis[:, 2]\n    K[:, 1, 2] = -axis[:, 0]\n    K[:, 2, 0] = -axis[:, 1]\n    K[:, 2, 1] = axis[:, 0]\n    eye = torch.eye(3).unsqueeze(0)\n    sin_a = angle.unsqueeze(-1).unsqueeze(-1)\n    cos_a = angle.unsqueeze(-1).unsqueeze(-1)\n    R_perturb = eye + torch.sin(sin_a) * K + (1 - torch.cos(cos_a)) * (K @ K)\n    return {{b1}}\n\ndef forward_diffusion_step(rotations, translations, t, beta_schedule):\n    \"\"\"Apply one step of forward diffusion to SE(3) frames.\n    rotations: (N, 3, 3), translations: (N, 3)\"\"\"\n    beta_t = beta_schedule[t]\n    # Noise translations with Gaussian noise\n    trans_noise = torch.randn_like(translations) * torch.sqrt(beta_t)\n    noisy_translations = {{b2}}\n    # Noise rotations with IGSO(3)\n    noisy_rotations = random_rotation_perturbation(rotations, {{b3}})\n    return noisy_rotations, noisy_translations",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "apply perturbation to R",
+                    "acceptable": ["R_perturb @ R", "torch.matmul(R_perturb, R)", "torch.bmm(R_perturb, R)"],
+                    "hint": "Compose the perturbation rotation with the original rotation via matrix multiplication."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "add noise to translations",
+                    "acceptable": ["translations + trans_noise"],
+                    "hint": "Add Gaussian noise to the translation vectors."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "rotation noise scale from beta",
+                    "acceptable": ["torch.sqrt(beta_t)", "beta_t.sqrt()", "beta_t ** 0.5"],
+                    "hint": "The rotation noise scale is the square root of beta_t, matching the translation noise variance."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_knn_graph",
+            "title": "K-Nearest Neighbor Graph for Protein Backbone",
+            "difficulty": "easy",
+            "description": "Build a k-nearest-neighbor graph from C-alpha atom coordinates, as used in graph-based protein design models like ProteinMPNN.",
+            "info": "Graph neural networks for protein design operate on sparse graphs constructed from backbone atom positions. ProteinMPNN (Dauparas et al., Science 2022) constructs a k-nearest-neighbor graph using C-alpha distances, typically with k=30 neighbors. Edge features encode distances, relative orientations, and dihedral angles between residues. This graph representation captures local structural context efficiently and is preferred over fully-connected attention due to the locality of physical interactions. The k-NN graph is a foundational component shared across many protein GNN architectures including GVP-GNN (Jing et al., ICLR 2021) and ESM-IF (Hsu et al., ICML 2022). Reference: Dauparas et al., Science 378, 49-56 (2022); Jing et al., 'Learning from Protein Structure with Geometric Vector Perceptrons', ICLR 2021.",
+            "code": "import torch\n\ndef build_knn_graph(ca_coords, k=30):\n    \"\"\"Build k-nearest-neighbor graph from C-alpha coordinates.\n    ca_coords: (N, 3) tensor of C-alpha positions.\n    Returns edge_index: (2, E) tensor of [src, dst] pairs.\n    \"\"\"\n    N = ca_coords.shape[0]\n    # Compute pairwise distance matrix\n    diff = ca_coords.unsqueeze(0) - ca_coords.unsqueeze(1)  # (N, N, 3)\n    dist_matrix = {{b1}}\n    # Set self-distances to infinity to exclude self-loops\n    dist_matrix.fill_diagonal_(float('inf'))\n    # Find k nearest neighbors for each node\n    _, knn_indices = {{b2}}\n    # Build edge index\n    src = torch.arange(N).unsqueeze(1).expand(-1, k).reshape(-1)\n    dst = knn_indices.reshape(-1)\n    edge_index = {{b3}}\n    return edge_index",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "Euclidean distance from diff",
+                    "acceptable": ["torch.norm(diff, dim=-1)", "diff.norm(dim=-1)", "torch.sqrt((diff ** 2).sum(dim=-1))", "(diff ** 2).sum(-1).sqrt()"],
+                    "hint": "Compute the L2 norm along the last dimension to get pairwise Euclidean distances."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "find k smallest distances",
+                    "acceptable": ["torch.topk(dist_matrix, k, dim=-1, largest=False)", "dist_matrix.topk(k, dim=-1, largest=False)"],
+                    "hint": "Use torch.topk with largest=False to find the k smallest distances per node."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "stack src and dst into (2, E)",
+                    "acceptable": ["torch.stack([src, dst], dim=0)", "torch.stack([src, dst])"],
+                    "hint": "Stack source and destination node indices into a (2, E) edge index tensor."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_se3_equivariant_layer",
+            "title": "SE(3)-Equivariant Vector Update",
+            "difficulty": "hard",
+            "description": "Implement an SE(3)-equivariant update for geometric vector features on protein residues. Scalar features are invariant; vector features transform equivariantly under rotations.",
+            "info": "SE(3)-equivariant neural networks maintain proper transformation behavior under rotations and translations, which is critical for 3D molecular modeling. In protein design, models like FrameDiff (Yim et al., ICLR 2024) and Chroma (Ingraham et al., Nature 2023) use SE(3)-equivariant layers to ensure that generated structures are physically valid regardless of coordinate frame. The key principle is that scalar features are rotation-invariant while vector features rotate with the coordinate frame. Geometric Vector Perceptrons (GVP) achieve this by processing scalars with standard MLPs and vectors with learned scalar-gated operations that preserve equivariance. This design ensures the network output transforms consistently with input rotations. Reference: Jing et al., 'Learning from Protein Structure with Geometric Vector Perceptrons', ICLR 2021; Yim et al., 'SE(3) diffusion model with application to protein backbone generation', ICLR 2024.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass SE3EquivariantUpdate(nn.Module):\n    \"\"\"GVP-style equivariant update with scalar and vector channels.\"\"\"\n    def __init__(self, scalar_dim=128, vector_dim=16):\n        super().__init__()\n        self.scalar_dim = scalar_dim\n        self.vector_dim = vector_dim\n        # MLPs operate only on invariant scalar features\n        self.scalar_mlp = nn.Sequential(\n            nn.Linear(scalar_dim + vector_dim, scalar_dim),\n            nn.ReLU(),\n            nn.Linear(scalar_dim, scalar_dim)\n        )\n        # Linear map for vector channels (no bias to preserve equivariance)\n        self.vector_linear = nn.Linear(vector_dim, vector_dim, bias=False)\n        self.gate_linear = nn.Linear(scalar_dim, vector_dim)\n\n    def forward(self, scalars, vectors):\n        # scalars: (N, scalar_dim), vectors: (N, vector_dim, 3)\n        # Compute rotation-invariant features from vectors: norms\n        vector_norms = {{b1}}\n        # Update scalars using both scalar features and vector norms\n        scalar_input = torch.cat([scalars, vector_norms], dim=-1)\n        updated_scalars = self.scalar_mlp(scalar_input)\n        # Update vectors equivariantly: linear transform + scalar gating\n        Wv = self.vector_linear(vectors.transpose(-1, -2)).transpose(-1, -2)\n        gates = {{b2}}\n        updated_vectors = {{b3}}\n        return updated_scalars, updated_vectors",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "invariant feature from vectors",
+                    "acceptable": ["torch.norm(vectors, dim=-1)", "vectors.norm(dim=-1)", "torch.sqrt((vectors ** 2).sum(dim=-1))"],
+                    "hint": "Compute the L2 norm of each vector along the spatial dimension (dim=-1) to get rotation-invariant scalar features."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "compute gates from scalars",
+                    "acceptable": ["torch.sigmoid(self.gate_linear(updated_scalars))", "self.gate_linear(updated_scalars).sigmoid()"],
+                    "hint": "Apply the gate linear layer to updated scalars, then pass through sigmoid to get gating values in [0, 1]."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "apply gates to vectors",
+                    "acceptable": ["Wv * gates.unsqueeze(-1)", "gates.unsqueeze(-1) * Wv"],
+                    "hint": "Multiply the transformed vectors by the scalar gates (unsqueeze gates to broadcast over the 3D spatial dimension)."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_fixed_backbone_loss",
+            "title": "Fixed-Backbone Sequence Design Loss",
+            "difficulty": "easy",
+            "description": "Implement the cross-entropy training loss for fixed-backbone sequence design, where the model predicts amino acid identities given a fixed backbone structure.",
+            "info": "Fixed-backbone sequence design (inverse folding) trains a model to predict amino acid sequences that fold into a given backbone structure. The standard training objective is per-residue cross-entropy loss between predicted logits and native amino acid identities. ProteinMPNN (Dauparas et al., Science 2022) uses this objective with teacher forcing during training and autoregressive sampling at inference. ESM-IF (Hsu et al., ICML 2022) uses a similar cross-entropy objective but with a GVP-Transformer encoder. Both models achieve ~50% sequence recovery on native backbones, substantially outperforming earlier Rosetta-based methods. The loss is typically averaged over all residues, with optional masking for unknown or disordered positions. Reference: Dauparas et al., Science 378, 49-56 (2022); Hsu et al., 'Learning inverse folding from millions of predicted structures', ICML 2022.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\ndef sequence_design_loss(logits, native_seq, mask=None):\n    \"\"\"Cross-entropy loss for fixed-backbone sequence design.\n    logits: (B, L, 20) predicted amino acid logits\n    native_seq: (B, L) integer labels 0-19\n    mask: (B, L) boolean, True for valid residues\n    \"\"\"\n    B, L, num_classes = logits.shape\n    # Reshape for cross entropy: (B*L, 20) and (B*L,)\n    logits_flat = logits.reshape(-1, num_classes)\n    labels_flat = native_seq.reshape(-1)\n    # Per-residue cross entropy (no reduction)\n    per_residue_loss = {{b1}}\n    per_residue_loss = per_residue_loss.reshape(B, L)\n    if mask is not None:\n        # Apply mask and average over valid residues only\n        per_residue_loss = {{b2}}\n        loss = per_residue_loss.sum() / {{b3}}\n    else:\n        loss = per_residue_loss.mean()\n    return loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "F.cross_entropy with no reduction",
+                    "acceptable": ["F.cross_entropy(logits_flat, labels_flat, reduction='none')"],
+                    "hint": "Use F.cross_entropy with reduction='none' to get per-element losses."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "mask the losses",
+                    "acceptable": ["per_residue_loss * mask", "per_residue_loss * mask.float()"],
+                    "hint": "Multiply the per-residue loss by the mask to zero out invalid positions."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "normalization factor",
+                    "acceptable": ["mask.sum()", "mask.float().sum()", "mask.sum().clamp(min=1)"],
+                    "hint": "Divide by the total number of valid (masked-in) residues."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_motif_scaffolding",
+            "title": "Motif Scaffolding with Conditional Diffusion",
+            "difficulty": "hard",
+            "description": "Implement the motif scaffolding inference procedure for RFdiffusion: keep motif residue coordinates fixed and denoise only scaffold residues at each diffusion step.",
+            "info": "Motif scaffolding is a key application of RFdiffusion (Watson et al., Nature 2023) where a functional motif (e.g., an enzyme active site or binding epitope) is held fixed while the model generates a surrounding scaffold structure. During reverse diffusion, motif residue coordinates are replaced with their known values at each denoising step, while scaffold residues are denoised normally. This inpainting-style approach allows conditional generation without retraining. RFdiffusion demonstrated remarkable success in scaffolding challenging motifs, including the RSV site V epitope and influenza hemagglutinin targets, with experimental validation showing high binding affinity. The method supports variable-length scaffolds and multiple disjoint motif segments. Reference: Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\n\ndef motif_scaffolding_step(denoiser, noisy_coords, motif_coords,\n                          motif_mask, t, noise_schedule):\n    \"\"\"One reverse diffusion step with motif inpainting.\n    noisy_coords: (N, 3) current noisy coordinates for all residues\n    motif_coords: (N, 3) ground truth coords (only valid where motif_mask=True)\n    motif_mask: (N,) boolean mask, True for motif residues\n    t: current timestep\n    \"\"\"\n    # Replace motif positions with noised version of ground truth at timestep t\n    alpha_t = noise_schedule['alpha_bar'][t]\n    motif_noise = torch.randn_like(motif_coords) * torch.sqrt(1 - alpha_t)\n    noised_motif = {{b1}}\n    # Inpaint: set motif residues to noised ground truth\n    noisy_coords[motif_mask] = {{b2}}\n    # Run denoiser to predict clean coordinates\n    predicted_clean = denoiser(noisy_coords, t)\n    # After denoising, replace motif positions with true coordinates\n    predicted_clean[motif_mask] = {{b3}}\n    return predicted_clean",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "noise the ground truth motif",
+                    "acceptable": ["torch.sqrt(alpha_t) * motif_coords + motif_noise", "motif_coords * torch.sqrt(alpha_t) + motif_noise"],
+                    "hint": "Apply the forward diffusion formula: sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * noise."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "insert noised motif",
+                    "acceptable": ["noised_motif[motif_mask]"],
+                    "hint": "Replace the motif positions in the noisy coordinates with the noised ground truth motif coordinates."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "replace with true motif coords",
+                    "acceptable": ["motif_coords[motif_mask]"],
+                    "hint": "After denoising, replace motif residue positions with the original ground truth motif coordinates."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_sctm_score",
+            "title": "Self-Consistency TM Score (scTM)",
+            "difficulty": "medium",
+            "description": "Implement the self-consistency TM-score (scTM) evaluation pipeline for assessing designability of generated protein backbones.",
+            "info": "The self-consistency TM-score (scTM) is the primary metric for evaluating designability of computationally generated protein structures. The pipeline is: (1) generate a backbone, (2) design a sequence for that backbone using an inverse folding model like ProteinMPNN, (3) predict the structure of that sequence using a folding model like AlphaFold2 or ESMFold, (4) compute the TM-score between the predicted and designed structure. An scTM > 0.5 indicates the design is 'designable' (the sequence folds back to the intended structure). RFdiffusion (Watson et al., Nature 2023) and Chroma (Ingraham et al., Nature 2023) both use scTM as the key benchmark. Chroma reported >80% designability rates. TM-score ranges from 0 to 1, where 1 indicates perfect structural match. Reference: Watson et al., Nature 620, 1089-1100 (2023); Ingraham et al., 'Illuminating protein space with a programmable generative model', Nature 623, 1070-1078 (2023).",
+            "code": "import torch\nimport numpy as np\n\ndef tm_score(coords1, coords2):\n    \"\"\"Compute TM-score between two sets of C-alpha coordinates.\n    coords1, coords2: (L, 3) numpy arrays.\n    \"\"\"\n    L = len(coords1)\n    d0 = 1.24 * (L - 15) ** (1.0 / 3.0) - 1.8\n    # Compute pairwise distances after optimal superposition (assume pre-aligned)\n    distances = np.sqrt(np.sum((coords1 - coords2) ** 2, axis=-1))\n    # TM-score formula: (1/L) * sum(1 / (1 + (d_i/d0)^2))\n    scores = {{b1}}\n    tm = {{b2}}\n    return tm\n\ndef compute_sctm(generated_backbone, inverse_fold_fn, fold_fn):\n    \"\"\"Full self-consistency pipeline.\n    generated_backbone: (L, 3) designed backbone coords\n    inverse_fold_fn: backbone -> sequence\n    fold_fn: sequence -> predicted coords\n    \"\"\"\n    # Step 1: design sequence for the backbone\n    designed_sequence = inverse_fold_fn(generated_backbone)\n    # Step 2: predict structure from designed sequence\n    predicted_coords = fold_fn(designed_sequence)\n    # Step 3: compute TM-score between generated and predicted\n    sctm = {{b3}}\n    return sctm",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "per-residue TM contribution",
+                    "acceptable": ["1.0 / (1.0 + (distances / d0) ** 2)"],
+                    "hint": "Apply the TM-score formula per residue: 1 / (1 + (d_i / d0)^2)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "average over residues",
+                    "acceptable": ["np.sum(scores) / L", "scores.sum() / L", "np.mean(scores)"],
+                    "hint": "TM-score is the sum of per-residue scores divided by the protein length L."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "compute TM-score between structures",
+                    "acceptable": ["tm_score(generated_backbone, predicted_coords)"],
+                    "hint": "Call tm_score comparing the original generated backbone with the structure predicted from the designed sequence."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_recovery_rate",
+            "title": "Sequence Recovery Rate for Inverse Folding",
+            "difficulty": "easy",
+            "description": "Compute the amino acid sequence recovery rate, the standard evaluation metric for inverse folding models. Recovery rate measures the fraction of positions where the predicted sequence matches the native sequence.",
+            "info": "Sequence recovery rate is the standard benchmark metric for inverse folding models. It measures the fraction of residue positions where the designed sequence matches the native (crystallographic) sequence. ProteinMPNN (Dauparas et al., Science 2022) achieves ~52% recovery on CATH test sets, compared to ~33% for the earlier StructGNN. ESM-IF (Hsu et al., ICML 2022) achieves ~51% using a GVP-Transformer architecture trained on predicted structures from AlphaFold2. While recovery rate is a useful benchmark, high recovery does not guarantee foldability; conversely, designed sequences with low recovery can still fold correctly since many sequences can adopt the same fold. Per-residue recovery is often stratified by secondary structure type (helix, sheet, loop). Reference: Dauparas et al., Science 378, 49-56 (2022); Hsu et al., ICML 2022.",
+            "code": "import torch\n\ndef sequence_recovery(predicted_seq, native_seq, mask=None):\n    \"\"\"Compute amino acid recovery rate.\n    predicted_seq: (B, L) integer tensor of predicted amino acid indices\n    native_seq: (B, L) integer tensor of native amino acid indices\n    mask: (B, L) optional boolean mask for valid positions\n    \"\"\"\n    # Compare predictions to native: per-position match\n    correct = {{b1}}\n    if mask is not None:\n        # Only count valid positions\n        num_correct = (correct & mask).sum().float()\n        total = {{b2}}\n    else:\n        num_correct = correct.sum().float()\n        total = correct.numel()\n    recovery_rate = {{b3}}\n    return recovery_rate",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "element-wise comparison",
+                    "acceptable": ["predicted_seq == native_seq", "(predicted_seq == native_seq)"],
+                    "hint": "Compare predicted and native amino acid indices element-wise with ==."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "count valid positions",
+                    "acceptable": ["mask.sum().float()", "mask.sum()", "mask.float().sum()"],
+                    "hint": "Sum the mask to get the total number of valid residue positions."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "compute fraction",
+                    "acceptable": ["num_correct / total"],
+                    "hint": "Divide number of correct predictions by total number of valid positions."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_conditional_generation",
+            "title": "Classifier-Free Guidance for Conditional Protein Generation",
+            "difficulty": "hard",
+            "description": "Implement classifier-free guidance for conditional protein backbone generation with Chroma, where generation is guided toward desired properties (e.g., symmetry, secondary structure content).",
+            "info": "Chroma (Ingraham et al., Nature 2023) uses classifier-free guidance to enable conditional protein generation without retraining. During training, conditioning information is randomly dropped with some probability, teaching the model both conditional and unconditional distributions. At inference, the guided score combines the unconditional and conditional predictions: score_guided = score_uncond + w * (score_cond - score_uncond), where w is the guidance weight. This allows steering generation toward desired properties such as symmetry groups, secondary structure composition, substructure constraints, and even natural language descriptions via CLIP embeddings. Higher guidance weights produce designs more faithful to the condition but with less diversity. Chroma demonstrated generation of over 2000 unique protein topologies. Reference: Ingraham et al., 'Illuminating protein space with a programmable generative model', Nature 623, 1070-1078 (2023).",
+            "code": "import torch\n\ndef classifier_free_guidance_step(model, x_t, t, condition,\n                                   guidance_weight=2.0):\n    \"\"\"Apply classifier-free guidance for conditional protein generation.\n    model: denoising network that takes (x_t, t, condition_or_None)\n    x_t: (N, 3) noisy coordinates at timestep t\n    condition: conditioning information (e.g., symmetry label)\n    guidance_weight: strength of guidance (w)\n    \"\"\"\n    # Predict noise with conditioning\n    eps_cond = model(x_t, t, condition)\n    # Predict noise without conditioning (unconditional)\n    eps_uncond = {{b1}}\n    # Classifier-free guidance formula\n    eps_guided = {{b2}}\n    return eps_guided\n\ndef guided_reverse_step(model, x_t, t, condition, beta_t, alpha_bar_t,\n                        guidance_weight=2.0):\n    \"\"\"Full reverse diffusion step with classifier-free guidance.\"\"\"\n    eps_guided = classifier_free_guidance_step(\n        model, x_t, t, condition, guidance_weight\n    )\n    # DDPM reverse step: x_{t-1} from x_t and predicted noise\n    alpha_t = 1 - beta_t\n    x_mean = (1 / torch.sqrt(alpha_t)) * (x_t - (beta_t / torch.sqrt(1 - alpha_bar_t)) * eps_guided)\n    noise = torch.randn_like(x_t) if t > 0 else torch.zeros_like(x_t)\n    x_prev = {{b3}}\n    return x_prev",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "unconditional prediction",
+                    "acceptable": ["model(x_t, t, None)"],
+                    "hint": "Call the model with None as the condition to get the unconditional noise prediction."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "guided score formula",
+                    "acceptable": ["eps_uncond + guidance_weight * (eps_cond - eps_uncond)"],
+                    "hint": "Classifier-free guidance: eps_uncond + w * (eps_cond - eps_uncond)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "add noise for stochasticity",
+                    "acceptable": ["x_mean + torch.sqrt(beta_t) * noise"],
+                    "hint": "Add scaled Gaussian noise: x_mean + sqrt(beta_t) * noise."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_hallucination",
+            "title": "Hallucination-Based Protein Design with Confidence Loss",
+            "difficulty": "medium",
+            "description": "Implement the hallucination-based protein design objective that optimizes a sequence to maximize the confidence (pLDDT) of a structure prediction network.",
+            "info": "Hallucination-based protein design uses differentiable structure prediction models as oracles, optimizing sequences to maximize prediction confidence. The approach, pioneered by Anishchenko et al. (Nature 2021) and developed further in 'constrained hallucination' (Wang et al., 2022), optimizes a continuous relaxation of the sequence (softmax over logits) to maximize predicted pLDDT or minimize predicted error. The intuition is that confident structure predictions correlate with well-folded, designable proteins. This approach generated novel protein folds validated experimentally with high success rates. The Gumbel-softmax trick enables gradient flow through the discrete sequence sampling. Hallucination was a precursor to diffusion-based methods and remains useful for targeted optimization. Reference: Anishchenko et al., 'De novo protein design by deep network hallucination', Nature 600, 547-552 (2021).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\ndef hallucination_step(structure_predictor, seq_logits, temperature=0.1):\n    \"\"\"One gradient step of hallucination-based protein design.\n    structure_predictor: differentiable model that returns\n                        (predicted_coords, plddt_per_residue)\n    seq_logits: (L, 20) learnable parameters (logits over amino acids)\n    temperature: Gumbel-softmax temperature\n    \"\"\"\n    # Soft one-hot via Gumbel-softmax for differentiable sampling\n    soft_seq = {{b1}}\n    # Predict structure and confidence from soft sequence\n    predicted_coords, plddt = structure_predictor(soft_seq)\n    # Loss: negative mean pLDDT (we want to maximize confidence)\n    loss = {{b2}}\n    return loss, predicted_coords, plddt\n\ndef run_hallucination(structure_predictor, seq_length, num_steps=500, lr=0.05):\n    \"\"\"Run full hallucination optimization loop.\"\"\"\n    # Initialize random sequence logits\n    seq_logits = nn.Parameter(torch.randn(seq_length, 20))\n    optimizer = torch.optim.Adam([seq_logits], lr=lr)\n    for step in range(num_steps):\n        optimizer.zero_grad()\n        loss, coords, plddt = hallucination_step(\n            structure_predictor, seq_logits\n        )\n        loss.backward()\n        optimizer.step()\n    # Final discrete sequence by argmax\n    final_sequence = {{b3}}\n    return final_sequence",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "Gumbel-softmax on logits",
+                    "acceptable": ["F.gumbel_softmax(seq_logits, tau=temperature, hard=False)", "F.gumbel_softmax(seq_logits, tau=temperature)"],
+                    "hint": "Use F.gumbel_softmax with the temperature parameter to get a differentiable soft one-hot representation."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "negate mean pLDDT",
+                    "acceptable": ["-plddt.mean()", "-torch.mean(plddt)"],
+                    "hint": "Negate the mean pLDDT so that minimizing the loss maximizes prediction confidence."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "discrete sequence from logits",
+                    "acceptable": ["torch.argmax(seq_logits, dim=-1)", "seq_logits.argmax(dim=-1)"],
+                    "hint": "Take argmax along the amino acid dimension to convert logits to discrete residue indices."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_framediff_score",
+            "title": "FrameDiff Score Network on SE(3) Frames",
+            "difficulty": "hard",
+            "description": "Implement the score prediction head for FrameDiff, which predicts translation scores and rotation scores from node embeddings of protein residue frames.",
+            "info": "FrameDiff (Yim et al., ICLR 2024) formulates protein backbone generation as score-based generative modeling on the product manifold SE(3)^N, where each residue is parameterized as an SE(3) frame (rotation + translation). The score network predicts translation scores in R^3 and rotation scores in the tangent space of SO(3) (represented as 3D vectors via the logarithmic map). FrameDiff introduces a novel training objective that decomposes the score into independent translation and rotation components, enabling efficient training. The model uses an Invariant Point Attention (IPA) backbone inspired by AlphaFold2. FrameDiff achieves high designability scores competitive with RFdiffusion on unconditional backbone generation benchmarks. Reference: Yim et al., 'SE(3) diffusion model with application to protein backbone generation', ICLR 2024.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass FrameDiffScoreHead(nn.Module):\n    \"\"\"Score prediction head for SE(3) diffusion on protein frames.\n    Predicts translation score (R^3) and rotation score (so(3) tangent vector).\n    \"\"\"\n    def __init__(self, node_dim=256):\n        super().__init__()\n        # Translation score: predict vector in R^3\n        self.trans_score_net = nn.Sequential(\n            nn.Linear(node_dim, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, 3)\n        )\n        # Rotation score: predict vector in so(3) tangent space (dim=3)\n        self.rot_score_net = nn.Sequential(\n            nn.Linear(node_dim, node_dim),\n            nn.ReLU(),\n            nn.Linear(node_dim, 3)\n        )\n\n    def forward(self, node_embeddings, frames_R, frames_t):\n        \"\"\"Predict SE(3) scores in the local frame of each residue.\n        node_embeddings: (N, node_dim) from IPA backbone\n        frames_R: (N, 3, 3) rotation matrices\n        frames_t: (N, 3) translation vectors\n        \"\"\"\n        # Predict scores in local frame\n        local_trans_score = self.trans_score_net(node_embeddings)  # (N, 3)\n        local_rot_score = {{b1}}\n        # Transform translation score to global frame\n        global_trans_score = {{b2}}\n        # Rotation scores stay in local tangent space (so(3) is rotation-equivariant)\n        return global_trans_score, local_rot_score\n\ndef framediff_score_loss(pred_trans_score, pred_rot_score,\n                        target_trans_score, target_rot_score):\n    \"\"\"Combined score matching loss for SE(3) diffusion.\"\"\"\n    trans_loss = torch.mean((pred_trans_score - target_trans_score) ** 2)\n    rot_loss = torch.mean((pred_rot_score - target_rot_score) ** 2)\n    return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "predict rotation score",
+                    "acceptable": ["self.rot_score_net(node_embeddings)"],
+                    "hint": "Pass node embeddings through the rotation score network to predict the SO(3) tangent vector."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "rotate local score to global frame",
+                    "acceptable": ["torch.bmm(frames_R, local_trans_score.unsqueeze(-1)).squeeze(-1)", "torch.einsum('nij,nj->ni', frames_R, local_trans_score)", "(frames_R @ local_trans_score.unsqueeze(-1)).squeeze(-1)"],
+                    "hint": "Apply the residue rotation matrix to transform the local translation score into the global coordinate frame."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "combine translation and rotation losses",
+                    "acceptable": ["trans_loss + rot_loss"],
+                    "hint": "Sum the translation and rotation score matching losses."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_edge_features",
+            "title": "Protein Graph Edge Features from Geometry",
+            "difficulty": "medium",
+            "description": "Compute geometric edge features for a protein backbone graph, including distances and relative positional encodings between residues, as used in ProteinMPNN and related GNNs.",
+            "info": "Protein GNN models like ProteinMPNN (Dauparas et al., Science 2022) and GVP-GNN (Jing et al., ICLR 2021) encode rich geometric information in edge features. Key features include C-alpha distances, unit direction vectors, relative sequential separation (encoded via sinusoidal positional encoding), and backbone dihedral angles. The distance is typically RBF-expanded into multiple Gaussian basis functions to provide a smooth representation. Direction vectors capture relative orientation and are important for maintaining geometric awareness. These edge features, combined with node features derived from backbone torsion angles and residue type, allow the GNN to reason about 3D structural context for sequence design. Reference: Dauparas et al., Science 378, 49-56 (2022); Jing et al., ICLR 2021.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef rbf_encode(distances, d_min=0.0, d_max=20.0, num_rbf=16):\n    \"\"\"Radial basis function encoding of distances.\"\"\"\n    mu = torch.linspace(d_min, d_max, num_rbf)\n    sigma = (d_max - d_min) / num_rbf\n    return torch.exp(-((distances.unsqueeze(-1) - mu) ** 2) / (2 * sigma ** 2))\n\ndef compute_edge_features(ca_coords, edge_index, max_seq_sep=32):\n    \"\"\"Compute geometric edge features for protein graph.\n    ca_coords: (N, 3) C-alpha coordinates\n    edge_index: (2, E) source and destination indices\n    \"\"\"\n    src, dst = edge_index\n    # Distance features (RBF-encoded)\n    diff = ca_coords[dst] - ca_coords[src]  # (E, 3)\n    distances = {{b1}}\n    dist_rbf = rbf_encode(distances)  # (E, num_rbf)\n    # Unit direction vectors\n    direction = {{b2}}\n    # Relative sequence position (sinusoidal encoding)\n    seq_sep = (dst - src).float().clamp(-max_seq_sep, max_seq_sep)\n    seq_enc = torch.stack([\n        torch.sin(seq_sep / (10000 ** (i / 8)))\n        for i in range(8)\n    ], dim=-1)\n    # Concatenate all edge features\n    edge_feats = {{b3}}\n    return edge_feats",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "L2 norm of diff vectors",
+                    "acceptable": ["torch.norm(diff, dim=-1)", "diff.norm(dim=-1)", "torch.sqrt((diff ** 2).sum(dim=-1))"],
+                    "hint": "Compute the Euclidean distance (L2 norm) of the difference vectors along the last dimension."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "normalize diff to unit vectors",
+                    "acceptable": ["F.normalize(diff, dim=-1)", "diff / distances.unsqueeze(-1)", "diff / (distances.unsqueeze(-1) + 1e-8)"],
+                    "hint": "Normalize the direction vectors to unit length using F.normalize or manual division."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "concatenate all features",
+                    "acceptable": ["torch.cat([dist_rbf, direction, seq_enc], dim=-1)"],
+                    "hint": "Concatenate the RBF distance features, unit direction vectors, and sequence separation encodings along the feature dimension."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_ipa_attention",
+            "title": "Invariant Point Attention (IPA) for Protein Structure",
+            "difficulty": "hard",
+            "description": "Implement a simplified version of Invariant Point Attention from AlphaFold2, which is used in FrameDiff and other SE(3)-aware protein generation models. IPA computes attention using both sequence features and 3D point positions.",
+            "info": "Invariant Point Attention (IPA) was introduced in AlphaFold2 (Jumper et al., Nature 2021) and adopted by FrameDiff (Yim et al., ICLR 2024) and other structure generation models. IPA augments standard attention with 3D geometric information by projecting query/key/value points into local residue frames, computing distances in global space, and aggregating results. The key property is SE(3) invariance: the attention output is invariant to global rotations and translations while being sensitive to relative geometry. IPA uses three types of interactions: standard sequence-based attention, pairwise bias from pair representations, and point-based attention computed from 3D distances between projected query and key points. This combination allows the model to reason about both sequence and structural context. Reference: Jumper et al., Nature 596, 583-589 (2021); Yim et al., ICLR 2024.",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport math\n\nclass SimplifiedIPA(nn.Module):\n    \"\"\"Simplified Invariant Point Attention.\"\"\"\n    def __init__(self, node_dim=256, num_heads=8, num_points=4):\n        super().__init__()\n        self.num_heads = num_heads\n        self.head_dim = node_dim // num_heads\n        self.num_points = num_points\n        # Standard QKV projections for sequence features\n        self.q_proj = nn.Linear(node_dim, node_dim)\n        self.k_proj = nn.Linear(node_dim, node_dim)\n        self.v_proj = nn.Linear(node_dim, node_dim)\n        # Point projections: each head has num_points query/key points\n        self.q_points = nn.Linear(node_dim, num_heads * num_points * 3)\n        self.k_points = nn.Linear(node_dim, num_heads * num_points * 3)\n        self.output_proj = nn.Linear(node_dim, node_dim)\n\n    def forward(self, node_feats, frames_R, frames_t):\n        N = node_feats.shape[0]\n        h, d, p = self.num_heads, self.head_dim, self.num_points\n        # Standard attention logits\n        Q = self.q_proj(node_feats).reshape(N, h, d)\n        K = self.k_proj(node_feats).reshape(N, h, d)\n        V = self.v_proj(node_feats).reshape(N, h, d)\n        seq_logits = torch.einsum('ihd,jhd->ijh', Q, K) / math.sqrt(d)\n        # Point-based attention: project points to global frame\n        q_pts_local = self.q_points(node_feats).reshape(N, h, p, 3)\n        k_pts_local = self.k_points(node_feats).reshape(N, h, p, 3)\n        # Transform points to global: R @ pt + t\n        q_pts_global = torch.einsum('nab,nhpb->nhpa', frames_R, q_pts_local) + frames_t[:, None, None, :]\n        k_pts_global = torch.einsum('nab,nhpb->nhpa', frames_R, k_pts_local) + frames_t[:, None, None, :]\n        # Point attention: negative squared distance\n        pt_diff = q_pts_global[:, None, :, :, :] - k_pts_global[None, :, :, :, :]\n        pt_dist_sq = (pt_diff ** 2).sum(dim=-1).sum(dim=-1)  # (N, N, h)\n        pt_logits = {{b1}}\n        # Combine sequence and point logits\n        logits = seq_logits + pt_logits\n        weights = {{b2}}\n        # Aggregate values\n        out = torch.einsum('ijh,jhd->ihd', weights, V)\n        out = out.reshape(N, h * d)\n        return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "negate distances for attention",
+                    "acceptable": ["-pt_dist_sq", "-1.0 * pt_dist_sq"],
+                    "hint": "Point attention logits are the negative squared distances: closer points get higher attention."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "softmax over source dimension",
+                    "acceptable": ["F.softmax(logits, dim=1)", "torch.softmax(logits, dim=1)"],
+                    "hint": "Apply softmax over dimension 1 (the key/source dimension j) to get attention weights."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "project output",
+                    "acceptable": ["self.output_proj(out)"],
+                    "hint": "Pass the aggregated output through the output projection layer."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_autoregressive_decode",
+            "title": "Autoregressive Decoding in ProteinMPNN",
+            "difficulty": "medium",
+            "description": "Implement the autoregressive sequence decoding procedure used in ProteinMPNN, where residues are decoded one at a time in a random order with teacher forcing disabled.",
+            "info": "ProteinMPNN (Dauparas et al., Science 2022) uses autoregressive decoding during inference to generate sequences for fixed backbones. A key innovation is the random decoding order: instead of decoding from N-terminus to C-terminus, residues are decoded in a random permutation. At each step, the model conditions on previously decoded residues (using their true amino acid identities in teacher forcing during training, or sampled identities during inference). The model uses a causal mask to prevent information leakage from future positions. Sampling temperature controls the diversity-quality tradeoff: lower temperatures produce more conservative designs closer to the training distribution, while higher temperatures increase diversity. Reference: Dauparas et al., 'Robust deep learning-based protein sequence design using ProteinMPNN', Science 378, 49-56 (2022).",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef autoregressive_decode(model, backbone_features, temperature=0.1):\n    \"\"\"Autoregressive sequence decoding with random order.\n    model: ProteinMPNN-style model with encode() and decode_step()\n    backbone_features: pre-computed structural features\n    Returns: (L,) tensor of amino acid indices\n    \"\"\"\n    L = backbone_features.shape[0]\n    num_amino_acids = 20\n    # Initialize sequence as unknown tokens\n    sequence = torch.full((L,), fill_value=-1, dtype=torch.long)\n    # Random decoding order\n    decode_order = {{b1}}\n    # Encode backbone structure (only done once)\n    encoder_out = model.encode(backbone_features)\n    for pos in decode_order:\n        # Get logits for this position conditioned on previously decoded\n        logits = model.decode_step(encoder_out, sequence, pos)  # (20,)\n        # Sample with temperature\n        probs = {{b2}}\n        sampled_aa = torch.multinomial(probs, num_samples=1).squeeze(-1)\n        # Place sampled amino acid into sequence\n        {{b3}}\n    return sequence",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "random permutation of positions",
+                    "acceptable": ["torch.randperm(L)", "torch.randperm(L).tolist()"],
+                    "hint": "Generate a random permutation of residue positions 0 to L-1 using torch.randperm."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "temperature-scaled softmax",
+                    "acceptable": ["F.softmax(logits / temperature, dim=-1)", "torch.softmax(logits / temperature, dim=-1)"],
+                    "hint": "Apply softmax to logits divided by temperature for temperature-scaled sampling."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "assign sampled amino acid",
+                    "acceptable": ["sequence[pos] = sampled_aa"],
+                    "hint": "Assign the sampled amino acid index to the current position in the sequence tensor."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_ddpm_reverse",
+            "title": "DDPM Reverse Process for Backbone Generation",
+            "difficulty": "medium",
+            "description": "Implement the DDPM reverse sampling process for protein backbone coordinate generation, as used in diffusion-based protein design.",
+            "info": "Denoising diffusion probabilistic models (DDPMs) form the backbone of modern protein structure generation methods including RFdiffusion (Watson et al., Nature 2023), FrameDiff (Yim et al., ICLR 2024), and Genie (Lin & AlQuraishi, NeurIPS 2023). The reverse process iteratively denoises random coordinates to produce valid protein backbones. Starting from pure Gaussian noise, each step uses a trained denoiser to predict the clean structure (or noise), then computes the posterior mean and adds calibrated noise. Genie specifically operates on C-alpha coordinates and uses a SE(3)-invariant transformer. The noise schedule is critical: cosine schedules work better than linear ones for protein structures. Typical generation uses 200-1000 diffusion timesteps. Reference: Lin & AlQuraishi, 'Generating Novel, Designable, and Diverse Protein Structures by Equivariantly Diffusing Oriented Residue Clouds', NeurIPS 2023; Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\n\ndef ddpm_reverse_sample(denoiser, num_residues, num_timesteps=200,\n                       beta_schedule=None):\n    \"\"\"DDPM reverse sampling for protein backbone coordinates.\n    denoiser: model that predicts clean coords from noisy input\n    Returns: (num_residues, 3) generated C-alpha coordinates\n    \"\"\"\n    if beta_schedule is None:\n        beta_schedule = torch.linspace(1e-4, 0.02, num_timesteps)\n    alpha = 1.0 - beta_schedule\n    alpha_bar = torch.cumprod(alpha, dim=0)\n    # Start from pure noise\n    x_t = torch.randn(num_residues, 3)\n    for t in reversed(range(num_timesteps)):\n        # Predict clean structure\n        x0_pred = denoiser(x_t, torch.tensor([t]))\n        # Compute posterior mean\n        alpha_bar_t = alpha_bar[t]\n        alpha_t = alpha[t]\n        beta_t = beta_schedule[t]\n        coeff1 = {{b1}}\n        coeff2 = beta_t / torch.sqrt(1 - alpha_bar_t)\n        posterior_mean = coeff1 * (x_t - coeff2 * (x_t - torch.sqrt(alpha_bar_t) * x0_pred))\n        # Add noise (except at t=0)\n        if t > 0:\n            noise = torch.randn_like(x_t)\n            x_t = {{b2}}\n        else:\n            x_t = {{b3}}\n    return x_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1/sqrt(alpha_t) coefficient",
+                    "acceptable": ["1.0 / torch.sqrt(alpha_t)", "torch.rsqrt(alpha_t)", "(1.0 / alpha_t.sqrt())"],
+                    "hint": "The first coefficient in the DDPM posterior mean is 1 / sqrt(alpha_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "posterior mean + noise",
+                    "acceptable": ["posterior_mean + torch.sqrt(beta_t) * noise"],
+                    "hint": "Add scaled noise to the posterior mean: posterior_mean + sqrt(beta_t) * noise."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "final step (no noise)",
+                    "acceptable": ["posterior_mean"],
+                    "hint": "At the final step (t=0), return the posterior mean without adding any noise."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_esm_if_encoder",
+            "title": "ESM-IF GVP-Transformer Encoder",
+            "difficulty": "medium",
+            "description": "Implement the GVP-Transformer encoder architecture from ESM-IF for inverse folding, which combines geometric vector perceptrons with transformer attention.",
+            "info": "ESM-IF (Hsu et al., ICML 2022) uses a GVP-Transformer architecture for inverse folding, combining Geometric Vector Perceptrons (GVPs) for encoding backbone geometry with transformer layers for sequence-level reasoning. The encoder processes backbone coordinates through GVP layers to produce SE(3)-invariant node features, which are then refined by transformer self-attention layers. ESM-IF was trained on 12 million predicted structures from AlphaFold2, demonstrating that scaling training data with computational predictions improves generalization. It achieves 51% sequence recovery and shows strong performance on zero-shot fitness prediction tasks. The architecture processes N, C-alpha, C, and O backbone atom coordinates to compute local coordinate frames and geometric features. Reference: Hsu et al., 'Learning inverse folding from millions of predicted structures', ICML 2022.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass GVPEncoderLayer(nn.Module):\n    \"\"\"Simplified GVP-Transformer encoder layer for ESM-IF.\"\"\"\n    def __init__(self, scalar_dim=512, vector_dim=16, num_heads=8):\n        super().__init__()\n        self.scalar_dim = scalar_dim\n        # GVP for processing geometric features\n        self.gvp_scalar = nn.Sequential(\n            nn.Linear(scalar_dim + vector_dim, scalar_dim),\n            nn.ReLU(),\n            nn.Linear(scalar_dim, scalar_dim)\n        )\n        self.vector_proj = nn.Linear(vector_dim, vector_dim, bias=False)\n        # Transformer attention over scalar features\n        self.self_attn = nn.MultiheadAttention(scalar_dim, num_heads, batch_first=True)\n        self.ffn = nn.Sequential(\n            nn.Linear(scalar_dim, scalar_dim * 4),\n            nn.GELU(),\n            nn.Linear(scalar_dim * 4, scalar_dim)\n        )\n        self.norm1 = nn.LayerNorm(scalar_dim)\n        self.norm2 = nn.LayerNorm(scalar_dim)\n\n    def forward(self, scalars, vectors):\n        # scalars: (B, L, scalar_dim), vectors: (B, L, vector_dim, 3)\n        # GVP: extract invariant features from vectors\n        vec_norms = vectors.norm(dim=-1)  # (B, L, vector_dim)\n        gvp_in = torch.cat([scalars, vec_norms], dim=-1)\n        scalar_update = self.gvp_scalar(gvp_in)\n        scalars = scalars + scalar_update\n        # Transformer self-attention on scalar features\n        residual = scalars\n        scalars = self.norm1(scalars)\n        attn_out, _ = {{b1}}\n        scalars = residual + attn_out\n        # Feed-forward with residual\n        residual = scalars\n        scalars = self.norm2(scalars)\n        ff_out = {{b2}}\n        scalars = {{b3}}\n        return scalars, vectors",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self-attention call",
+                    "acceptable": ["self.self_attn(scalars, scalars, scalars)"],
+                    "hint": "Self-attention: query, key, and value are all the same (scalars)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "feed-forward on scalars",
+                    "acceptable": ["self.ffn(scalars)"],
+                    "hint": "Pass the normalized scalars through the feed-forward network."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "residual + feed-forward",
+                    "acceptable": ["residual + ff_out"],
+                    "hint": "Add the feed-forward output to the residual (pre-norm residual connection)."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_chroma_graph_diffusion",
+            "title": "Chroma: Graph-Based Diffusion on Protein Residues",
+            "difficulty": "hard",
+            "description": "Implement the graph-based denoising network from Chroma, which uses a GNN backbone to denoise protein coordinates while maintaining SE(3) equivariance.",
+            "info": "Chroma (Ingraham et al., Nature 2023) introduces a diffusion model for protein generation that operates on a dynamically constructed graph over residues. Unlike RFdiffusion which fine-tunes a structure prediction network, Chroma trains a GNN-based denoiser from scratch that directly predicts coordinate displacements. The graph is rebuilt at each denoising step based on current (noisy) inter-residue distances, allowing the model to adapt its receptive field as the structure becomes less noisy. Chroma's key innovation is the combination of this graph-based architecture with a rich set of programmatic conditioners, enabling generation conditioned on symmetry, shape, semantics, and natural language. The model generates proteins with up to 4000 residues and achieves >80% designability. Reference: Ingraham et al., 'Illuminating protein space with a programmable generative model', Nature 623, 1070-1078 (2023).",
+            "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass ChromaDenoiseLayer(nn.Module):\n    \"\"\"Chroma-style graph denoising layer with dynamic graph construction.\"\"\"\n    def __init__(self, node_dim=256, edge_dim=64, k_neighbors=20):\n        super().__init__()\n        self.k = k_neighbors\n        self.edge_encoder = nn.Sequential(\n            nn.Linear(1, edge_dim),  # encode distance\n            nn.SiLU(),\n            nn.Linear(edge_dim, edge_dim)\n        )\n        self.node_update = nn.Sequential(\n            nn.Linear(node_dim + edge_dim, node_dim),\n            nn.SiLU(),\n            nn.Linear(node_dim, node_dim)\n        )\n        self.coord_update = nn.Linear(node_dim, 3, bias=False)\n\n    def forward(self, node_feats, coords):\n        N = coords.shape[0]\n        # Dynamic graph: rebuild kNN from current coordinates\n        dist_mat = torch.cdist(coords, coords)  # (N, N)\n        dist_mat.fill_diagonal_(float('inf'))\n        knn_dist, knn_idx = dist_mat.topk(self.k, largest=False)  # (N, k)\n        # Encode edge features from distances\n        edge_feats = {{b1}}\n        # Aggregate neighbor information\n        neighbor_feats = node_feats[knn_idx]  # (N, k, node_dim)\n        agg = (neighbor_feats * edge_feats).mean(dim=1)  # (N, node_dim)\n        # Update node features\n        node_input = torch.cat([node_feats, agg], dim=-1)\n        node_feats = node_feats + self.node_update(node_input)\n        # Predict equivariant coordinate displacement\n        displacement = {{b2}}\n        # Update coordinates\n        updated_coords = {{b3}}\n        return node_feats, updated_coords",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "encode kNN distances",
+                    "acceptable": ["self.edge_encoder(knn_dist.unsqueeze(-1))"],
+                    "hint": "Pass the kNN distances (unsqueezed to add a feature dim) through the edge encoder MLP."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "predict coordinate displacement",
+                    "acceptable": ["self.coord_update(node_feats)"],
+                    "hint": "Pass updated node features through the coordinate update linear layer to get (N, 3) displacements."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "apply displacement to coords",
+                    "acceptable": ["coords + displacement"],
+                    "hint": "Add the predicted displacement to the current coordinates."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_scrmsd",
+            "title": "Self-Consistency RMSD (scRMSD) Evaluation",
+            "difficulty": "easy",
+            "description": "Implement the self-consistency RMSD (scRMSD) metric that evaluates whether a designed protein backbone is structurally self-consistent after inverse folding and refolding.",
+            "info": "Self-consistency RMSD (scRMSD) complements scTM as a designability metric. While scTM measures global fold similarity (normalized between 0-1), scRMSD measures the root-mean-square deviation in Angstroms between the designed backbone and the structure predicted from the designed sequence. An scRMSD below 2 Angstroms is generally considered a successful design, indicating the sequence folds to the intended structure with atomic-level accuracy. RFdiffusion (Watson et al., Nature 2023) reports both scTM and scRMSD, with their best unconditional designs achieving scRMSD < 1 Angstrom. FrameDiff (Yim et al., ICLR 2024) and Genie (Lin & AlQuraishi, NeurIPS 2023) also use scRMSD as a primary evaluation metric, often alongside designability rate (fraction with scRMSD < 2A). Reference: Watson et al., Nature 620, 1089-1100 (2023); Yim et al., ICLR 2024.",
+            "code": "import torch\nimport numpy as np\n\ndef compute_rmsd(coords1, coords2):\n    \"\"\"Compute RMSD between two coordinate sets after optimal superposition.\n    coords1, coords2: (L, 3) numpy arrays\n    Assumes coordinates have been centered.\n    \"\"\"\n    # Center both structures\n    coords1_centered = coords1 - coords1.mean(axis=0)\n    coords2_centered = coords2 - coords2.mean(axis=0)\n    # Kabsch algorithm: find optimal rotation\n    H = coords1_centered.T @ coords2_centered\n    U, S, Vt = np.linalg.svd(H)\n    # Handle reflection case\n    d = np.sign(np.linalg.det(Vt.T @ U.T))\n    diag = np.diag([1, 1, d])\n    R_opt = Vt.T @ diag @ U.T\n    # Apply rotation and compute RMSD\n    coords1_aligned = (R_opt @ coords1_centered.T).T\n    diff = coords1_aligned - coords2_centered\n    rmsd = {{b1}}\n    return rmsd\n\ndef compute_scrmsd(generated_backbone, inverse_fold_fn, fold_fn):\n    \"\"\"Self-consistency RMSD pipeline.\"\"\"\n    designed_seq = {{b2}}\n    predicted_structure = fold_fn(designed_seq)\n    scrmsd = {{b3}}\n    return scrmsd",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "RMSD from differences",
+                    "acceptable": ["np.sqrt(np.mean(np.sum(diff ** 2, axis=-1)))", "np.sqrt((diff ** 2).sum(axis=-1).mean())", "np.sqrt(np.mean(diff ** 2) * 3)"],
+                    "hint": "RMSD = sqrt(mean of per-atom squared distances). Sum squared diffs over xyz, then mean over atoms, then sqrt."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "design sequence from backbone",
+                    "acceptable": ["inverse_fold_fn(generated_backbone)"],
+                    "hint": "Use the inverse folding function to design a sequence for the generated backbone."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "compute RMSD between structures",
+                    "acceptable": ["compute_rmsd(generated_backbone, predicted_structure)"],
+                    "hint": "Compute the RMSD between the original designed backbone and the predicted structure."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_noise_schedule",
+            "title": "Cosine Noise Schedule for Protein Diffusion",
+            "difficulty": "easy",
+            "description": "Implement the cosine noise schedule used in protein diffusion models, which provides a smoother noise distribution than linear schedules.",
+            "info": "The noise schedule is a critical hyperparameter in diffusion models for protein generation. The cosine schedule, introduced by Nichol & Dhariwal (ICML 2021) and widely adopted in protein design, defines alpha_bar_t = cos((t/T + s) / (1 + s) * pi/2)^2, where s is a small offset preventing singularity. RFdiffusion (Watson et al., Nature 2023) uses a modified cosine schedule for translations and a separate schedule for rotations on SO(3). The cosine schedule provides near-linear noise accumulation in the middle timesteps and slower noise addition at the extremes, which better preserves structural features during the early noising steps. Genie (Lin & AlQuraishi, NeurIPS 2023) also uses a cosine schedule and found it superior to linear schedules for protein coordinate diffusion. Reference: Nichol & Dhariwal, ICML 2021; Watson et al., Nature 620, 1089-1100 (2023).",
+            "code": "import torch\nimport math\n\ndef cosine_noise_schedule(num_timesteps, s=0.008):\n    \"\"\"Cosine noise schedule for diffusion models.\n    Returns alpha_bar (cumulative signal retention) for each timestep.\n    \"\"\"\n    steps = torch.linspace(0, num_timesteps, num_timesteps + 1)\n    # f(t) = cos((t/T + s) / (1 + s) * pi/2)^2\n    f_t = {{b1}}\n    # alpha_bar_t = f(t) / f(0)\n    alpha_bar = f_t / f_t[0]\n    # Clip to prevent numerical issues\n    alpha_bar = torch.clamp(alpha_bar, min=1e-5, max=1.0)\n    # Compute betas from consecutive alpha_bars\n    # beta_t = 1 - alpha_bar_t / alpha_bar_{t-1}\n    betas = {{b2}}\n    betas = torch.clamp(betas, min=1e-5, max=0.999)\n    return {{b3}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "cosine function for schedule",
+                    "acceptable": ["torch.cos((steps / num_timesteps + s) / (1 + s) * math.pi / 2) ** 2", "torch.cos(((steps / num_timesteps) + s) / (1 + s) * math.pi / 2) ** 2", "torch.cos((steps / num_timesteps + s) / (1 + s) * math.pi * 0.5) ** 2"],
+                    "hint": "Apply f(t) = cos((t/T + s) / (1+s) * pi/2)^2 where steps are t values and num_timesteps is T."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "betas from alpha_bars",
+                    "acceptable": ["1 - alpha_bar[1:] / alpha_bar[:-1]", "1.0 - alpha_bar[1:] / alpha_bar[:-1]"],
+                    "hint": "beta_t = 1 - alpha_bar_t / alpha_bar_{t-1}, using consecutive elements of alpha_bar."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "return schedule values",
+                    "acceptable": ["betas, alpha_bar[1:]", "{'betas': betas, 'alpha_bar': alpha_bar[1:]}"],
+                    "hint": "Return the beta values and the alpha_bar values (excluding the initial f(0)/f(0)=1 entry)."
+                }
+            ]
+        },
+        {
+            "id": "prot_design_genie_equivariant",
+            "title": "Genie: Equivariant Denoiser for Residue Clouds",
+            "difficulty": "hard",
+            "description": "Implement the SE(3)-equivariant coordinate denoiser from Genie, which predicts clean C-alpha positions from noisy oriented residue clouds using equivariant message passing.",
+            "info": "Genie (Lin & AlQuraishi, NeurIPS 2023) formulates protein backbone generation as denoising diffusion on 'oriented residue clouds', where each residue has a position and an orientation frame. The denoiser must be SE(3)-equivariant: translations of the input should translate the output, and rotations should rotate the output. Genie achieves this by computing relative position vectors between residues (which are equivariant), processing scalar invariants with standard neural networks, and producing equivariant coordinate updates by weighting direction vectors with learned scalar coefficients. This factorization into invariant scalars and equivariant vectors is a common design pattern in geometric deep learning for molecular systems. Genie generates diverse, novel backbone structures with high designability rates. Reference: Lin & AlQuraishi, 'Generating Novel, Designable, and Diverse Protein Structures by Equivariantly Diffusing Oriented Residue Clouds', NeurIPS 2023.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass GenieEquivariantLayer(nn.Module):\n    \"\"\"SE(3)-equivariant denoising layer from Genie.\"\"\"\n    def __init__(self, node_dim=256, k_neighbors=30):\n        super().__init__()\n        self.k = k_neighbors\n        # Invariant feature processing\n        self.invariant_mlp = nn.Sequential(\n            nn.Linear(node_dim + 1, node_dim),  # +1 for distance\n            nn.SiLU(),\n            nn.Linear(node_dim, node_dim)\n        )\n        # Scalar weights for equivariant position update\n        self.coord_weight_mlp = nn.Sequential(\n            nn.Linear(node_dim, node_dim),\n            nn.SiLU(),\n            nn.Linear(node_dim, 1)\n        )\n        self.node_update = nn.Linear(node_dim, node_dim)\n\n    def forward(self, node_feats, coords):\n        N = coords.shape[0]\n        # Build kNN graph from current coords\n        dist_mat = torch.cdist(coords, coords)\n        dist_mat.fill_diagonal_(float('inf'))\n        knn_dist, knn_idx = dist_mat.topk(self.k, largest=False)\n        # Compute relative position vectors (equivariant)\n        rel_pos = coords[knn_idx] - coords.unsqueeze(1)  # (N, k, 3)\n        rel_dist = {{b1}}\n        # Invariant feature update\n        neighbor_feats = node_feats[knn_idx]  # (N, k, node_dim)\n        inv_input = torch.cat([neighbor_feats, rel_dist], dim=-1)\n        messages = self.invariant_mlp(inv_input)  # (N, k, node_dim)\n        agg_feats = messages.mean(dim=1)  # (N, node_dim)\n        node_feats = node_feats + self.node_update(agg_feats)\n        # Equivariant coordinate update: weighted sum of relative positions\n        weights = {{b2}}\n        coord_delta = (weights * rel_pos).mean(dim=1)  # (N, 3)\n        coords = {{b3}}\n        return node_feats, coords",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "distances for invariant features",
+                    "acceptable": ["rel_pos.norm(dim=-1, keepdim=True)", "torch.norm(rel_pos, dim=-1, keepdim=True)"],
+                    "hint": "Compute the L2 norm of relative positions, keeping the last dimension for concatenation with features."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "scalar weights from features",
+                    "acceptable": ["self.coord_weight_mlp(messages)"],
+                    "hint": "Pass the message features through the coordinate weight MLP to get scalar weights for each neighbor direction."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "update coordinates equivariantly",
+                    "acceptable": ["coords + coord_delta"],
+                    "hint": "Add the weighted coordinate displacement to the current positions."
+                }
+            ]
+        }
+    ]
+}

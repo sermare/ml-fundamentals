@@ -11,6 +11,7 @@ async function init() {
 
     document.getElementById("search-box").addEventListener("input", renderSidebar);
     document.getElementById("btn-check").addEventListener("click", checkAnswer);
+    document.getElementById("btn-reveal").addEventListener("click", revealAnswer);
     document.getElementById("btn-reset").addEventListener("click", resetBlanks);
 
     document.querySelectorAll(".filter-btn").forEach(btn => {
@@ -73,6 +74,32 @@ function selectQuestion(q) {
     document.getElementById("q-title").textContent = q.title;
     document.getElementById("q-description").textContent = q.description;
 
+    // Info panel
+    const infoPanel = document.getElementById("info-panel");
+    const infoToggle = document.getElementById("info-toggle");
+    const infoContent = document.getElementById("info-content");
+    if (q.info) {
+        infoPanel.classList.remove("hidden");
+        infoContent.classList.add("hidden");
+        infoToggle.classList.remove("open");
+        infoToggle.textContent = "Show Concept Info";
+        infoContent.textContent = q.info;
+        infoToggle.onclick = () => {
+            const isOpen = !infoContent.classList.contains("hidden");
+            if (isOpen) {
+                infoContent.classList.add("hidden");
+                infoToggle.classList.remove("open");
+                infoToggle.textContent = "Show Concept Info";
+            } else {
+                infoContent.classList.remove("hidden");
+                infoToggle.classList.add("open");
+                infoToggle.textContent = "Hide Concept Info";
+            }
+        };
+    } else {
+        infoPanel.classList.add("hidden");
+    }
+
     renderCode(q);
     renderSidebar();
 }
@@ -97,7 +124,7 @@ function renderCode(q) {
             input.style.width = Math.max(120, (input.placeholder.length + 2) * 9) + "px";
             input.addEventListener("input", () => {
                 input.style.width = Math.max(120, (input.value.length + 2) * 9) + "px";
-                input.classList.remove("correct", "incorrect");
+                input.classList.remove("correct", "incorrect", "revealed");
             });
             container.appendChild(input);
         } else {
@@ -128,7 +155,7 @@ async function checkAnswer() {
 
     const result = await res.json();
     const feedback = document.getElementById("feedback");
-    feedback.classList.remove("hidden", "success", "error");
+    feedback.classList.remove("hidden", "success", "error", "revealed");
 
     if (result.all_correct) {
         feedback.classList.add("success");
@@ -159,10 +186,36 @@ async function checkAnswer() {
     renderSidebar();
 }
 
+async function revealAnswer() {
+    if (!currentQuestion) return;
+
+    const res = await fetch("/api/reveal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question_id: currentQuestion.id }),
+    });
+
+    const result = await res.json();
+    const feedback = document.getElementById("feedback");
+    feedback.classList.remove("hidden", "success", "error");
+    feedback.classList.add("revealed");
+    feedback.innerHTML = "Answer revealed. Try to understand it, then reset and try again!";
+
+    for (const [blankId, answer] of Object.entries(result.answers)) {
+        const input = document.querySelector(`[data-blank-id="${blankId}"]`);
+        if (input) {
+            input.value = answer;
+            input.style.width = Math.max(120, (answer.length + 2) * 9) + "px";
+            input.classList.remove("correct", "incorrect");
+            input.classList.add("revealed");
+        }
+    }
+}
+
 function resetBlanks() {
     document.querySelectorAll(".blank-input").forEach(input => {
         input.value = "";
-        input.classList.remove("correct", "incorrect");
+        input.classList.remove("correct", "incorrect", "revealed");
     });
     document.getElementById("feedback").classList.add("hidden");
 }

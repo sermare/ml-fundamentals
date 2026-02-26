@@ -1,0 +1,547 @@
+{
+    "topic": "Flow Matching - Advanced",
+    "questions": [
+        {
+            "id": "flow_adv_cfm_loss",
+            "title": "Conditional Flow Matching Loss",
+            "difficulty": "medium",
+            "description": "Implement the conditional flow matching (CFM) loss. Given a vector field network v_theta, a noise sample x0, a data sample x1, and a time t, compute the conditional flow matching objective by constructing the interpolant and its time derivative, then regressing the network output against the target velocity.",
+            "info": "Conditional Flow Matching (Lipman et al., 2023) avoids intractable marginal vector fields by conditioning on individual data points. The conditional probability path is p_t(x | x1) with interpolant x_t = (1-t)*x0 + t*x1, and its time derivative u_t = x1 - x0 is the target velocity. The CFM loss is ||v_theta(x_t, t) - u_t||^2, which has the same gradients as the marginal FM loss but is tractable to compute. This made flow matching practical for high-dimensional generative modeling.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef cfm_loss(v_theta, x0, x1, t):\n    \"\"\"Conditional flow matching loss.\n    Args:\n        v_theta: nn.Module, vector field network taking (x_t, t)\n        x0: (B, D) noise samples\n        x1: (B, D) data samples\n        t: (B, 1) time in [0, 1]\n    \"\"\"\n    # Construct interpolant x_t = (1-t)*x0 + t*x1\n    x_t = {{b1}}\n    # Target conditional velocity: dx_t/dt\n    u_t = {{b2}}\n    # Predict velocity and compute MSE loss\n    v_pred = v_theta(x_t, t)\n    loss = {{b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(1 - t) * ??? + t * ???",
+                    "acceptable": ["(1 - t) * x0 + t * x1"],
+                    "hint": "Linear interpolation from x0 (noise) at t=0 to x1 (data) at t=1."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x1 - ???",
+                    "acceptable": ["x1 - x0"],
+                    "hint": "The time derivative of (1-t)*x0 + t*x1 is x1 - x0."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.mean((??? - ???) ** 2)",
+                    "acceptable": ["torch.mean((v_pred - u_t) ** 2)", "((v_pred - u_t) ** 2).mean()"],
+                    "hint": "MSE between predicted velocity and target velocity u_t."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_ot_coupling",
+            "title": "Minibatch Optimal Transport Coupling",
+            "difficulty": "hard",
+            "description": "Implement minibatch optimal transport (OT) coupling for flow matching. Given a batch of noise samples x0 and data samples x1, compute the OT assignment using the cost matrix and scipy's linear_sum_assignment, then reorder x0 to match the optimal pairing.",
+            "info": "Tong et al. (2023) introduced minibatch OT coupling for conditional flow matching to reduce path crossing and improve training. Instead of randomly pairing noise and data samples, OT finds the assignment that minimizes total transport cost (sum of squared distances). This produces straighter trajectories, enabling faster sampling with fewer ODE steps. The cost matrix C_ij = ||x0_i - x1_j||^2 is computed, and the Hungarian algorithm finds the optimal permutation.",
+            "code": "import torch\nfrom scipy.optimize import linear_sum_assignment\n\ndef ot_coupling(x0, x1):\n    \"\"\"Minibatch OT coupling.\n    Args:\n        x0: (B, D) noise samples\n        x1: (B, D) data samples\n    Returns:\n        x0_paired: (B, D) reordered noise samples\n    \"\"\"\n    # Compute pairwise squared distance cost matrix\n    cost = torch.cdist(x0, x1, p=2) ** 2\n    cost_np = cost.detach().cpu().numpy()\n    # Solve assignment problem\n    row_ind, col_ind = {{b1}}\n    # Reorder x0 so that x0[i] is paired with x1[i]\n    # We need to create a mapping: for each x1[j], which x0[i] maps to it\n    perm = {{b2}}\n    x0_paired = {{b3}}\n    return x0_paired",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "linear_sum_assignment(???)",
+                    "acceptable": ["linear_sum_assignment(cost_np)"],
+                    "hint": "Use scipy's linear_sum_assignment on the numpy cost matrix."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.tensor(???)",
+                    "acceptable": ["torch.tensor(col_ind)"],
+                    "hint": "col_ind gives the column (x1) assignment for each row (x0). We need the column indices to reorder."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x0[???]",
+                    "acceptable": ["x0[row_ind][torch.argsort(torch.tensor(col_ind))]", "x0[torch.tensor(row_ind)][torch.argsort(torch.tensor(col_ind))]"],
+                    "hint": "Reorder x0 so position j gets the x0 sample assigned to x1[j]. Use row_ind and col_ind to build this mapping."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_rectified_flow",
+            "title": "Rectified Flow (Reflow) Procedure",
+            "difficulty": "hard",
+            "description": "Implement the reflow procedure for rectified flows. Given a trained flow model, generate (x0, x1) pairs by running the ODE, then retrain on these straightened pairs to produce more linear trajectories.",
+            "info": "Rectified flows (Liu et al., 2022) iteratively straighten flow trajectories through a 'reflow' procedure. Starting from a trained flow matching model, we generate coupled pairs (x0, x1) by sampling noise x0 and integrating the ODE to get x1. These pairs define straighter paths than the original random coupling. Retraining on these pairs yields flows that are closer to straight lines, enabling distillation to single-step generation. Each reflow iteration reduces the transport cost and path curvature.",
+            "code": "import torch\nimport torch.nn as nn\n\ndef generate_reflow_pairs(v_theta, x0_batch, n_steps=100):\n    \"\"\"Generate (x0, x1) pairs by running the learned ODE.\n    Args:\n        v_theta: trained velocity network\n        x0_batch: (B, D) initial noise samples\n        n_steps: number of Euler steps\n    Returns:\n        x0_batch, x1_batch: paired samples\n    \"\"\"\n    dt = {{b1}}\n    x_t = x0_batch.clone()\n    with torch.no_grad():\n        for i in range(n_steps):\n            t = torch.ones(x_t.shape[0], 1, device=x_t.device) * (i * dt)\n            x_t = {{b2}}\n    x1_batch = x_t\n    return x0_batch, x1_batch\n\ndef reflow_loss(v_theta_new, x0, x1, t):\n    \"\"\"Reflow training loss on generated pairs.\"\"\"\n    x_t = (1 - t) * x0 + t * x1\n    target = {{b3}}\n    pred = v_theta_new(x_t, t)\n    return torch.mean((pred - target) ** 2)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1.0 / ???",
+                    "acceptable": ["1.0 / n_steps"],
+                    "hint": "The time step dt is the total interval [0,1] divided by the number of steps."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x_t + ??? * v_theta(x_t, t)",
+                    "acceptable": ["x_t + dt * v_theta(x_t, t)"],
+                    "hint": "Euler step: x_{t+dt} = x_t + dt * v(x_t, t)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x1 - ???",
+                    "acceptable": ["x1 - x0"],
+                    "hint": "The target velocity for the reflow pair (x0, x1) is still x1 - x0, but now these are ODE-coupled pairs."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_rk45_step",
+            "title": "Adaptive RK45 ODE Step",
+            "difficulty": "hard",
+            "description": "Implement a single step of the Runge-Kutta-Fehlberg (RK45) method for adaptive step size ODE solving in flow matching inference. Compute the four RK stages, the fourth-order solution, and the error estimate for step size adaptation.",
+            "info": "During flow matching inference, we solve the ODE dx/dt = v_theta(x, t) from t=0 to t=1. The RK45 method uses a fourth-order Runge-Kutta formula with an embedded fifth-order estimate to adapt the step size. When the error estimate is below a tolerance, the step is accepted and the step size may increase; otherwise the step is rejected and retried with a smaller step. This enables efficient sampling with fewer function evaluations than fixed-step Euler methods, as demonstrated in Lipman et al. (2023).",
+            "code": "import torch\n\ndef rk4_step(v_theta, x, t, dt):\n    \"\"\"Single RK4 step for ODE dx/dt = v_theta(x, t).\n    Args:\n        v_theta: velocity network\n        x: current state (B, D)\n        t: current time (scalar)\n        dt: step size (scalar)\n    Returns:\n        x_next: state after one RK4 step\n    \"\"\"\n    t_tensor = torch.ones(x.shape[0], 1, device=x.device) * t\n    k1 = v_theta(x, t_tensor)\n    k2 = v_theta(x + 0.5 * dt * k1, t_tensor + {{b1}})\n    k3 = v_theta(x + 0.5 * dt * k2, t_tensor + 0.5 * dt)\n    k4 = v_theta({{b2}}, t_tensor + dt)\n    x_next = x + (dt / 6.0) * {{b3}}\n    return x_next",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "??? * dt",
+                    "acceptable": ["0.5 * dt"],
+                    "hint": "k2 is evaluated at the midpoint t + dt/2."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x + dt * ???",
+                    "acceptable": ["x + dt * k3"],
+                    "hint": "k4 is evaluated at x + dt*k3 (full step using k3 slope)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "(k1 + ??? + ??? + k4)",
+                    "acceptable": ["(k1 + 2 * k2 + 2 * k3 + k4)", "(k1 + 2*k2 + 2*k3 + k4)"],
+                    "hint": "Classic RK4 weighted average: (k1 + 2*k2 + 2*k3 + k4) / 6."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_stochastic_interpolant",
+            "title": "Stochastic Interpolant Construction",
+            "difficulty": "medium",
+            "description": "Implement the stochastic interpolant framework from Albergo & Vanden-Eijnden (2023). Construct an interpolant x_t = alpha_t * x0 + beta_t * x1 + sigma_t * epsilon with separate schedule functions for the noise, data, and stochastic components.",
+            "info": "Stochastic interpolants (Albergo & Vanden-Eijnden, 2023) generalize flow matching by introducing a stochastic component sigma_t * epsilon alongside the deterministic interpolation. The interpolant x_t = alpha_t * x0 + beta_t * x1 + sigma_t * epsilon satisfies boundary conditions alpha_0=1, beta_0=0, alpha_1=0, beta_1=1, and sigma_0=sigma_1=0. The stochastic term provides additional flexibility and can interpolate between deterministic ODE sampling and stochastic SDE sampling. The velocity and score can both be extracted from this framework.",
+            "code": "import torch\nimport math\n\ndef stochastic_interpolant(x0, x1, t):\n    \"\"\"Construct stochastic interpolant.\n    Args:\n        x0: (B, D) source samples\n        x1: (B, D) target samples\n        t: (B, 1) time in [0, 1]\n    Returns:\n        x_t, velocity_target, epsilon\n    \"\"\"\n    # Schedule functions satisfying boundary conditions\n    alpha_t = {{b1}}\n    beta_t = t\n    sigma_t = torch.sqrt(2 * t * (1 - t) + 1e-8)\n    # Stochastic noise\n    epsilon = torch.randn_like(x0)\n    # Interpolant\n    x_t = alpha_t * x0 + beta_t * x1 + {{b2}}\n    # Time derivatives of schedules\n    dalpha_dt = -1.0\n    dbeta_dt = 1.0\n    dsigma_dt = (1 - 2 * t) / (torch.sqrt(2 * t * (1 - t) + 1e-8))\n    # Velocity target (deterministic part)\n    velocity_target = {{b3}}\n    return x_t, velocity_target, epsilon",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 - ???",
+                    "acceptable": ["1 - t"],
+                    "hint": "alpha_t should be 1 at t=0 and 0 at t=1. The simplest choice is 1 - t."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "??? * epsilon",
+                    "acceptable": ["sigma_t * epsilon"],
+                    "hint": "The stochastic component is sigma_t multiplied by the noise epsilon."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "dalpha_dt * x0 + dbeta_dt * x1 + dsigma_dt * ???",
+                    "acceptable": ["dalpha_dt * x0 + dbeta_dt * x1 + dsigma_dt * epsilon", "-x0 + x1 + dsigma_dt * epsilon"],
+                    "hint": "The velocity is d(x_t)/dt = dalpha/dt * x0 + dbeta/dt * x1 + dsigma/dt * epsilon."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_cfg_guidance",
+            "title": "Classifier-Free Guidance in Flow Matching",
+            "difficulty": "medium",
+            "description": "Implement classifier-free guidance (CFG) for conditional flow matching. The guided velocity blends the unconditional and conditional predictions with a guidance scale w.",
+            "info": "Classifier-free guidance, adapted from diffusion models to flow matching, steers generation toward a conditioning signal c by extrapolating between unconditional and conditional velocity predictions. The guided velocity is v_guided = (1 - w) * v_uncond + w * v_cond, or equivalently v_uncond + w * (v_cond - v_uncond). During training, the condition is randomly dropped (replaced with a null token) with some probability. At inference, w > 1 amplifies the conditional signal. This technique is essential for text-to-image flow matching models like Stable Diffusion 3 (Esser et al., 2024).",
+            "code": "import torch\nimport torch.nn as nn\n\nclass GuidedFlowModel(nn.Module):\n    def __init__(self, v_theta, guidance_scale=7.5):\n        super().__init__()\n        self.v_theta = v_theta\n        self.w = guidance_scale\n\n    def forward(self, x_t, t, cond, null_cond):\n        \"\"\"Compute guided velocity.\n        Args:\n            x_t: (B, D) noisy state\n            t: (B, 1) time\n            cond: conditioning signal\n            null_cond: null conditioning (for unconditional)\n        \"\"\"\n        v_cond = self.v_theta(x_t, t, cond)\n        v_uncond = {{b1}}\n        v_guided = {{b2}}\n        return v_guided\n\n    def training_step(self, x_t, t, cond, null_cond, target, drop_prob=0.1):\n        \"\"\"Training with random condition dropout.\"\"\"\n        mask = (torch.rand(x_t.shape[0], 1, device=x_t.device) > drop_prob).float()\n        cond_input = {{b3}}\n        v_pred = self.v_theta(x_t, t, cond_input)\n        return torch.mean((v_pred - target) ** 2)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.v_theta(x_t, t, ???)",
+                    "acceptable": ["self.v_theta(x_t, t, null_cond)"],
+                    "hint": "The unconditional prediction uses the null conditioning signal."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "v_uncond + self.w * (??? - ???)",
+                    "acceptable": ["v_uncond + self.w * (v_cond - v_uncond)"],
+                    "hint": "CFG formula: v_uncond + w * (v_cond - v_uncond)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "mask * ??? + (1 - mask) * ???",
+                    "acceptable": ["mask * cond + (1 - mask) * null_cond"],
+                    "hint": "When mask=1 keep the real condition, when mask=0 use the null condition."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_multistep_gen",
+            "title": "Multi-Step vs Single-Step Generation",
+            "difficulty": "easy",
+            "description": "Implement both single-step (distilled) and multi-step Euler generation for a flow matching model. Compare the two approaches by writing the generation loops.",
+            "info": "Flow matching models can generate samples via multi-step ODE integration or, after distillation, in a single step. Multi-step generation uses N Euler steps: x_{i+1} = x_i + (1/N)*v(x_i, t_i), trading compute for quality. Single-step generation directly predicts x1 = x0 + v(x0, 0), which is fast but requires a distilled model (e.g., via rectified flow or progressive distillation). Lipman et al. (2023) showed that flow matching with linear paths enables effective few-step generation even without distillation.",
+            "code": "import torch\n\ndef single_step_generate(v_theta, x0):\n    \"\"\"One-step generation (distilled model).\"\"\"\n    t = torch.zeros(x0.shape[0], 1, device=x0.device)\n    v = v_theta(x0, t)\n    x1 = {{b1}}\n    return x1\n\ndef multi_step_generate(v_theta, x0, n_steps=50):\n    \"\"\"Multi-step Euler generation.\"\"\"\n    dt = {{b2}}\n    x_t = x0.clone()\n    for i in range(n_steps):\n        t = torch.ones(x0.shape[0], 1, device=x0.device) * (i * dt)\n        v = v_theta(x_t, t)\n        x_t = {{b3}}\n    return x_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x0 + ???",
+                    "acceptable": ["x0 + v"],
+                    "hint": "In single-step generation, x1 = x0 + v(x0, 0) since the full interval is [0,1]."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "1.0 / ???",
+                    "acceptable": ["1.0 / n_steps"],
+                    "hint": "Step size is the total interval divided by the number of steps."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x_t + ??? * v",
+                    "acceptable": ["x_t + dt * v"],
+                    "hint": "Euler update: x_{t+dt} = x_t + dt * v(x_t, t)."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_vp_path",
+            "title": "Variance-Preserving Probability Path",
+            "difficulty": "medium",
+            "description": "Implement a variance-preserving (VP) probability path for flow matching where x_t = cos(pi*t/2)*x0 + sin(pi*t/2)*x1. This path preserves the norm of the state throughout the interpolation.",
+            "info": "Variance-preserving paths use trigonometric schedules x_t = cos(pi*t/2)*x0 + sin(pi*t/2)*x1 so that if x0 and x1 are unit-variance and uncorrelated, x_t also has unit variance for all t. This contrasts with the linear (variance-exploding) path where variance changes during interpolation. Albergo & Vanden-Eijnden (2023) showed that VP paths can improve training stability. The target velocity becomes u_t = (-pi/2)*sin(pi*t/2)*x0 + (pi/2)*cos(pi*t/2)*x1, derived from differentiating the interpolant.",
+            "code": "import torch\nimport math\n\ndef vp_interpolant(x0, x1, t):\n    \"\"\"Variance-preserving interpolant and velocity.\n    Args:\n        x0: (B, D) noise, x1: (B, D) data, t: (B, 1)\n    Returns:\n        x_t, u_t (target velocity)\n    \"\"\"\n    angle = {{b1}}\n    alpha_t = torch.cos(angle)\n    beta_t = torch.sin(angle)\n    x_t = alpha_t * x0 + beta_t * x1\n    # Velocity: d(x_t)/dt\n    dalpha_dt = {{b2}}\n    dbeta_dt = (math.pi / 2) * torch.cos(angle)\n    u_t = {{b3}}\n    return x_t, u_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "math.pi * t / ???",
+                    "acceptable": ["math.pi * t / 2", "(math.pi / 2) * t", "math.pi / 2 * t"],
+                    "hint": "The angle goes from 0 to pi/2 as t goes from 0 to 1."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "-(math.pi / 2) * torch.???(angle)",
+                    "acceptable": ["-(math.pi / 2) * torch.sin(angle)"],
+                    "hint": "d/dt cos(pi*t/2) = -(pi/2) * sin(pi*t/2)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "dalpha_dt * ??? + dbeta_dt * ???",
+                    "acceptable": ["dalpha_dt * x0 + dbeta_dt * x1"],
+                    "hint": "Chain rule: velocity = dalpha/dt * x0 + dbeta/dt * x1."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_ve_path",
+            "title": "Variance-Exploding Linear Path",
+            "difficulty": "easy",
+            "description": "Implement the standard linear (variance-exploding) probability path and compute the signal-to-noise ratio (SNR) at each time step to understand how it changes during interpolation.",
+            "info": "The linear path x_t = (1-t)*x0 + t*x1 is the simplest choice in flow matching (Lipman et al., 2023). It is called 'variance-exploding' because if x0 ~ N(0,I) and x1 ~ p_data, the variance of x_t is not constant over t. Specifically, Var(x_t) = (1-t)^2 + t^2 * Var(x1) which varies with t. The SNR = t^2 / (1-t)^2 increases monotonically from 0 to infinity. Despite its simplicity, this path works remarkably well in practice and is the default choice in most flow matching implementations.",
+            "code": "import torch\n\ndef linear_path_with_snr(x0, x1, t):\n    \"\"\"Linear path interpolant with SNR computation.\n    Args:\n        x0: (B, D) noise ~ N(0, I)\n        x1: (B, D) data\n        t: (B, 1) time\n    Returns:\n        x_t, snr\n    \"\"\"\n    x_t = (1 - t) * x0 + t * x1\n    # Signal coefficient squared\n    signal_coeff_sq = {{b1}}\n    # Noise coefficient squared\n    noise_coeff_sq = {{b2}}\n    snr = signal_coeff_sq / (noise_coeff_sq + 1e-8)\n    return x_t, snr",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "t ** ???",
+                    "acceptable": ["t ** 2", "t**2"],
+                    "hint": "The data coefficient is t, so the signal power is t^2."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(1 - t) ** ???",
+                    "acceptable": ["(1 - t) ** 2", "(1-t)**2"],
+                    "hint": "The noise coefficient is (1-t), so the noise power is (1-t)^2."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_score_velocity_connection",
+            "title": "Score Matching to Flow Matching Connection",
+            "difficulty": "hard",
+            "description": "Implement the conversion between a trained score function (from a diffusion model) and the equivalent velocity field for flow matching. For a VP-SDE with noise schedule sigma_t, the velocity can be expressed in terms of the score.",
+            "info": "Flow matching and score-based diffusion models are deeply connected. For a probability path p_t(x) = N(alpha_t * x1, sigma_t^2 * I), the score is grad_x log p_t(x) = -(x - alpha_t * x1) / sigma_t^2. The velocity field can be written as v(x,t) = dalpha/dt * x / alpha_t + (dalpha/dt * sigma_t / alpha_t - dsigma/dt) * sigma_t * score(x,t). This means any trained diffusion model score function can be converted into a flow matching velocity field, enabling ODE-based deterministic sampling of diffusion models (Song et al., 2021; Lipman et al., 2023).",
+            "code": "import torch\n\ndef score_to_velocity(score_fn, x_t, t, alpha_t, sigma_t,\n                      dalpha_dt, dsigma_dt):\n    \"\"\"Convert score function to velocity field.\n    Args:\n        score_fn: trained score network s(x, t) ~ grad log p_t(x)\n        x_t: (B, D) current state\n        t: (B, 1) time\n        alpha_t, sigma_t: noise schedule values (B, 1)\n        dalpha_dt, dsigma_dt: time derivatives of schedules (B, 1)\n    Returns:\n        velocity: (B, D)\n    \"\"\"\n    score = score_fn(x_t, t)\n    # First term: drift from changing alpha\n    drift = {{b1}}\n    # Second term: score-dependent correction\n    score_coeff = dalpha_dt * sigma_t / alpha_t - dsigma_dt\n    score_term = {{b2}}\n    velocity = {{b3}}\n    return velocity",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(dalpha_dt / alpha_t) * ???",
+                    "acceptable": ["(dalpha_dt / alpha_t) * x_t", "dalpha_dt * x_t / alpha_t"],
+                    "hint": "The drift term scales the current state x_t by dalpha/dt / alpha_t."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "score_coeff * ??? * score",
+                    "acceptable": ["score_coeff * sigma_t * score"],
+                    "hint": "The score term multiplies the score by sigma_t and the score coefficient."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "??? + ???",
+                    "acceptable": ["drift + score_term"],
+                    "hint": "The velocity is the sum of the drift term and the score-dependent term."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_discrete_flow",
+            "title": "Flow Matching for Discrete Data",
+            "difficulty": "hard",
+            "description": "Implement a continuous-time Markov chain (CTMC) flow matching approach for discrete data, such as text tokens. Define the rate matrix and the interpolation in probability simplex space.",
+            "info": "Flow matching for discrete data (Campbell et al., 2024; Gat et al., 2024) extends continuous flow matching to categorical variables. Instead of interpolating in Euclidean space, we work with probability vectors on the simplex. The interpolant p_t = (1-t)*p_uniform + t*p_data linearly interpolates between a uniform distribution over K categories and a one-hot data distribution. The velocity on the simplex is dp_t/dt = p_data - p_uniform. At inference, we can sample from the categorical distribution at each step or use the argmax of the predicted probabilities.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef discrete_flow_interpolant(x1_onehot, K, t):\n    \"\"\"Interpolant on probability simplex for discrete data.\n    Args:\n        x1_onehot: (B, K) one-hot encoded data\n        K: number of categories\n        t: (B, 1) time in [0, 1]\n    Returns:\n        p_t: (B, K) probability vector at time t\n    \"\"\"\n    p_uniform = {{b1}}\n    p_t = (1 - t) * p_uniform + t * x1_onehot\n    return p_t\n\ndef discrete_flow_sample_step(p_theta, x_t_onehot, t, dt, K):\n    \"\"\"One step of discrete flow generation.\n    Args:\n        p_theta: network predicting (B, K) logits\n        x_t_onehot: (B, K) current one-hot state\n        t, dt: time and step size\n    Returns:\n        x_next_onehot: (B, K) next one-hot state\n    \"\"\"\n    logits = p_theta(x_t_onehot, t)\n    probs = {{b2}}\n    # Sample from categorical\n    indices = {{b3}}\n    x_next_onehot = F.one_hot(indices, K).float()\n    return x_next_onehot",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.ones_like(x1_onehot) / ???",
+                    "acceptable": ["torch.ones_like(x1_onehot) / K"],
+                    "hint": "Uniform distribution: each of K categories has probability 1/K."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.softmax(logits, dim=???)",
+                    "acceptable": ["F.softmax(logits, dim=-1)", "F.softmax(logits, dim=1)"],
+                    "hint": "Apply softmax over the category dimension to get probabilities."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.multinomial(probs, ???)",
+                    "acceptable": ["torch.multinomial(probs, 1).squeeze(-1)", "torch.multinomial(probs, num_samples=1).squeeze(-1)", "torch.multinomial(probs, 1).squeeze()"],
+                    "hint": "Sample one index per batch element from the categorical distribution."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_ot_cost_matrix",
+            "title": "OT Cost Matrix Computation",
+            "difficulty": "easy",
+            "description": "Compute the pairwise squared Euclidean distance cost matrix for optimal transport coupling in flow matching. This is a fundamental building block for OT-CFM.",
+            "info": "The cost matrix is the foundation of optimal transport coupling in flow matching (Tong et al., 2023). For minibatch OT-CFM, we need C_ij = ||x0_i - x1_j||^2, the squared Euclidean distance between every pair of noise and data samples. This can be computed efficiently using the identity ||a - b||^2 = ||a||^2 + ||b||^2 - 2*a.b, avoiding explicit pairwise subtraction. The cost matrix is then fed to an assignment solver (e.g., Hungarian algorithm) to find optimal pairings.",
+            "code": "import torch\n\ndef compute_ot_cost_matrix(x0, x1):\n    \"\"\"Compute squared Euclidean distance cost matrix.\n    Args:\n        x0: (B, D) source samples\n        x1: (B, D) target samples\n    Returns:\n        C: (B, B) cost matrix where C[i,j] = ||x0[i] - x1[j]||^2\n    \"\"\"\n    # ||x0||^2, shape (B, 1)\n    x0_sq = {{b1}}\n    # ||x1||^2, shape (1, B)\n    x1_sq = (x1 ** 2).sum(dim=1, keepdim=True).T\n    # Cross term\n    cross = {{b2}}\n    C = {{b3}}\n    return C",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(x0 ** 2).sum(dim=???, keepdim=True)",
+                    "acceptable": ["(x0 ** 2).sum(dim=1, keepdim=True)"],
+                    "hint": "Sum squared elements along the feature dimension (dim=1)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x0 @ ???",
+                    "acceptable": ["x0 @ x1.T", "x0 @ x1.t()"],
+                    "hint": "The cross term is x0 @ x1^T giving a (B, B) matrix."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x0_sq + x1_sq - ??? * cross",
+                    "acceptable": ["x0_sq + x1_sq - 2 * cross"],
+                    "hint": "||a-b||^2 = ||a||^2 + ||b||^2 - 2*a.b."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_time_conditioning",
+            "title": "Sinusoidal Time Embedding for Flow Matching",
+            "difficulty": "easy",
+            "description": "Implement sinusoidal time embeddings commonly used to condition velocity networks in flow matching models. These embeddings allow the network to distinguish different time steps.",
+            "info": "Time conditioning is critical in flow matching because the velocity field v(x, t) must vary smoothly with time. Sinusoidal embeddings, borrowed from the Transformer positional encoding (Vaswani et al., 2017), map the scalar t to a high-dimensional vector using sin and cos at different frequencies. This provides a rich, smooth representation of time. The embedding dimension is typically 128 or 256. Both Lipman et al. (2023) and Tong et al. (2023) use these embeddings in their velocity network architectures.",
+            "code": "import torch\nimport math\n\ndef sinusoidal_time_embedding(t, embed_dim=128):\n    \"\"\"Sinusoidal time embedding.\n    Args:\n        t: (B,) or (B, 1) time values in [0, 1]\n        embed_dim: embedding dimension (must be even)\n    Returns:\n        emb: (B, embed_dim) time embeddings\n    \"\"\"\n    if t.dim() == 2:\n        t = t.squeeze(-1)\n    half_dim = embed_dim // 2\n    freqs = torch.exp(\n        -math.log(10000.0) * torch.arange(half_dim, device=t.device) / half_dim\n    )\n    args = {{b1}}\n    emb = torch.cat([{{b2}}], dim=-1)\n    return emb",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "t[:, None] * ???",
+                    "acceptable": ["t[:, None] * freqs[None, :]", "t[:, None] * freqs", "t.unsqueeze(-1) * freqs.unsqueeze(0)", "t.unsqueeze(-1) * freqs"],
+                    "hint": "Outer product of time values and frequency vector. Broadcast (B,1) * (half_dim,)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.sin(???), torch.cos(???)",
+                    "acceptable": ["torch.sin(args), torch.cos(args)"],
+                    "hint": "Concatenate sin and cos of the arguments to get the full embedding."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_velocity_net",
+            "title": "Velocity Network Architecture",
+            "difficulty": "medium",
+            "description": "Build a velocity network v_theta(x, t) for flow matching that takes a state x and time t, uses a sinusoidal time embedding, and outputs a velocity of the same dimension as x.",
+            "info": "The velocity network is the core learnable component in flow matching. It takes the current state x_t and time t as input and outputs the predicted velocity v(x_t, t). A common architecture uses an MLP with time conditioning via addition or concatenation of a time embedding. The network must output a vector of the same dimension as x_t. Lipman et al. (2023) recommend using skip connections and time embedding injection at every layer for best performance. The network is trained with the CFM loss to match the conditional velocity field.",
+            "code": "import torch\nimport torch.nn as nn\n\nclass VelocityNet(nn.Module):\n    def __init__(self, data_dim, hidden_dim=256, time_dim=128):\n        super().__init__()\n        self.time_mlp = nn.Sequential(\n            nn.Linear(time_dim, hidden_dim),\n            nn.SiLU(),\n            nn.Linear(hidden_dim, hidden_dim)\n        )\n        self.net = nn.Sequential(\n            nn.Linear(data_dim, hidden_dim),\n            nn.SiLU(),\n            nn.Linear(hidden_dim, hidden_dim),\n            nn.SiLU(),\n            nn.Linear(hidden_dim, {{b1}})\n        )\n        self.time_dim = time_dim\n\n    def forward(self, x, t):\n        # t: (B, 1)\n        t_emb = sinusoidal_time_embedding(t, self.time_dim)\n        t_hidden = {{b2}}\n        h = self.net[0](x)       # Linear\n        h = self.net[1](h)       # SiLU\n        h = {{b3}}               # Add time conditioning\n        h = self.net[2](h)       # Linear\n        h = self.net[3](h)       # SiLU\n        h = self.net[4](h)       # Linear -> output\n        return h",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "???_dim",
+                    "acceptable": ["data_dim"],
+                    "hint": "The output dimension must match the input data dimension since velocity has the same shape as x."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.time_mlp(???)",
+                    "acceptable": ["self.time_mlp(t_emb)"],
+                    "hint": "Pass the time embedding through the time MLP to get a hidden-dim vector."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "h + ???",
+                    "acceptable": ["h + t_hidden"],
+                    "hint": "Inject time information by adding the time hidden representation to h."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_training_loop",
+            "title": "Complete CFM Training Loop",
+            "difficulty": "medium",
+            "description": "Implement a complete training loop for conditional flow matching, including sampling time uniformly, pairing noise and data, computing the loss, and performing the optimization step.",
+            "info": "The CFM training loop (Lipman et al., 2023) samples minibatches of data x1, pairs them with noise x0 ~ N(0,I), draws random times t ~ U(0,1), constructs interpolants x_t, and minimizes ||v_theta(x_t, t) - (x1-x0)||^2. Time is sampled uniformly in [0,1], though some works propose non-uniform sampling for better performance. The noise x0 is freshly sampled each iteration. Tong et al. (2023) showed that using OT coupling instead of random pairing significantly improves convergence and sample quality.",
+            "code": "import torch\nimport torch.optim as optim\n\ndef train_cfm_step(v_theta, optimizer, x1_batch):\n    \"\"\"One training step of conditional flow matching.\n    Args:\n        v_theta: velocity network\n        optimizer: optimizer\n        x1_batch: (B, D) batch of data samples\n    Returns:\n        loss value\n    \"\"\"\n    B, D = x1_batch.shape\n    device = x1_batch.device\n    # Sample noise and time\n    x0 = {{b1}}\n    t = torch.rand(B, 1, device=device)\n    # Construct interpolant and target\n    x_t = (1 - t) * x0 + t * x1_batch\n    target = x1_batch - x0\n    # Forward pass\n    v_pred = v_theta(x_t, t)\n    loss = {{b2}}\n    # Backward pass\n    optimizer.zero_grad()\n    loss.backward()\n    {{b3}}\n    return loss.item()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.randn(???, device=device)",
+                    "acceptable": ["torch.randn(B, D, device=device)", "torch.randn_like(x1_batch)"],
+                    "hint": "Sample standard Gaussian noise with the same shape as x1_batch."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.mean((v_pred - ???) ** 2)",
+                    "acceptable": ["torch.mean((v_pred - target) ** 2)", "((v_pred - target) ** 2).mean()"],
+                    "hint": "MSE loss between predicted velocity and target velocity (x1 - x0)."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "optimizer.???()",
+                    "acceptable": ["optimizer.step()"],
+                    "hint": "Call the optimizer's step method to update parameters."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_hutchinson_divergence",
+            "title": "Hutchinson Trace Estimator for Divergence",
+            "difficulty": "hard",
+            "description": "Implement the Hutchinson trace estimator to compute the divergence of the velocity field, which is needed for exact log-likelihood computation in flow matching via the instantaneous change of variables formula.",
+            "info": "Exact log-likelihood in continuous normalizing flows requires computing div(v_theta), the divergence of the velocity field, via the instantaneous change of variables: d/dt log p_t(x_t) = -div(v_theta(x_t, t)). Computing the full divergence requires D backward passes (one per dimension), which is expensive. The Hutchinson estimator approximates it as E[epsilon^T * (dv/dx) * epsilon] where epsilon is random noise with E[epsilon*epsilon^T]=I. This reduces the cost to one backward pass per estimate. This technique was introduced for Neural ODEs by Grathwohl et al. (2019) and is used in flow matching for density estimation.",
+            "code": "import torch\n\ndef hutchinson_divergence(v_theta, x_t, t):\n    \"\"\"Estimate divergence using Hutchinson's trace estimator.\n    Args:\n        v_theta: velocity network\n        x_t: (B, D) current state, requires_grad=True\n        t: (B, 1) time\n    Returns:\n        div_est: (B,) estimated divergence\n    \"\"\"\n    x_t.requires_grad_(True)\n    v = v_theta(x_t, t)\n    # Random probe vector\n    epsilon = {{b1}}\n    # Compute vector-Jacobian product: epsilon^T @ (dv/dx)\n    vjp = torch.autograd.grad(\n        outputs=v, inputs=x_t,\n        grad_outputs=epsilon,\n        create_graph=True\n    )[0]\n    # Trace estimate: epsilon^T @ (dv/dx) @ epsilon\n    div_est = {{b2}}\n    return div_est\n\ndef log_likelihood_ode(v_theta, x1, n_steps=100):\n    \"\"\"Compute log p(x1) by integrating backward from t=1 to t=0.\"\"\"\n    dt = -1.0 / n_steps  # negative because we go backward\n    x_t = x1.clone()\n    log_p = torch.zeros(x1.shape[0], device=x1.device)\n    for i in range(n_steps):\n        t_val = 1.0 - i / n_steps\n        t = torch.ones(x1.shape[0], 1, device=x1.device) * t_val\n        div = hutchinson_divergence(v_theta, x_t, t)\n        log_p = {{b3}}\n        with torch.no_grad():\n            v = v_theta(x_t, t)\n            x_t = x_t + dt * v\n    # Add log p_0(x_0) = log N(x_0; 0, I)\n    log_p0 = -0.5 * (x_t ** 2).sum(dim=1) - 0.5 * x_t.shape[1] * torch.log(torch.tensor(2 * 3.14159))\n    return log_p + log_p0",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.randn_like(???)",
+                    "acceptable": ["torch.randn_like(x_t)"],
+                    "hint": "The random probe vector epsilon has the same shape as x_t."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "(??? * epsilon).sum(dim=???)",
+                    "acceptable": ["(vjp * epsilon).sum(dim=1)", "(vjp * epsilon).sum(dim=-1)"],
+                    "hint": "Trace estimate = sum of element-wise product of vjp and epsilon along features."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "log_p - ??? * div",
+                    "acceptable": ["log_p - dt * div", "log_p + div / n_steps"],
+                    "hint": "Accumulate: d(log_p)/dt = -div(v), so log_p -= dt * div (dt is negative, so this adds)."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_ema",
+            "title": "Exponential Moving Average for Flow Matching",
+            "difficulty": "easy",
+            "description": "Implement an EMA (Exponential Moving Average) wrapper for the velocity network parameters, which is standard practice in flow matching and diffusion model training for stable generation.",
+            "info": "Exponential moving average of model parameters is a critical technique for stable and high-quality generation in flow matching models. The EMA parameters theta_ema are updated as theta_ema = decay * theta_ema + (1 - decay) * theta_train after each training step. Typical decay values are 0.999 or 0.9999. At generation time, the EMA parameters are used instead of the training parameters. This smooths out training noise and consistently improves sample quality. All major flow matching implementations including those in Lipman et al. (2023) and Tong et al. (2023) use EMA.",
+            "code": "import torch\nimport copy\n\nclass EMAModel:\n    def __init__(self, model, decay=0.999):\n        self.decay = decay\n        self.ema_model = copy.deepcopy(model)\n        self.ema_model.eval()\n        for p in self.ema_model.parameters():\n            p.requires_grad_(False)\n\n    @torch.no_grad()\n    def update(self, model):\n        for ema_p, model_p in zip(\n            self.ema_model.parameters(), model.parameters()\n        ):\n            ema_p.data = {{b1}}\n\n    def forward(self, *args, **kwargs):\n        return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "self.decay * ??? + (1 - self.decay) * ???",
+                    "acceptable": ["self.decay * ema_p.data + (1 - self.decay) * model_p.data"],
+                    "hint": "EMA update: ema = decay * ema + (1 - decay) * current."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "self.ema_model(???)",
+                    "acceptable": ["self.ema_model(*args, **kwargs)"],
+                    "hint": "Forward pass through the EMA model with all arguments."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_midpoint_solver",
+            "title": "Midpoint ODE Solver for Flow Matching",
+            "difficulty": "medium",
+            "description": "Implement the midpoint method (second-order Runge-Kutta) for ODE solving during flow matching inference. This is more accurate than Euler but simpler than RK4.",
+            "info": "The midpoint method is a second-order ODE solver that evaluates the velocity at the midpoint of each step for better accuracy. Given x_t and step size dt, it first computes a half-step x_mid = x_t + (dt/2)*v(x_t, t), then uses the velocity at the midpoint for the full step: x_{t+dt} = x_t + dt*v(x_mid, t+dt/2). This achieves second-order accuracy O(dt^2) compared to Euler's first-order O(dt), enabling fewer steps for the same quality. It requires two function evaluations per step, making it a good trade-off between Euler (1 eval) and RK4 (4 evals).",
+            "code": "import torch\n\ndef midpoint_generate(v_theta, x0, n_steps=25):\n    \"\"\"Generate samples using the midpoint ODE solver.\n    Args:\n        v_theta: velocity network\n        x0: (B, D) initial noise\n        n_steps: number of steps\n    Returns:\n        x1: (B, D) generated samples\n    \"\"\"\n    dt = 1.0 / n_steps\n    x_t = x0.clone()\n    for i in range(n_steps):\n        t_curr = i * dt\n        t_tensor = torch.ones(x0.shape[0], 1, device=x0.device) * t_curr\n        # Evaluate velocity at current point\n        v_curr = v_theta(x_t, t_tensor)\n        # Half-step to midpoint\n        x_mid = {{b1}}\n        t_mid = torch.ones(x0.shape[0], 1, device=x0.device) * (t_curr + 0.5 * dt)\n        # Evaluate velocity at midpoint\n        v_mid = {{b2}}\n        # Full step using midpoint velocity\n        x_t = {{b3}}\n    return x_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x_t + 0.5 * dt * ???",
+                    "acceptable": ["x_t + 0.5 * dt * v_curr"],
+                    "hint": "The midpoint is x_t plus half a step using the current velocity."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "v_theta(x_mid, ???)",
+                    "acceptable": ["v_theta(x_mid, t_mid)"],
+                    "hint": "Evaluate the velocity network at the midpoint state and midpoint time."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "x_t + dt * ???",
+                    "acceptable": ["x_t + dt * v_mid"],
+                    "hint": "The full step uses the midpoint velocity: x_{t+dt} = x_t + dt * v_mid."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_distillation_loss",
+            "title": "Progressive Distillation for Flow Matching",
+            "difficulty": "hard",
+            "description": "Implement progressive distillation loss to train a student model that takes half as many steps as the teacher. The student learns to match two teacher steps with one student step.",
+            "info": "Progressive distillation (Salimans & Ho, 2022), adapted for flow matching, trains a student model to replicate two teacher steps in a single step. Given x_t, the teacher takes two steps: x_{t+dt} and x_{t+2dt}, while the student predicts x_{t+2dt} directly from x_t with one step of size 2*dt. The student is trained to minimize ||x_student - x_teacher||^2. By iterating this process, we can halve the number of steps each round, ultimately reaching single-step generation. This is a key technique for deploying flow matching models in latency-sensitive applications.",
+            "code": "import torch\n\n@torch.no_grad()\ndef teacher_two_steps(v_teacher, x_t, t, dt):\n    \"\"\"Teacher takes two Euler steps of size dt.\"\"\"\n    t1 = torch.ones(x_t.shape[0], 1, device=x_t.device) * t\n    v1 = v_teacher(x_t, t1)\n    x_mid = x_t + dt * v1\n    t2 = torch.ones(x_t.shape[0], 1, device=x_t.device) * (t + dt)\n    v2 = v_teacher(x_mid, t2)\n    x_target = {{b1}}\n    return x_target\n\ndef distillation_loss(v_student, v_teacher, x_t, t_val, dt):\n    \"\"\"Distillation loss: student matches teacher's two steps in one.\"\"\"\n    # Teacher target (no grad)\n    x_teacher = teacher_two_steps(v_teacher, x_t, t_val, dt)\n    # Student: one step of size 2*dt\n    t_tensor = torch.ones(x_t.shape[0], 1, device=x_t.device) * t_val\n    v_s = v_student(x_t, t_tensor)\n    x_student = {{b2}}\n    loss = {{b3}}\n    return loss",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "x_mid + ??? * v2",
+                    "acceptable": ["x_mid + dt * v2"],
+                    "hint": "Second Euler step from x_mid: x_target = x_mid + dt * v2."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "x_t + ??? * v_s",
+                    "acceptable": ["x_t + 2 * dt * v_s"],
+                    "hint": "Student takes one step of size 2*dt to cover the same interval."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "torch.mean((??? - ???) ** 2)",
+                    "acceptable": ["torch.mean((x_student - x_teacher) ** 2)", "torch.mean((x_student - x_teacher.detach()) ** 2)"],
+                    "hint": "MSE between student's prediction and teacher's target."
+                }
+            ]
+        },
+        {
+            "id": "flow_adv_gaussian_path_general",
+            "title": "General Gaussian Probability Path",
+            "difficulty": "medium",
+            "description": "Implement a general Gaussian probability path p_t(x|x1) = N(mu_t(x1), sigma_t^2 * I) with configurable schedule functions, unifying variance-preserving and variance-exploding paths under one framework.",
+            "info": "Lipman et al. (2023) showed that many flow matching paths can be unified as Gaussian paths p_t(x|x1) = N(mu_t(x1), sigma_t^2 * I) with different choices of mu_t and sigma_t. For the linear path: mu_t = t*x1, sigma_t = 1-t. For the VP path: mu_t = cos(pi*t/2) is replaced with trigonometric schedules. The conditional velocity field is u_t(x|x1) = (mu_t'*(x1) * (x - mu_t(x1)) + sigma_t' * sigma_t * I) / sigma_t, but simplifies to (mu_t' / sigma_t) * (x1*sigma_t - (x-mu_t)) + sigma_t' * noise_component. This general framework enables principled comparison of different probability path designs.",
+            "code": "import torch\n\nclass GaussianPath:\n    \"\"\"General Gaussian probability path.\"\"\"\n\n    def sample_xt(self, x0, x1, t, mu_t, sigma_t):\n        \"\"\"Sample x_t ~ N(mu_t, sigma_t^2 I) using reparameterization.\n        x0 is standard Gaussian noise for reparameterization.\n        \"\"\"\n        x_t = {{b1}}\n        return x_t\n\n    def compute_target_velocity(self, x0, x1, t, mu_t, sigma_t,\n                                  dmu_dt, dsigma_dt):\n        \"\"\"Compute conditional velocity target.\n        For x_t = mu_t + sigma_t * x0, velocity = dmu/dt + dsigma/dt * x0.\n        \"\"\"\n        u_t = {{b2}}\n        return u_t\n\ndef make_linear_schedules(t):\n    \"\"\"Linear (OT) path: mu_t = t*x1, sigma_t = 1-t.\"\"\"\n    mu_coeff = t           # multiply by x1\n    sigma_t = {{b3}}\n    dmu_dt = 1.0\n    dsigma_dt = -1.0\n    return mu_coeff, sigma_t, dmu_dt, dsigma_dt",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "mu_t + sigma_t * ???",
+                    "acceptable": ["mu_t + sigma_t * x0"],
+                    "hint": "Reparameterization trick: x_t = mu_t + sigma_t * noise (x0 is the noise)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "dmu_dt + dsigma_dt * ???",
+                    "acceptable": ["dmu_dt + dsigma_dt * x0"],
+                    "hint": "d/dt(mu_t + sigma_t * x0) = dmu/dt + dsigma/dt * x0."
+                },
+                {
+                    "id": "b3",
+                    "placeholder": "1 - ???",
+                    "acceptable": ["1 - t"],
+                    "hint": "For the linear path, sigma_t = 1 - t, going from 1 at t=0 to 0 at t=1."
+                }
+            ]
+        }
+    ]
+}

@@ -6,12 +6,18 @@
             "title": "L2 Regularization Loss",
             "difficulty": "easy",
             "description": "Add L2 regularization (weight decay) to a loss. lambda_reg is the regularization strength, W is the weight matrix.",
+            "info": "L2 regularization (weight decay) penalizes large weight values by adding the sum of squared weights to the loss function. This encourages the model to use smaller, more distributed weights rather than relying heavily on a few large weights, reducing overfitting. Mathematically, L2 regularization corresponds to placing a Gaussian prior on the weights in a Bayesian framework. The gradient contribution of L2 is simply 2*lambda*W, which has the effect of multiplicatively shrinking weights toward zero each step, hence the name 'weight decay'.",
             "code": "import numpy as np\n\ndef l2_regularized_loss(loss, W, lambda_reg):\n    return loss + {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "lambda_reg * np.???",
-                    "acceptable": ["lambda_reg * np.sum(W ** 2)", "lambda_reg * np.sum(W**2)", "0.5 * lambda_reg * np.sum(W ** 2)", "0.5 * lambda_reg * np.sum(W**2)"],
+                    "acceptable": [
+                        "lambda_reg * np.sum(W ** 2)",
+                        "lambda_reg * np.sum(W**2)",
+                        "0.5 * lambda_reg * np.sum(W ** 2)",
+                        "0.5 * lambda_reg * np.sum(W**2)"
+                    ],
                     "hint": "L2 = lambda * sum(W^2). Sometimes includes a 0.5 factor."
                 }
             ]
@@ -21,18 +27,24 @@
             "title": "Dropout Forward (NumPy)",
             "difficulty": "medium",
             "description": "Implement dropout during training with inverted dropout scaling. p is the drop probability.",
+            "info": "Dropout is a powerful regularization technique that randomly sets activations to zero during training with probability p, forcing the network to learn redundant representations. The inverted dropout variant scales surviving activations by 1/(1-p) during training so that no rescaling is needed at test time, keeping the expected activation magnitude consistent. This can be interpreted as training an ensemble of 2^n subnetworks (where n is the number of units) that share weights. Dropout was introduced by Srivastava et al. (2014) and remains one of the most effective regularization methods for fully connected layers.",
             "code": "import numpy as np\n\ndef dropout_forward(x, p=0.5, training=True):\n    if not training:\n        return x\n    mask = {{b1}}\n    return {{b2}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "(np.random.??? < ???)",
-                    "acceptable": ["(np.random.rand(*x.shape) < (1 - p))", "(np.random.random(x.shape) < (1 - p))"],
+                    "acceptable": [
+                        "(np.random.rand(*x.shape) < (1 - p))",
+                        "(np.random.random(x.shape) < (1 - p))"
+                    ],
                     "hint": "Create a binary mask where each element survives with probability (1 - p)."
                 },
                 {
                     "id": "b2",
                     "placeholder": "x * mask / ???",
-                    "acceptable": ["x * mask / (1 - p)"],
+                    "acceptable": [
+                        "x * mask / (1 - p)"
+                    ],
                     "hint": "Inverted dropout: scale by 1/(1-p) so expected value stays the same."
                 }
             ]
@@ -42,18 +54,23 @@
             "title": "Batch Normalization (Inference)",
             "difficulty": "medium",
             "description": "Apply batch normalization at inference time using running mean and variance. gamma and beta are learnable parameters, eps is a small constant.",
+            "info": "Batch normalization normalizes activations to zero mean and unit variance, then applies a learnable scale (gamma) and shift (beta) to restore representational power. During training, it uses batch statistics, but at inference time it uses running averages computed during training for deterministic outputs. BatchNorm reduces internal covariate shift, allowing higher learning rates and faster convergence, and also provides a mild regularization effect. The epsilon term (typically 1e-5) prevents division by zero when the variance is very small.",
             "code": "import numpy as np\n\ndef batchnorm_inference(x, running_mean, running_var, gamma, beta, eps=1e-5):\n    x_hat = {{b1}}\n    return {{b2}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "(x - ???) / np.sqrt(??? + eps)",
-                    "acceptable": ["(x - running_mean) / np.sqrt(running_var + eps)"],
+                    "acceptable": [
+                        "(x - running_mean) / np.sqrt(running_var + eps)"
+                    ],
                     "hint": "Normalize: (x - mean) / sqrt(var + eps)."
                 },
                 {
                     "id": "b2",
                     "placeholder": "gamma * ??? + beta",
-                    "acceptable": ["gamma * x_hat + beta"],
+                    "acceptable": [
+                        "gamma * x_hat + beta"
+                    ],
                     "hint": "Scale and shift: gamma * x_hat + beta."
                 }
             ]

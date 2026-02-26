@@ -41,6 +41,7 @@ def get_questions():
             "difficulty": q["difficulty"],
             "description": q["description"],
             "code": q["code"],
+            "info": q.get("info", ""),
             "blanks": [
                 {"id": b["id"], "placeholder": b.get("placeholder", "___")}
                 for b in q["blanks"]
@@ -86,6 +87,24 @@ def check_answer():
             all_correct = False
 
     return jsonify({"all_correct": all_correct, "results": results})
+
+
+@app.route("/api/reveal", methods=["POST"])
+def reveal_answer():
+    data = request.json
+    question_id = data.get("question_id")
+
+    questions = load_questions()
+    question = next((q for q in questions if q["id"] == question_id), None)
+
+    if not question:
+        return jsonify({"error": "Question not found"}), 404
+
+    answers = {}
+    for blank in question["blanks"]:
+        answers[blank["id"]] = blank["acceptable"][0]
+
+    return jsonify({"answers": answers})
 
 
 if __name__ == "__main__":

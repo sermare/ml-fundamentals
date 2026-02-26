@@ -1,0 +1,385 @@
+{
+    "topic": "Diffusion Models - Basics",
+    "questions": [
+        {
+            "id": "diff_basics_linear_beta_schedule",
+            "title": "Linear Beta Schedule",
+            "difficulty": "easy",
+            "description": "Create a linear noise schedule that linearly interpolates beta values from beta_start to beta_end over T timesteps.",
+            "info": "The beta schedule controls how much noise is added at each timestep in the forward diffusion process. A linear schedule simply spaces beta values evenly between a small starting value (e.g., 1e-4) and a larger ending value (e.g., 0.02). This is the original schedule used in the DDPM paper by Ho et al. (2020). The choice of schedule significantly impacts generation quality, as it determines how quickly the data distribution is destroyed into pure Gaussian noise.",
+            "code": "import torch\n\ndef linear_beta_schedule(T, beta_start=1e-4, beta_end=0.02):\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.linspace(?, ?, ?)",
+                    "acceptable": ["torch.linspace(beta_start, beta_end, T)", "torch.linspace(beta_start, beta_end, steps=T)"],
+                    "hint": "Use torch.linspace to create T evenly spaced values from beta_start to beta_end."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_alpha_from_beta",
+            "title": "Compute Alpha from Beta",
+            "difficulty": "easy",
+            "description": "Compute alpha_t = 1 - beta_t, the amount of signal retained at each step.",
+            "info": "In the forward diffusion process, alpha_t represents the fraction of the original signal preserved after one noising step. Since beta_t is the variance of the noise added, alpha_t = 1 - beta_t captures the complementary quantity: how much of the previous image is kept. Together, alpha and beta must sum to 1 at each timestep. This simple relationship is the foundation for all subsequent diffusion math, including the cumulative products used for direct sampling.",
+            "code": "import torch\n\ndef compute_alphas(betas):\n    \"\"\"Given a tensor of betas, return the corresponding alphas.\"\"\"\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 - ???",
+                    "acceptable": ["1 - betas", "1.0 - betas"],
+                    "hint": "alpha_t = 1 - beta_t for each timestep."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_alpha_bar_cumprod",
+            "title": "Cumulative Product for Alpha Bar",
+            "difficulty": "easy",
+            "description": "Compute alpha_bar_t = product of alpha_1 * alpha_2 * ... * alpha_t using a cumulative product.",
+            "info": "Alpha_bar_t (also written as \\bar{alpha}_t) is the cumulative product of all alphas from timestep 1 to t. It represents the total fraction of the original signal remaining at timestep t. This quantity is essential because it allows us to sample x_t directly from x_0 without iterating through all intermediate steps, via x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * epsilon. As t increases, alpha_bar_t decreases toward 0, meaning the signal is progressively destroyed.",
+            "code": "import torch\n\ndef compute_alpha_bar(alphas):\n    \"\"\"Compute cumulative product of alphas.\"\"\"\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(alphas)",
+                    "acceptable": ["torch.cumprod(alphas, dim=0)", "torch.cumprod(alphas, 0)"],
+                    "hint": "Use torch.cumprod along dimension 0 to compute the running product."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_forward_q_one_step",
+            "title": "Forward Process: One Step q(x_t | x_{t-1})",
+            "difficulty": "medium",
+            "description": "Implement one step of the forward diffusion process q(x_t | x_{t-1}) = N(x_t; sqrt(1 - beta_t) * x_{t-1}, beta_t * I).",
+            "info": "The forward process q(x_t | x_{t-1}) defines a Gaussian transition kernel that gradually adds noise to data. At each step, the mean is scaled by sqrt(1 - beta_t) (slightly shrinking the signal) and Gaussian noise with variance beta_t is added. This is a Markov chain where each step only depends on the previous one. The reparameterization trick lets us write this as x_t = sqrt(1 - beta_t) * x_{t-1} + sqrt(beta_t) * epsilon, where epsilon ~ N(0, I). This formulation makes the operation differentiable.",
+            "code": "import torch\n\ndef forward_one_step(x_prev, beta_t):\n    \"\"\"Sample x_t from q(x_t | x_{t-1}).\"\"\"\n    noise = torch.randn_like(x_prev)\n    mean_coeff = {{b1}}\n    std = {{b2}}\n    return mean_coeff * x_prev + std * noise",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(1 - beta_t)", "torch.sqrt(1.0 - beta_t)", "(1 - beta_t).sqrt()", "(1.0 - beta_t).sqrt()"],
+                    "hint": "The mean coefficient is sqrt(1 - beta_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(beta_t)", "beta_t.sqrt()"],
+                    "hint": "The standard deviation is sqrt(beta_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_reparam_sample_xt",
+            "title": "Reparameterization: Sample x_t Directly from x_0",
+            "difficulty": "medium",
+            "description": "Sample x_t directly from x_0 using the reparameterization trick: x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * epsilon.",
+            "info": "A key insight of DDPM is that we do not need to run the forward chain step by step. Because each step adds Gaussian noise and Gaussians compose nicely, we can jump directly from x_0 to any x_t in closed form. The formula x_t = sqrt(\\bar{alpha}_t) * x_0 + sqrt(1 - \\bar{alpha}_t) * epsilon elegantly decomposes x_t into a scaled original signal plus scaled noise. This makes training efficient since we can randomly sample any timestep t and immediately compute the noisy version.",
+            "code": "import torch\n\ndef sample_xt_from_x0(x0, alpha_bar_t, noise=None):\n    \"\"\"Sample x_t directly from x_0 using reparameterization.\"\"\"\n    if noise is None:\n        noise = torch.randn_like(x0)\n    return {{b1}} * x0 + {{b2}} * noise",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(alpha_bar_t)", "alpha_bar_t.sqrt()"],
+                    "hint": "The signal coefficient is sqrt(alpha_bar_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(1 - alpha_bar_t)", "torch.sqrt(1.0 - alpha_bar_t)", "(1 - alpha_bar_t).sqrt()", "(1.0 - alpha_bar_t).sqrt()"],
+                    "hint": "The noise coefficient is sqrt(1 - alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_noise_prediction_loss",
+            "title": "DDPM Simplified Training Loss",
+            "difficulty": "medium",
+            "description": "Implement the simplified DDPM training loss: L = E[||epsilon - epsilon_theta(x_t, t)||^2], the MSE between true noise and predicted noise.",
+            "info": "The DDPM paper showed that a simplified objective works best in practice: train the model epsilon_theta to predict the noise epsilon that was added to create x_t from x_0. The loss is simply the mean squared error between the actual noise sampled from N(0,I) and the model's prediction. This is mathematically equivalent (up to a weighting factor) to the variational lower bound on the data log-likelihood. The simplicity of this loss -- just predict the noise -- is one reason diffusion models became so practical and popular.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef diffusion_loss(model, x0, t, alpha_bar):\n    \"\"\"Compute simplified DDPM loss.\"\"\"\n    noise = torch.randn_like(x0)\n    alpha_bar_t = alpha_bar[t].reshape(-1, 1, 1, 1)\n    x_t = torch.sqrt(alpha_bar_t) * x0 + torch.sqrt(1 - alpha_bar_t) * noise\n    predicted_noise = model(x_t, t)\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "F.???(noise, predicted_noise)",
+                    "acceptable": ["F.mse_loss(noise, predicted_noise)", "F.mse_loss(predicted_noise, noise)"],
+                    "hint": "Use F.mse_loss to compute MSE between the true noise and predicted noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_cosine_schedule",
+            "title": "Cosine Noise Schedule",
+            "difficulty": "hard",
+            "description": "Implement the cosine schedule for alpha_bar as proposed by Nichol & Dhariwal: alpha_bar_t = f(t)/f(0) where f(t) = cos((t/T + s)/(1+s) * pi/2)^2.",
+            "info": "The cosine schedule was introduced to fix a problem with the linear schedule: it destroys information too quickly in early timesteps and too slowly near the end. The cosine function provides a smoother, more gradual transition. The offset s (typically 0.008) prevents alpha_bar from being too small near t=T, which helps numerical stability. This schedule leads to better image quality because the model gets to see useful signal across a wider range of timesteps during training, rather than spending most of its capacity on nearly pure noise.",
+            "code": "import torch\nimport math\n\ndef cosine_alpha_bar_schedule(T, s=0.008):\n    \"\"\"Compute alpha_bar using cosine schedule.\"\"\"\n    steps = torch.arange(T + 1, dtype=torch.float32)\n    f = {{b1}}\n    alpha_bar = f / f[0]\n    return alpha_bar[1:]",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.cos(??? * math.pi / 2) ** 2",
+                    "acceptable": ["torch.cos((steps / T + s) / (1 + s) * math.pi / 2) ** 2", "torch.cos(((steps / T) + s) / (1 + s) * math.pi / 2) ** 2"],
+                    "hint": "f(t) = cos((t/T + s) / (1 + s) * pi/2)^2. Use steps for t."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_betas_from_cosine",
+            "title": "Derive Betas from Alpha Bar",
+            "difficulty": "medium",
+            "description": "Given a precomputed alpha_bar schedule, derive the per-step beta values. Since alpha_bar_t = prod(1 - beta_i), we have beta_t = 1 - alpha_bar_t / alpha_bar_{t-1}.",
+            "info": "When using a cosine or other non-linear schedule, we typically define alpha_bar directly and then derive the individual betas. The relationship alpha_bar_t = alpha_bar_{t-1} * (1 - beta_t) can be rearranged to beta_t = 1 - alpha_bar_t / alpha_bar_{t-1}. In practice, we also clip beta to a maximum value (e.g., 0.999) to prevent numerical issues when alpha_bar values are very small near the end of the diffusion process. This derived beta can then be used in the reverse sampling process.",
+            "code": "import torch\n\ndef get_betas_from_alpha_bar(alpha_bar):\n    \"\"\"Derive betas from alpha_bar schedule.\"\"\"\n    betas = torch.zeros_like(alpha_bar)\n    betas[0] = 1 - alpha_bar[0]\n    for t in range(1, len(alpha_bar)):\n        betas[t] = {{b1}}\n    return torch.clamp(betas, max=0.999)",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 - alpha_bar[?] / alpha_bar[?]",
+                    "acceptable": ["1 - alpha_bar[t] / alpha_bar[t - 1]", "1 - alpha_bar[t] / alpha_bar[t-1]", "1.0 - alpha_bar[t] / alpha_bar[t - 1]", "1.0 - alpha_bar[t] / alpha_bar[t-1]"],
+                    "hint": "beta_t = 1 - alpha_bar_t / alpha_bar_{t-1}."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_snr",
+            "title": "Signal-to-Noise Ratio",
+            "difficulty": "medium",
+            "description": "Compute the signal-to-noise ratio (SNR) at timestep t. SNR_t = alpha_bar_t / (1 - alpha_bar_t).",
+            "info": "The signal-to-noise ratio (SNR) at timestep t quantifies the relative strength of the original signal versus the added noise in x_t. Since x_t = sqrt(alpha_bar_t)*x_0 + sqrt(1-alpha_bar_t)*epsilon, the signal power is alpha_bar_t and noise power is (1-alpha_bar_t), giving SNR = alpha_bar_t / (1-alpha_bar_t). The SNR monotonically decreases from a large value (nearly pure signal) at t=0 to near zero (nearly pure noise) at t=T. The log-SNR is often used for analysis and for defining improved loss weightings.",
+            "code": "import torch\n\ndef compute_snr(alpha_bar):\n    \"\"\"Compute signal-to-noise ratio for each timestep.\"\"\"\n    return {{b1}}\n\ndef compute_log_snr(alpha_bar):\n    \"\"\"Compute log signal-to-noise ratio.\"\"\"\n    snr = compute_snr(alpha_bar)\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "alpha_bar / ???",
+                    "acceptable": ["alpha_bar / (1 - alpha_bar)", "alpha_bar / (1.0 - alpha_bar)"],
+                    "hint": "SNR = alpha_bar_t / (1 - alpha_bar_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(snr)",
+                    "acceptable": ["torch.log(snr)"],
+                    "hint": "Take the natural logarithm of SNR."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_posterior_variance",
+            "title": "Posterior Variance of Reverse Process",
+            "difficulty": "hard",
+            "description": "Compute the posterior variance beta_tilde_t = beta_t * (1 - alpha_bar_{t-1}) / (1 - alpha_bar_t), used in the reverse diffusion step.",
+            "info": "The posterior q(x_{t-1} | x_t, x_0) is a Gaussian whose variance beta_tilde_t can be computed in closed form. This variance is fixed (not learned in basic DDPM) and depends on beta_t, alpha_bar_t, and alpha_bar_{t-1}. The formula beta_tilde_t = beta_t * (1 - alpha_bar_{t-1}) / (1 - alpha_bar_t) arises from Bayes' rule applied to the Gaussian forward transitions. This quantity is used during the reverse sampling process to add the right amount of stochasticity when denoising from x_t to x_{t-1}.",
+            "code": "import torch\n\ndef compute_posterior_variance(betas, alpha_bar):\n    \"\"\"Compute posterior variance beta_tilde for each timestep.\"\"\"\n    alpha_bar_prev = torch.cat([torch.tensor([1.0]), alpha_bar[:-1]])\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "betas * (???) / (???)",
+                    "acceptable": ["betas * (1 - alpha_bar_prev) / (1 - alpha_bar)", "betas * (1.0 - alpha_bar_prev) / (1.0 - alpha_bar)"],
+                    "hint": "beta_tilde_t = beta_t * (1 - alpha_bar_{t-1}) / (1 - alpha_bar_t). Use alpha_bar_prev for alpha_bar_{t-1}."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_forward_variance",
+            "title": "Variance of x_t Given x_0",
+            "difficulty": "easy",
+            "description": "Compute the variance of x_t given x_0. Since x_t = sqrt(alpha_bar_t)*x_0 + sqrt(1-alpha_bar_t)*eps, the variance of the noise component is (1 - alpha_bar_t).",
+            "info": "When we sample x_t from x_0 using the reparameterization trick, the noise term is sqrt(1-alpha_bar_t)*epsilon where epsilon~N(0,I). The variance of this noise component is therefore (1-alpha_bar_t)*I. As t increases, alpha_bar_t decreases, so the variance grows from nearly 0 (at t=0, almost no noise) to nearly 1 (at t=T, almost pure unit-variance Gaussian noise). This monotonic increase in variance is what drives the forward process to gradually transform data into noise.",
+            "code": "import torch\n\ndef forward_process_variance(alpha_bar):\n    \"\"\"Return the variance of the noise in x_t given x_0.\"\"\"\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1 - ???",
+                    "acceptable": ["1 - alpha_bar", "1.0 - alpha_bar"],
+                    "hint": "The variance of x_t given x_0 is (1 - alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_noisy_image_viz",
+            "title": "Generate Noisy Images at Multiple Timesteps",
+            "difficulty": "medium",
+            "description": "Given an image x0, generate noisy versions at several timesteps using the closed-form forward process.",
+            "info": "Visualizing the forward process at different timesteps helps build intuition about how diffusion models work. At early timesteps, the image is barely corrupted and fine details start to blur. At middle timesteps, the overall structure is still visible but heavily noised. Near the final timestep T, the image is almost indistinguishable from pure Gaussian noise. This progressive corruption is exactly what the reverse process (the neural network) must learn to undo, step by step.",
+            "code": "import torch\n\ndef generate_noisy_images(x0, alpha_bar, timesteps):\n    \"\"\"Generate noisy versions of x0 at given timesteps.\n    Returns a list of noisy images.\"\"\"\n    noisy_images = []\n    for t in timesteps:\n        ab_t = alpha_bar[t]\n        noise = torch.randn_like(x0)\n        x_t = {{b1}} * x0 + {{b2}} * noise\n        noisy_images.append(x_t)\n    return noisy_images",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(ab_t)", "ab_t.sqrt()"],
+                    "hint": "Signal coefficient is sqrt(alpha_bar_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.sqrt(???)",
+                    "acceptable": ["torch.sqrt(1 - ab_t)", "torch.sqrt(1.0 - ab_t)", "(1 - ab_t).sqrt()", "(1.0 - ab_t).sqrt()"],
+                    "hint": "Noise coefficient is sqrt(1 - alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_gaussian_noise_numpy",
+            "title": "Gaussian Noise Sampling (NumPy)",
+            "difficulty": "easy",
+            "description": "Sample Gaussian noise with the same shape as an input image using NumPy.",
+            "info": "Gaussian (normal) noise is the fundamental building block of diffusion models. The forward process adds standard normal noise (mean=0, variance=1) at each step. In NumPy, np.random.randn returns samples from the standard normal distribution. The noise must match the shape of the input data so it can be added element-wise. Understanding how to sample and manipulate Gaussian noise is a prerequisite for implementing any diffusion model.",
+            "code": "import numpy as np\n\ndef sample_noise_like(x):\n    \"\"\"Sample standard Gaussian noise with the same shape as x.\"\"\"\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.random.???(???)",
+                    "acceptable": ["np.random.randn(*x.shape)", "np.random.standard_normal(x.shape)"],
+                    "hint": "Use np.random.randn with the shape of x unpacked, or np.random.standard_normal."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_full_schedule_pipeline",
+            "title": "Full Schedule Computation Pipeline",
+            "difficulty": "medium",
+            "description": "Compute all diffusion schedule quantities (betas, alphas, alpha_bar, sqrt_alpha_bar, sqrt_one_minus_alpha_bar) from a linear schedule.",
+            "info": "In practice, all schedule-related quantities are precomputed once and stored for use during training and sampling. This avoids redundant computation at each training step. The key derived quantities are: alphas (1-beta), alpha_bar (cumulative product of alphas), sqrt(alpha_bar) for scaling x_0, and sqrt(1-alpha_bar) for scaling noise. These precomputed tensors are typically registered as buffers in the PyTorch model so they move to the correct device automatically.",
+            "code": "import torch\n\ndef precompute_schedule(T, beta_start=1e-4, beta_end=0.02):\n    betas = torch.linspace(beta_start, beta_end, T)\n    alphas = {{b1}}\n    alpha_bar = {{b2}}\n    sqrt_alpha_bar = torch.sqrt(alpha_bar)\n    sqrt_one_minus_alpha_bar = torch.sqrt(1.0 - alpha_bar)\n    return betas, alphas, alpha_bar, sqrt_alpha_bar, sqrt_one_minus_alpha_bar",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "1.0 - ???",
+                    "acceptable": ["1.0 - betas", "1 - betas"],
+                    "hint": "alpha_t = 1 - beta_t."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.???(alphas, ???)",
+                    "acceptable": ["torch.cumprod(alphas, dim=0)", "torch.cumprod(alphas, 0)"],
+                    "hint": "alpha_bar is the cumulative product of alphas along dim 0."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_training_step",
+            "title": "DDPM Training Step",
+            "difficulty": "hard",
+            "description": "Implement a single training step for DDPM: sample random timesteps, add noise, predict noise, compute loss.",
+            "info": "Each DDPM training iteration involves: (1) sampling a batch of random timesteps uniformly from [0, T), (2) sampling Gaussian noise, (3) creating noisy inputs x_t using the reparameterization trick, (4) having the model predict the noise from x_t and t, and (5) computing MSE loss between true and predicted noise. The uniform sampling of timesteps ensures the model learns to denoise at all noise levels equally. This simple recipe -- combined with the architectural inductive biases of U-Net -- produces remarkably high-quality generative models.",
+            "code": "import torch\nimport torch.nn.functional as F\n\ndef train_step(model, optimizer, x0, sqrt_alpha_bar, sqrt_one_minus_alpha_bar, T):\n    batch_size = x0.shape[0]\n    t = {{b1}}\n    noise = torch.randn_like(x0)\n    \n    s_ab = sqrt_alpha_bar[t].reshape(-1, 1, 1, 1)\n    s_omab = sqrt_one_minus_alpha_bar[t].reshape(-1, 1, 1, 1)\n    x_t = s_ab * x0 + s_omab * noise\n    \n    pred_noise = model(x_t, t)\n    loss = {{b2}}\n    \n    optimizer.zero_grad()\n    loss.backward()\n    optimizer.step()\n    return loss.item()",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.randint(?, ?, (?,))",
+                    "acceptable": ["torch.randint(0, T, (batch_size,))", "torch.randint(0, T, (batch_size,), device=x0.device)"],
+                    "hint": "Sample random timesteps uniformly from 0 to T-1 for each item in the batch."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "F.???(noise, pred_noise)",
+                    "acceptable": ["F.mse_loss(noise, pred_noise)", "F.mse_loss(pred_noise, noise)"],
+                    "hint": "MSE loss between actual noise and predicted noise."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_posterior_mean",
+            "title": "Posterior Mean for Reverse Step",
+            "difficulty": "hard",
+            "description": "Compute the posterior mean mu_tilde(x_t, x_0) = (sqrt(alpha_bar_{t-1}) * beta_t / (1 - alpha_bar_t)) * x_0 + (sqrt(alpha_t) * (1 - alpha_bar_{t-1}) / (1 - alpha_bar_t)) * x_t.",
+            "info": "The posterior mean is a weighted combination of x_0 and x_t. It comes from applying Bayes' rule to the forward Gaussian transitions q(x_t|x_{t-1}) and q(x_{t-1}|x_0). The two coefficients trade off between the original data estimate and the current noisy observation. In practice, since we do not know x_0, we first estimate it from the predicted noise: x_0_hat = (x_t - sqrt(1-alpha_bar_t)*epsilon_theta) / sqrt(alpha_bar_t), then plug that into this formula. This is the core of the DDPM reverse sampling procedure.",
+            "code": "import torch\n\ndef posterior_mean(x0, x_t, alpha_bar_t, alpha_bar_t_prev, beta_t, alpha_t):\n    \"\"\"Compute posterior mean mu_tilde.\"\"\"\n    coeff_x0 = {{b1}}\n    coeff_xt = {{b2}}\n    return coeff_x0 * x0 + coeff_xt * x_t",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.sqrt(alpha_bar_t_prev) * ??? / ???",
+                    "acceptable": ["torch.sqrt(alpha_bar_t_prev) * beta_t / (1 - alpha_bar_t)", "torch.sqrt(alpha_bar_t_prev) * beta_t / (1.0 - alpha_bar_t)", "alpha_bar_t_prev.sqrt() * beta_t / (1 - alpha_bar_t)", "alpha_bar_t_prev.sqrt() * beta_t / (1.0 - alpha_bar_t)"],
+                    "hint": "Coefficient for x0: sqrt(alpha_bar_{t-1}) * beta_t / (1 - alpha_bar_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.sqrt(alpha_t) * ??? / ???",
+                    "acceptable": ["torch.sqrt(alpha_t) * (1 - alpha_bar_t_prev) / (1 - alpha_bar_t)", "torch.sqrt(alpha_t) * (1.0 - alpha_bar_t_prev) / (1.0 - alpha_bar_t)", "alpha_t.sqrt() * (1 - alpha_bar_t_prev) / (1 - alpha_bar_t)", "alpha_t.sqrt() * (1.0 - alpha_bar_t_prev) / (1.0 - alpha_bar_t)"],
+                    "hint": "Coefficient for x_t: sqrt(alpha_t) * (1 - alpha_bar_{t-1}) / (1 - alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_predict_x0_from_noise",
+            "title": "Predict x_0 from Predicted Noise",
+            "difficulty": "medium",
+            "description": "Given x_t and predicted noise epsilon_theta, recover the predicted x_0: x_0 = (x_t - sqrt(1 - alpha_bar_t) * epsilon_theta) / sqrt(alpha_bar_t).",
+            "info": "Since x_t = sqrt(alpha_bar_t)*x_0 + sqrt(1-alpha_bar_t)*epsilon, we can algebraically solve for x_0 once we have an estimate of epsilon. The model predicts epsilon_theta, so x_0_hat = (x_t - sqrt(1-alpha_bar_t)*epsilon_theta) / sqrt(alpha_bar_t). This predicted x_0 is used in the reverse sampling process to compute the posterior mean. In practice, the predicted x_0 is often clipped to [-1, 1] to improve stability, since the true data lies in that range for normalized images.",
+            "code": "import torch\n\ndef predict_x0(x_t, predicted_noise, alpha_bar_t):\n    \"\"\"Recover x_0 estimate from x_t and predicted noise.\"\"\"\n    return {{b1}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "(x_t - ???) / ???",
+                    "acceptable": ["(x_t - torch.sqrt(1 - alpha_bar_t) * predicted_noise) / torch.sqrt(alpha_bar_t)", "(x_t - torch.sqrt(1.0 - alpha_bar_t) * predicted_noise) / torch.sqrt(alpha_bar_t)", "(x_t - (1 - alpha_bar_t).sqrt() * predicted_noise) / alpha_bar_t.sqrt()", "(x_t - (1.0 - alpha_bar_t).sqrt() * predicted_noise) / alpha_bar_t.sqrt()"],
+                    "hint": "x_0 = (x_t - sqrt(1 - alpha_bar_t) * eps_theta) / sqrt(alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_numpy_forward_process",
+            "title": "Forward Process in NumPy",
+            "difficulty": "easy",
+            "description": "Implement the forward diffusion reparameterization in NumPy: x_t = sqrt(alpha_bar_t) * x0 + sqrt(1 - alpha_bar_t) * epsilon.",
+            "info": "Implementing the forward process in NumPy helps solidify the mathematical foundation without the abstraction of PyTorch tensors. The formula x_t = sqrt(alpha_bar_t)*x_0 + sqrt(1-alpha_bar_t)*epsilon is the same regardless of framework. Using NumPy is useful for prototyping, visualization, and understanding the math. The key numpy function np.sqrt computes element-wise square roots, and np.random.randn samples from the standard normal distribution.",
+            "code": "import numpy as np\n\ndef forward_diffusion_numpy(x0, alpha_bar_t):\n    \"\"\"Add noise to x0 at level determined by alpha_bar_t.\"\"\"\n    noise = np.random.randn(*x0.shape)\n    x_t = {{b1}} * x0 + {{b2}} * noise\n    return x_t, noise",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "np.sqrt(???)",
+                    "acceptable": ["np.sqrt(alpha_bar_t)"],
+                    "hint": "Signal scaling: sqrt(alpha_bar_t)."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "np.sqrt(???)",
+                    "acceptable": ["np.sqrt(1 - alpha_bar_t)", "np.sqrt(1.0 - alpha_bar_t)"],
+                    "hint": "Noise scaling: sqrt(1 - alpha_bar_t)."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_timestep_embedding",
+            "title": "Sinusoidal Timestep Embedding",
+            "difficulty": "hard",
+            "description": "Create sinusoidal positional embeddings for diffusion timesteps, similar to Transformer positional encodings.",
+            "info": "Diffusion models need to condition on the timestep t so the network knows the current noise level. Sinusoidal embeddings, borrowed from the Transformer architecture, map integer timesteps to continuous vector representations. Even dimensions use sin and odd dimensions use cos, with frequencies that decrease geometrically. This gives the model a smooth, continuous representation of time that generalizes across timesteps. The embedding dimension is typically matched to the model's hidden dimension (e.g., 128 or 256).",
+            "code": "import torch\nimport math\n\ndef sinusoidal_embedding(t, dim):\n    \"\"\"Create sinusoidal timestep embeddings.\n    t: (batch_size,) integer timesteps\n    dim: embedding dimension (must be even)\n    \"\"\"\n    half_dim = dim // 2\n    emb_scale = {{b1}} / (half_dim - 1)\n    emb = torch.exp(torch.arange(half_dim, dtype=torch.float32) * -emb_scale)\n    emb = t[:, None].float() * emb[None, :]\n    return {{b2}}",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "math.log(???)",
+                    "acceptable": ["math.log(10000)", "math.log(10000.0)", "math.log(10000.)"],
+                    "hint": "Use log(10000) as the base frequency, same as in Transformers."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "torch.cat([torch.???(emb), torch.???(emb)], dim=-1)",
+                    "acceptable": ["torch.cat([torch.sin(emb), torch.cos(emb)], dim=-1)", "torch.cat([torch.sin(emb), torch.cos(emb)], dim=1)"],
+                    "hint": "Concatenate sin and cos of the scaled timesteps along the last dimension."
+                }
+            ]
+        },
+        {
+            "id": "diff_basics_compare_schedules",
+            "title": "Compare Linear and Cosine Schedules",
+            "difficulty": "hard",
+            "description": "Compute and compare alpha_bar values for both linear and cosine schedules to observe their different noise progression profiles.",
+            "info": "Comparing schedules reveals their fundamentally different noise progression profiles. The linear schedule's alpha_bar drops quickly at first (destroying fine details early) and flattens near the end. The cosine schedule provides a much more uniform decrease, preserving signal longer at early timesteps. This can be quantified by looking at the SNR at various points: the cosine schedule maintains higher SNR at early timesteps and decreases more smoothly. In practice, the cosine schedule produces better FID scores because the model can effectively learn at more timesteps.",
+            "code": "import torch\nimport math\n\ndef compare_schedules(T=1000):\n    # Linear schedule\n    betas_lin = torch.linspace(1e-4, 0.02, T)\n    alphas_lin = 1.0 - betas_lin\n    alpha_bar_lin = {{b1}}\n    \n    # Cosine schedule\n    steps = torch.arange(T + 1, dtype=torch.float32)\n    f = torch.cos((steps / T + 0.008) / 1.008 * math.pi / 2) ** 2\n    alpha_bar_cos = {{b2}}\n    \n    return alpha_bar_lin, alpha_bar_cos[:T]",
+            "blanks": [
+                {
+                    "id": "b1",
+                    "placeholder": "torch.???(alphas_lin, dim=0)",
+                    "acceptable": ["torch.cumprod(alphas_lin, dim=0)", "torch.cumprod(alphas_lin, 0)"],
+                    "hint": "Cumulative product of alphas gives alpha_bar."
+                },
+                {
+                    "id": "b2",
+                    "placeholder": "f[???:] / f[0]",
+                    "acceptable": ["f[1:] / f[0]"],
+                    "hint": "Normalize f by f[0] and skip the first element to get T values."
+                }
+            ]
+        }
+    ]
+}

@@ -6,12 +6,16 @@
             "title": "Basic Conv2d Layer",
             "difficulty": "easy",
             "description": "Define a Conv2d layer in PyTorch: 3 input channels (RGB), 16 output filters, 3x3 kernel, padding=1.",
+            "info": "Convolutional layers are the building blocks of CNNs, applying learnable spatial filters to detect local patterns like edges, textures, and shapes. A Conv2d layer with 3 input channels (RGB) and 16 output filters applies 16 different 3x3 kernels across the image, producing 16 feature maps. Using padding=1 with a 3x3 kernel preserves the spatial dimensions (same padding), which simplifies architecture design. Each filter learns to detect a different feature, and the parameter count is much smaller than a fully connected layer: only 3*16*3*3 + 16 = 448 parameters versus millions for a fully connected alternative.",
             "code": "import torch.nn as nn\n\nconv = {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "nn.???(?, ?, ?, padding=?)",
-                    "acceptable": ["nn.Conv2d(3, 16, 3, padding=1)", "nn.Conv2d(3, 16, kernel_size=3, padding=1)"],
+                    "acceptable": [
+                        "nn.Conv2d(3, 16, 3, padding=1)",
+                        "nn.Conv2d(3, 16, kernel_size=3, padding=1)"
+                    ],
                     "hint": "nn.Conv2d(in_channels, out_channels, kernel_size, padding)."
                 }
             ]
@@ -21,12 +25,16 @@
             "title": "Conv Output Size Formula",
             "difficulty": "medium",
             "description": "Complete the formula to compute the output spatial dimension after a convolution. Input size=H, kernel=K, padding=P, stride=S.",
+            "info": "Computing the output spatial dimensions of a convolutional layer is essential for correctly connecting layers and avoiding shape mismatches. The formula O = (H + 2P - K) / S + 1 accounts for how the kernel slides across the input: padding P adds border pixels, kernel size K determines the receptive field, and stride S controls the step size. For example, a 32x32 input with a 5x5 kernel, no padding, and stride 1 yields a 28x28 output. This formula is one of the most frequently used calculations when designing CNN architectures.",
             "code": "def conv_output_size(H, K, P, S):\n    return {{b1}}",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "(H + ??? - K) // S + 1",
-                    "acceptable": ["(H + 2 * P - K) // S + 1", "(H + 2*P - K) // S + 1"],
+                    "acceptable": [
+                        "(H + 2 * P - K) // S + 1",
+                        "(H + 2*P - K) // S + 1"
+                    ],
                     "hint": "Output = (H + 2P - K) / S + 1."
                 }
             ]
@@ -36,30 +44,46 @@
             "title": "Simple CNN Classifier",
             "difficulty": "hard",
             "description": "Build a simple CNN: Conv2d(1,32,3) -> ReLU -> MaxPool2d(2) -> Flatten -> Linear to 10 classes. Input is 28x28 grayscale (MNIST-like). After conv+pool the spatial size is 13x13.",
+            "info": "This simple CNN illustrates the classic pattern of convolutional feature extraction followed by fully connected classification. The Conv2d layer detects spatial features, ReLU adds non-linearity, and MaxPool2d reduces spatial dimensions by half while retaining the strongest activations. The critical step of flattening reshapes the 3D feature maps (channels x height x width) into a 1D vector for the fully connected layer. Computing the correct flattened dimension (32 * 13 * 13 = 5408) requires tracking spatial dimensions through each layer, a common source of bugs in CNN implementations.",
             "code": "import torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass SimpleCNN(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.conv1 = {{b1}}\n        self.pool = {{b2}}\n        self.fc1 = {{b3}}\n\n    def forward(self, x):\n        x = self.pool(F.relu(self.conv1(x)))\n        x = {{b4}}\n        x = self.fc1(x)\n        return x",
             "blanks": [
                 {
                     "id": "b1",
                     "placeholder": "nn.???(?, ?, ?)",
-                    "acceptable": ["nn.Conv2d(1, 32, 3)", "nn.Conv2d(1, 32, kernel_size=3)"],
+                    "acceptable": [
+                        "nn.Conv2d(1, 32, 3)",
+                        "nn.Conv2d(1, 32, kernel_size=3)"
+                    ],
                     "hint": "1 input channel (grayscale), 32 output filters, 3x3 kernel."
                 },
                 {
                     "id": "b2",
                     "placeholder": "nn.???(?, ?)",
-                    "acceptable": ["nn.MaxPool2d(2, 2)", "nn.MaxPool2d(2)"],
+                    "acceptable": [
+                        "nn.MaxPool2d(2, 2)",
+                        "nn.MaxPool2d(2)"
+                    ],
                     "hint": "2x2 max pooling."
                 },
                 {
                     "id": "b3",
                     "placeholder": "nn.???(?, ?)",
-                    "acceptable": ["nn.Linear(32 * 13 * 13, 10)", "nn.Linear(5408, 10)"],
+                    "acceptable": [
+                        "nn.Linear(32 * 13 * 13, 10)",
+                        "nn.Linear(5408, 10)"
+                    ],
                     "hint": "After conv(28->26) and pool(26->13): 32 channels * 13 * 13 = 5408 features -> 10 classes."
                 },
                 {
                     "id": "b4",
                     "placeholder": "x.???(?, ?)",
-                    "acceptable": ["x.view(-1, 32 * 13 * 13)", "x.view(-1, 5408)", "x.reshape(-1, 32 * 13 * 13)", "x.reshape(-1, 5408)", "torch.flatten(x, 1)"],
+                    "acceptable": [
+                        "x.view(-1, 32 * 13 * 13)",
+                        "x.view(-1, 5408)",
+                        "x.reshape(-1, 32 * 13 * 13)",
+                        "x.reshape(-1, 5408)",
+                        "torch.flatten(x, 1)"
+                    ],
                     "hint": "Flatten all spatial dims while keeping batch dim."
                 }
             ]
